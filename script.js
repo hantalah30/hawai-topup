@@ -7,12 +7,12 @@ const API_URL = "http://localhost:3000/api";
 
 const ASSETS = {
   "Mobile Legends": {
-    banner: "assets/ml-banner.png",
-    logo: "assets/lance2.png",
+    banner: "assets/lance-banner.jpg",
+    logo: "assets/lance.png",
     color: "#00f3ff",
     icons: {
-      member: "assets/wdp.png",
-      diamond: "assets/dm.png",
+      member: "https://cdn-icons-png.flaticon.com/512/6532/6532936.png",
+      diamond: "https://cdn-icons-png.flaticon.com/512/3914/3914438.png",
     },
   },
   "Free Fire": {
@@ -472,16 +472,13 @@ const App = {
   },
 };
 
-// --- TERMINAL LOGIC (UPDATED FOR TRIPAY) ---
 const Terminal = {
   process: async () => {
     const { selectedItem } = App.state;
     const uid = document.getElementById("uid").value;
     const zone = document.getElementById("zone").value;
-    const name = App.state.nickname || "Guest";
-
     if (!uid || !selectedItem) {
-      alert("PILIH ITEM & ISI DATA DULU!");
+      alert("DATA INCOMPLETE");
       return;
     }
 
@@ -500,13 +497,11 @@ const Terminal = {
         }, d),
       );
 
-    await type("INITIATING SECURE PROTOCOL...", 100);
-    await type(`USER: ${name} (${uid})`, 300);
-    await type(`ITEM: ${selectedItem.name}`, 300);
-    await type("REQUESTING TRIPAY GATEWAY...", 600);
+    await type("ESTABLISHING SECURE HANDSHAKE...", 100);
+    await type(`TARGET: ${uid}`, 300);
+    await type(`PACKET: ${selectedItem.name}`, 300);
 
     try {
-      // KIRIM REQUEST KE SERVER.JS
       const res = await fetch(`${API_URL}/transaction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -515,67 +510,47 @@ const Terminal = {
           uid: uid,
           zone: zone,
           price: selectedItem.price,
-          name: selectedItem.name, // Kirim nama item untuk Invoice Tripay
         }),
       });
       const data = await res.json();
-
-      if (data.error) throw new Error(data.error);
-
       App.state.refId = data.ref_id;
 
       await type(`INVOICE: ${data.ref_id}`, 200);
-      await type(`AMOUNT: Rp ${data.amount.toLocaleString()}`, 200);
-      await type(`QRIS GENERATED. WAITING FOR PAYMENT...`, 200);
+      await type(`QR MATRIX GENERATED.`, 200);
 
-      // TAMPILKAN QRIS DARI TRIPAY
-      con.innerHTML += `
-                <div style="text-align:center; margin:20px; background:#fff; padding:10px; border-radius:10px; display:inline-block">
-                    <img src="${data.qr_image}" width="180" style="display:block">
-                    <div style="color:#000; font-weight:bold; margin-top:5px; font-size:12px">SCAN QRIS</div>
-                </div>
-                <div style="text-align:center">
-                    <a href="${data.checkout_url}" target="_blank" style="color:var(--primary); text-decoration:none; border:1px solid var(--primary); padding:5px 10px; border-radius:5px; font-size:12px">BUKA HALAMAN PEMBAYARAN &gt;</a>
-                </div>
-                <div style="margin-top:20px; color:#666; font-size:10px; text-align:center">AUTO-CHECKING STATUS...</div>
-            `;
+      con.innerHTML += `<div style="text-align:center; margin:20px;"><img src="${data.qr_image}" width="180" style="border:5px solid #fff; border-radius:10px"></div>`;
+      con.innerHTML += `<button onclick="Terminal.payTest('${data.ref_id}')" style="width:100%; padding:15px; background:red; color:#fff; border:none; cursor:pointer; font-weight:bold; font-family:var(--font-hud)">[DEV] FORCE SUCCESS</button>`;
 
-      // MULAI POLLING STATUS OTOMATIS
       Terminal.poll();
     } catch (e) {
-      type(`FATAL ERROR: ${e.message}`, 0);
+      type("FATAL ERROR: CONNECTION REFUSED", 0);
     }
   },
 
+  payTest: async (id) => {
+    await fetch(`${API_URL}/process-topup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ref_id: id }),
+    });
+  },
+
   poll: () => {
-    // Cek status setiap 3 detik
     const int = setInterval(async () => {
       if (!App.state.refId) {
         clearInterval(int);
         return;
       }
-
-      try {
-        const res = await fetch(`${API_URL}/status/${App.state.refId}`);
-        const data = await res.json();
-
-        // Jika status sudah PAID / SUCCESS
-        if (data.status === "PAID" || data.status === "SUCCESS") {
-          clearInterval(int);
-          Sound.success();
-          document.getElementById("modal-terminal").classList.add("hidden");
-          Receipt.show({
-            ...App.state.selectedItem,
-            uid: document.getElementById("uid").value,
-            sn: data.sn || "PROCESSED",
-          });
-        } else if (data.status === "FAILED") {
-          clearInterval(int);
-          alert("Pembayaran Gagal / Expired");
-          location.reload();
-        }
-      } catch (e) {
-        console.log("Polling...");
+      const res = await fetch(`${API_URL}/status/${App.state.refId}`);
+      const data = await res.json();
+      if (data.status === "SUCCESS") {
+        clearInterval(int);
+        Sound.success();
+        document.getElementById("modal-terminal").classList.add("hidden");
+        Receipt.show({
+          ...App.state.selectedItem,
+          uid: document.getElementById("uid").value,
+        });
       }
     }, 3000);
   },
@@ -587,8 +562,7 @@ const Receipt = {
     document.getElementById("receipt-data").innerHTML = `
             <div class="rc-row"><span>ITEM</span><span>${data.name}</span></div>
             <div class="rc-row"><span>UID</span><span>${data.uid}</span></div>
-            <div class="rc-row"><span>STATUS</span><span style="color:#0f0">SUCCESS</span></div>
-            <div class="rc-row" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px"><span>SN/BUKTI</span><span style="font-size:10px">${data.sn}</span></div>
+            <div class="rc-row" style="margin-top:10px; font-weight:bold; color:var(--primary); font-size:16px;"><span>TOTAL</span><span>Rp ${data.price.toLocaleString()}</span></div>
         `;
   },
   close: () => {
@@ -597,38 +571,60 @@ const Receipt = {
   },
 };
 
+// --- 3D ENGINE ---
 const World = {
   init: () => {
-    const c = document.getElementById("webgl-canvas");
-    if (!c) return;
-    const s = new THREE.Scene();
-    s.fog = new THREE.FogExp2(0x020203, 0.02);
-    const cam = new THREE.PerspectiveCamera(
+    const cvs = document.getElementById("webgl-canvas");
+    if (!cvs) return;
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020203, 0.025);
+    const camera = new THREE.PerspectiveCamera(
       70,
       window.innerWidth / window.innerHeight,
       0.1,
       1000,
     );
-    cam.position.set(0, 3, 10);
-    const r = new THREE.WebGLRenderer({ canvas: c, alpha: true });
-    r.setSize(window.innerWidth, window.innerHeight);
-    const g = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200, 60, 60),
-      new THREE.MeshBasicMaterial({
-        color: 0x00f3ff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.1,
-      }),
+    camera.position.set(0, 3, 10);
+    const renderer = new THREE.WebGLRenderer({ canvas: cvs, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const gridGeo = new THREE.PlaneGeometry(200, 200, 60, 60);
+    const gridMat = new THREE.MeshBasicMaterial({
+      color: 0x00f3ff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.15,
+    });
+    const grid = new THREE.Mesh(gridGeo, gridMat);
+    grid.rotation.x = -Math.PI / 2;
+    scene.add(grid);
+
+    // Less particles on mobile
+    const isMobile = window.innerWidth < 768;
+    const starGeo = new THREE.BufferGeometry();
+    const count = isMobile ? 300 : 1000;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 120;
+    starGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const stars = new THREE.Points(
+      starGeo,
+      new THREE.PointsMaterial({ color: 0xff0055, size: 0.1 }),
     );
-    g.rotation.x = -Math.PI / 2;
-    s.add(g);
-    function a() {
-      requestAnimationFrame(a);
-      g.position.z = (Date.now() * 0.005) % 2;
-      r.render(s, cam);
+    scene.add(stars);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      grid.position.z = (Date.now() * 0.005) % 3;
+      stars.rotation.y += 0.0005;
+      renderer.render(scene, camera);
     }
-    a();
+    animate();
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   },
 };
+
 window.onload = App.init;
