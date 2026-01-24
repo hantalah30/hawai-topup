@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>HAWAI | SYSTEM OVERRIDE</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Syncopate:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="webgl-canvas"></canvas>
+    <div class="fx-scanlines"></div>
+    <div class="fx-noise"></div>
+    <div class="fx-vignette"></div>
+
+    <div class="cursor-dot"></div>
+    <div class="cursor-ring"></div>
+
+    <div id="boot-layer">
+      <div class="boot-content">
+        <div class="boot-logo">HAWAI <span class="accent">OMEGA</span></div>
+        <div class="boot-bar-track">
+          <div class="boot-bar" id="boot-bar"></div>
+        </div>
+        <div class="boot-status" id="boot-status">
+          INITIALIZING NEURAL NET...
+        </div>
+      </div>
+    </div>
+
+    <div id="app-interface">
+      <header class="cyber-header">
+        <div class="header-inner">
+          <div class="brand" onclick="App.router('home')">
+            <div class="brand-logo">H</div>
+            <div class="brand-txt">
+              <span class="b-title">HAWAI</span>
+              <span class="b-ver">SYS.10</span>
+            </div>
+          </div>
+          <div class="desktop-nav desktop-only">
+            <div class="nav-item">
+              SERVER: <span class="text-neon">ONLINE</span>
+            </div>
+            <div class="nav-item">
+              PING: <span class="text-green">12ms</span>
+            </div>
+          </div>
+          <div class="mobile-refresh mobile-only" onclick="location.reload()">
+            <i class="fas fa-bolt"></i>
+          </div>
+        </div>
+      </header>
+
+      <main id="viewport"></main>
+
+      <nav class="dock-wrapper">
+        <div class="dock">
+          <div
+            class="dock-btn active"
+            data-page="home"
+            onclick="App.router('home')"
+          >
+            <i class="fas fa-th-large"></i>
+            <span class="dock-lbl">HOME</span>
+          </div>
+          <div
+            class="dock-btn"
+            data-page="history"
+            onclick="App.router('history')"
+          >
+            <i class="fas fa-history"></i>
+            <span class="dock-lbl">LOGS</span>
+          </div>
+          <div class="dock-sep desktop-only"></div>
+          <div class="dock-btn desktop-only" onclick="location.reload()">
+            <i class="fas fa-power-off text-red"></i>
+            <span class="dock-lbl">EXIT</span>
+          </div>
+        </div>
+      </nav>
+
+      <div id="modal-terminal" class="modal hidden">
+        <div class="terminal-window">
+          <div class="term-head">
+            <div class="traffic-lights">
+              <span class="red"></span><span class="yellow"></span
+              ><span class="green"></span>
+            </div>
+            <div class="term-title">SECURE_GATEWAY.exe</div>
+          </div>
+          <div class="term-body" id="term-log"></div>
+        </div>
+      </div>
+
+      <div id="modal-receipt" class="modal hidden">
+        <div class="receipt-card">
+          <div class="receipt-icon"><i class="fas fa-check"></i></div>
+          <h2>PAYMENT SUCCESS</h2>
+          <div id="receipt-data" class="receipt-content"></div>
+          <button class="btn-glitch full" onclick="Receipt.close()">
+            DISMISS
+          </button>
+        </div>
+      </div>
+
+      <div id="sticky-pay" class="sticky-pay hidden mobile-only">
+        <div class="sp-info">
+          <span id="sp-item">Select Item</span>
+          <span id="sp-price" class="text-neon">Rp 0</span>
+        </div>
+        <button class="sp-btn" onclick="Terminal.process()">PAY NOW</button>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
