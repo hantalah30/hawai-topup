@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Invoice Premium - Hawai Omega</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+
+    <style>
+      :root {
+        --primary: #00f3ff;
+        --secondary: #7000ff;
+        --bg-dark: #050507;
+        --panel-bg: #0f0f13;
+        --border: rgba(255, 255, 255, 0.08);
+      }
+
+      body {
+        background-color: #000;
+        color: #fff;
+        font-family: "Segoe UI", sans-serif;
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* --- LAYOUT UTAMA --- */
+      .invoice-layout {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        max-width: 1300px;
+        max-height: 850px;
+        background: var(--bg-dark);
+        border-radius: 25px;
+        overflow: hidden;
+        box-shadow: 0 0 80px rgba(0, 243, 255, 0.05);
+        position: relative;
+        opacity: 0;
+        animation: fadeIn 0.8s forwards;
+      }
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* --- SISI VISUAL (KIRI) --- */
+      .visual-side {
+        flex: 4;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        z-index: 1;
+      }
+
+      /* Background Image & Effects */
+      .visual-bg {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: center;
+        filter: brightness(0.6);
+        transition: transform 10s ease;
+        z-index: -2;
+      }
+      .visual-side:hover .visual-bg {
+        transform: scale(1.1);
+      }
+
+      /* Overlay Gradient */
+      .visual-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to right,
+          rgba(5, 5, 7, 0.8),
+          rgba(5, 5, 7, 0.3)
+        );
+        z-index: -1;
+      }
+
+      /* Scanline Effect */
+      .scanlines {
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0),
+          rgba(255, 255, 255, 0) 50%,
+          rgba(0, 0, 0, 0.2) 50%,
+          rgba(0, 0, 0, 0.2)
+        );
+        background-size: 100% 4px;
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* 3D Logo Wrapper */
+      .logo-container {
+        perspective: 1000px;
+        margin-bottom: 20px;
+      }
+      .game-logo-large {
+        width: 140px;
+        height: 140px;
+        border-radius: 30px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        transition: transform 0.1s;
+        background: #000;
+      }
+
+      .game-title-large {
+        font-size: 3.5rem;
+        font-weight: 900;
+        line-height: 1;
+        text-transform: uppercase;
+        text-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+        margin-bottom: 10px;
+        position: relative;
+      }
+
+      /* --- SISI DETAIL (KANAN) --- */
+      .detail-side {
+        flex: 5;
+        background: var(--panel-bg);
+        padding: 40px 50px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--border);
+      }
+
+      /* Scrollbar Halus */
+      .detail-side::-webkit-scrollbar {
+        width: 6px;
+      }
+      .detail-side::-webkit-scrollbar-track {
+        background: var(--bg-dark);
+      }
+      .detail-side::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 3px;
+      }
+
+      /* --- TIMELINE (STEPPER) --- */
+      .stepper-wrapper {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        position: relative;
+      }
+      .stepper-wrapper::before {
+        content: "";
+        position: absolute;
+        top: 15px;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: #333;
+        z-index: 0;
+      }
+      .stepper-item {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        width: 33%;
+      }
+      .step-counter {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #333;
+        color: #888;
+        margin: 0 auto 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        border: 2px solid var(--bg-dark);
+        transition: 0.3s;
+      }
+      .step-name {
+        font-size: 0.8rem;
+        color: #666;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      /* Active Step */
+      .stepper-item.active .step-counter {
+        background: var(--primary);
+        color: #000;
+        box-shadow: 0 0 15px var(--primary);
+      }
+      .stepper-item.active .step-name {
+        color: #fff;
+      }
+      .stepper-item.completed .step-counter {
+        background: #00ff00;
+        color: #000;
+      }
+
+      /* --- INFO BOX --- */
+      .info-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 20px;
+      }
+      .row-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+        font-size: 0.95rem;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+        padding-bottom: 10px;
+      }
+      .row-item:last-child {
+        border: 0;
+        margin: 0;
+        padding: 0;
+      }
+      .lbl {
+        color: #888;
+      }
+      .val {
+        font-weight: 600;
+      }
+
+      /* --- PAYMENT AREA --- */
+      .payment-zone {
+        background: #fff;
+        color: #000;
+        border-radius: 20px;
+        padding: 30px;
+        text-align: center;
+        margin-top: auto;
+        position: relative;
+        overflow: hidden;
+      }
+      .payment-zone::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+      }
+
+      .qr-box {
+        background: #fff;
+        padding: 10px;
+        border-radius: 15px;
+        display: inline-block;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      .va-display {
+        font-family: monospace;
+        font-size: 2.2rem;
+        font-weight: 800;
+        letter-spacing: 2px;
+        color: #333;
+        margin: 15px 0;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .va-display:hover {
+        color: var(--primary);
+        transform: scale(1.05);
+      }
+      .va-display:active {
+        transform: scale(0.95);
+      }
+
+      /* --- MOBILE MODE --- */
+      @media (max-width: 768px) {
+        body {
+          display: block;
+          overflow-y: auto;
+          height: auto;
+        }
+        .invoice-layout {
+          flex-direction: column;
+          border-radius: 0;
+          height: auto;
+          max-height: none;
+        }
+
+        .visual-side {
+          height: 280px;
+          padding: 20px;
+          justify-content: flex-end;
+        }
+        .visual-bg {
+          filter: brightness(0.5);
+        }
+        .game-logo-large {
+          width: 80px;
+          height: 80px;
+          border-radius: 20px;
+          margin-bottom: 10px;
+        }
+        .game-title-large {
+          font-size: 2rem;
+        }
+
+        .detail-side {
+          padding: 30px 20px;
+          border-top-left-radius: 30px;
+          border-top-right-radius: 30px;
+          margin-top: -30px;
+          border-top: 1px solid var(--primary);
+          min-height: 70vh;
+        }
+        .payment-zone {
+          border-radius: 15px;
+          padding: 20px;
+        }
+        .va-display {
+          font-size: 1.6rem;
+        }
+      }
+
+      #loader {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loader">
+      <div class="text-center">
+        <i class="fas fa-circle-notch fa-spin fa-3x text-info mb-3"></i>
+        <div class="small fw-bold text-secondary">LOADING DATA...</div>
+      </div>
+    </div>
+
+    <div class="invoice-layout">
+      <div class="visual-side">
+        <div class="visual-bg" id="bgImg"></div>
+        <div class="visual-overlay"></div>
+        <div class="scanlines"></div>
+
+        <div class="logo-container" id="logoWrap">
+          <img src="" id="gameLogo" class="game-logo-large" />
+        </div>
+
+        <div id="gameTitle" class="game-title-large">GAME</div>
+        <div class="text-secondary small font-monospace" id="refIdSmall">
+          TRX-...
+        </div>
+      </div>
+
+      <div class="detail-side">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h4 class="m-0 fw-bold">Rincian Pesanan</h4>
+          <a
+            href="index.html"
+            class="btn btn-outline-secondary btn-sm rounded-pill px-3"
+            ><i class="fas fa-arrow-left"></i> Home</a
+          >
+        </div>
+
+        <div class="stepper-wrapper">
+          <div class="stepper-item completed">
+            <div class="step-counter"><i class="fas fa-check"></i></div>
+            <div class="step-name">Dibuat</div>
+          </div>
+          <div class="stepper-item active" id="stepPay">
+            <div class="step-counter">2</div>
+            <div class="step-name">Bayar</div>
+          </div>
+          <div class="stepper-item" id="stepDone">
+            <div class="step-counter">3</div>
+            <div class="step-name">Selesai</div>
+          </div>
+        </div>
+
+        <div
+          id="alertBox"
+          class="alert alert-warning border-0 text-center mb-4 py-2 small fw-bold"
+        >
+          <i class="fas fa-clock me-1"></i> Selesaikan dalam:
+          <span id="timer" class="fs-6 ms-1 text-dark">--:--:--</span>
+        </div>
+
+        <div class="info-card">
+          <div class="row-item">
+            <span class="lbl">Item</span>
+            <span class="val text-white" id="dItem">...</span>
+          </div>
+          <div class="row-item">
+            <span class="lbl">ID / Nick</span>
+            <span class="val text-end">
+              <span id="dUid">...</span><br />
+              <span class="text-success small" id="dNick">...</span>
+            </span>
+          </div>
+          <div class="row-item">
+            <span class="lbl">Metode</span>
+            <span class="val text-info" id="dMethod">...</span>
+          </div>
+          <div
+            class="row-item border-0 pt-2 mt-2"
+            style="border-top: 1px solid #333 !important"
+          >
+            <span class="lbl">Total Tagihan</span>
+            <span class="val fs-4 text-warning" id="dTotal">Rp 0</span>
+          </div>
+        </div>
+
+        <div id="paymentArea" class="payment-zone"></div>
+      </div>
+    </div>
+
+    <script src="invoice.js"></script>
+  </body>
+</html>

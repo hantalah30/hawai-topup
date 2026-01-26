@@ -1,0 +1,395 @@
+{
+  "config": {
+    "tripay": {
+      "merchant_code": "T31542",
+      "api_key": "DEV-q99LEtL0voi972heK1hBC2RY9k4vSzhor5nmMPm9",
+      "private_key": "gQsgg-PuIZf-xittx-4GKTx-mlfOs"
+    },
+    "digiflazz": {
+      "username": "tifohugK4d1o",
+      "api_key": "905819dd-1418-5f26-b737-0e46768db5c7"
+    },
+    "admin_password": "admin"
+  },
+  "assets": {
+    "sliders": [
+      "assets/slider1.png",
+      "assets/slider2.png",
+      "assets/slider3.png"
+    ],
+    "banners": {
+      "Mobile Legends": "assets/ml-banner.png",
+      "Free Fire": "assets/ff-banner.jpg"
+    }
+  },
+  "products": [
+    {
+      "sku": "112DM",
+      "name": "MOBILELEGEND - 112 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 29139,
+      "markup": 1000,
+      "price_sell": 30139,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "12DM",
+      "name": "MOBILELEGEND - 12 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 3775,
+      "markup": 1000,
+      "price_sell": 4775,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "19DM",
+      "name": "MOBILELEGEND - 19 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 5295,
+      "markup": 1000,
+      "price_sell": 6295,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "2002K",
+      "name": "DANA 200.000",
+      "brand": "DANA",
+      "category": "E-Money",
+      "price_modal": 200150,
+      "markup": 1000,
+      "price_sell": 201150,
+      "image": "assets/default.png",
+      "is_active": false
+    },
+    {
+      "sku": "200k",
+      "name": "Go Pay 200.000",
+      "brand": "GO PAY",
+      "category": "E-Money",
+      "price_modal": 200795,
+      "markup": 1000,
+      "price_sell": 201795,
+      "image": "assets/default.png",
+      "is_active": false
+    },
+    {
+      "sku": "240DM",
+      "name": "MOBILELEGEND - 240 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 60972,
+      "markup": 1000,
+      "price_sell": 61972,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "277DM",
+      "name": "MOBILELEGEND - 277 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 71130,
+      "markup": 1000,
+      "price_sell": 72130,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "28DM",
+      "name": "MOBILELEGEND - 28 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 7550,
+      "markup": 1000,
+      "price_sell": 8550,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "296DM",
+      "name": "MOBILELEGEND - 296 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 76182,
+      "markup": 1000,
+      "price_sell": 77182,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "305DM",
+      "name": "MOBILELEGEND - 305 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 77960,
+      "markup": 1000,
+      "price_sell": 78960,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "36DM",
+      "name": "MOBILELEGEND - 36 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 9479,
+      "markup": 1000,
+      "price_sell": 10479,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "3DM",
+      "name": "MOBILELEGEND - 3 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 1007,
+      "markup": 1000,
+      "price_sell": 2007,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "44DM",
+      "name": "MOBILELEGEND - 44 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 12510,
+      "markup": 1000,
+      "price_sell": 13510,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "500DM",
+      "name": "MOBILELEGEND - 500 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 127023,
+      "markup": 1000,
+      "price_sell": 128023,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "50K",
+      "name": "DANA 50.000",
+      "brand": "DANA",
+      "category": "E-Money",
+      "price_modal": 50150,
+      "markup": 1000,
+      "price_sell": 51150,
+      "image": "assets/default.png",
+      "is_active": false
+    },
+    {
+      "sku": "514DM",
+      "name": "MOBILELEGEND - 514 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 130389,
+      "markup": 1000,
+      "price_sell": 131389,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "59DM",
+      "name": "MOBILELEGEND - 59 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 15380,
+      "markup": 1000,
+      "price_sell": 16380,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "74DM",
+      "name": "MOBILELEGEND - 74 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 19480,
+      "markup": 1000,
+      "price_sell": 20480,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "792DM",
+      "name": "MOBILELEGEND - 792 Diamond",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 198432,
+      "markup": 1000,
+      "price_sell": 199432,
+      "image": "assets/1769446306980.png",
+      "is_active": true
+    },
+    {
+      "sku": "NM",
+      "name": "Mobile Legends Cek Username",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 5,
+      "markup": 1000,
+      "price_sell": 1005,
+      "image": "assets/1769440861027.png",
+      "is_active": false
+    },
+    {
+      "sku": "WDP",
+      "name": "MOBILE LEGENDS Weekly Diamond Pass",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 27389,
+      "markup": 1000,
+      "price_sell": 28389,
+      "image": "assets/1769440861027.png",
+      "is_active": true,
+      "is_promo": true
+    },
+    {
+      "sku": "WDP2",
+      "name": "MOBILE LEGENDS Weekly Diamond Pass 2x",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 54753,
+      "markup": 1000,
+      "price_sell": 55753,
+      "image": "assets/1769440861027.png",
+      "is_active": true,
+      "is_promo": true
+    },
+    {
+      "sku": "WDP3",
+      "name": "MOBILE LEGENDS Weekly Diamond Pass 3x",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 82117,
+      "markup": 1000,
+      "price_sell": 83117,
+      "image": "assets/1769440861027.png",
+      "is_active": true
+    },
+    {
+      "sku": "WDP4",
+      "name": "MOBILE LEGENDS Weekly Diamond Pass 4x",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 109481,
+      "markup": 1000,
+      "price_sell": 110481,
+      "image": "assets/1769440861027.png",
+      "is_active": true
+    },
+    {
+      "sku": "WDP5",
+      "name": "MOBILE LEGENDS Weekly Diamond Pass 5x",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 138000,
+      "markup": 1000,
+      "price_sell": 139000,
+      "image": "assets/1769440861027.png",
+      "is_active": true
+    },
+    {
+      "sku": "WDPG1",
+      "name": "Mobile Legends Weekly Diamond Pass (Global)",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 25726,
+      "markup": 1000,
+      "price_sell": 26726,
+      "image": "assets/1769440861027.png",
+      "is_active": true
+    },
+    {
+      "sku": "WDPG2",
+      "name": "Mobile Legends Weekly Diamond Pass (Global)",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 23767,
+      "markup": 1000,
+      "price_sell": 24767,
+      "image": "assets/1769440861027.png",
+      "is_active": true
+    },
+    {
+      "sku": "WDPG3",
+      "name": "Mobile Legends Weekly Diamond Pass (Global)",
+      "brand": "MOBILE LEGENDS",
+      "category": "Games",
+      "price_modal": 23879,
+      "markup": 1000,
+      "price_sell": 24879,
+      "image": "assets/1769440861027.png",
+      "is_active": true
+    },
+    {
+      "sku": "WELKIN",
+      "name": "Genshin Impact Blessing of the Welkin Moon",
+      "brand": "Genshin Impact",
+      "category": "Games",
+      "price_modal": 53894,
+      "markup": 1000,
+      "price_sell": 54894,
+      "image": "assets/default.png",
+      "is_active": false
+    }
+  ],
+  "transactions": [
+    {
+      "ref_id": "DEV-T31542333545IMJXY",
+      "merchant_ref": "INV-627601769460257127",
+      "game": "MOBILE LEGENDS",
+      "product_name": "MOBILE LEGENDS Weekly Diamond Pass",
+      "nickname": "HanTA",
+      "user_id": "63661400",
+      "amount": 28389,
+      "method": "QRIS2",
+      "status": "PAID",
+      "qr_url": "https://tripay.co.id/qr/DEV-T31542333545IMJXY",
+      "pay_code": null,
+      "checkout_url": "https://tripay.co.id/checkout/DEV-T31542333545IMJXY",
+      "created_at": 1769460257315
+    },
+    {
+      "ref_id": "DEV-T31542333546VBCLU",
+      "merchant_ref": "INV-194551769460407522",
+      "game": "MOBILE LEGENDS",
+      "product_name": "MOBILE LEGENDS Weekly Diamond Pass 2x",
+      "nickname": "HanTA",
+      "user_id": "63661400",
+      "amount": 55753,
+      "method": "QRIS2",
+      "status": "EXPIRED",
+      "qr_url": "https://tripay.co.id/qr/DEV-T31542333546VBCLU",
+      "pay_code": null,
+      "checkout_url": "https://tripay.co.id/checkout/DEV-T31542333546VBCLU",
+      "created_at": 1769460407715
+    },
+    {
+      "ref_id": "DEV-T3154233354761UEJ",
+      "merchant_ref": "INV-336621769460670860",
+      "game": "MOBILE LEGENDS",
+      "product_name": "MOBILE LEGENDS Weekly Diamond Pass 2x",
+      "nickname": "HanTA",
+      "user_id": "63661400",
+      "amount": 55753,
+      "method": "QRIS2",
+      "status": "PAID",
+      "qr_url": "https://tripay.co.id/qr/DEV-T3154233354761UEJ",
+      "pay_code": null,
+      "checkout_url": "https://tripay.co.id/checkout/DEV-T3154233354761UEJ",
+      "created_at": 1769460671046
+    }
+  ]
+}
