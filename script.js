@@ -129,6 +129,7 @@ const App = {
     rawProducts: [],
     gamesList: [],
     selectedItem: null,
+    paymentMethod: null, // Menyimpan metode pembayaran
     nickname: null,
     refId: null,
   },
