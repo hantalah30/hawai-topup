@@ -1,19 +1,15 @@
 :root {
-  /* --- COLORS (OLD STYLE BASE) --- */
   --primary: #00f3ff; /* Cyan Neon */
   --secondary: #ff0055; /* Red Neon */
-  --accent: #ffee00; /* Yellow/Gold */
-  --bg-void: #020203; /* Deep Dark */
+  --accent: #ffee00; /* Yellow Neon */
+  --bg-void: #020203;
   --glass: rgba(15, 20, 30, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
-
-  /* --- FONTS --- */
+  --glass-border: rgba(255, 255, 255, 0.08);
   --font-head: "Syncopate", sans-serif;
   --font-body: "Rajdhani", sans-serif;
   --font-mono: "Orbitron", sans-serif;
-
-  /* --- DIMENSIONS --- */
   --header-h: 70px;
+  --dock-h: 80px;
 }
 
 * {
@@ -23,7 +19,6 @@
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
-
 body {
   background: var(--bg-void);
   color: #fff;
@@ -32,15 +27,12 @@ body {
   min-height: 100vh;
 }
 
-/* =========================================
-   1. VFX & BACKGROUND (OLD STYLE - KEPT)
-   ========================================= */
+/* --- VFX LAYERS (LAMA) --- */
 #webgl-canvas {
   position: fixed;
   inset: 0;
   z-index: 0;
 }
-
 .fx-scanlines {
   position: fixed;
   inset: 0;
@@ -56,7 +48,6 @@ body {
   z-index: 2;
   opacity: 0.5;
 }
-
 .fx-noise {
   position: fixed;
   inset: 0;
@@ -65,7 +56,6 @@ body {
   pointer-events: none;
   z-index: 1;
 }
-
 .fx-vignette {
   position: fixed;
   inset: 0;
@@ -74,19 +64,32 @@ body {
   z-index: 3;
 }
 
-/* --- UTILS --- */
+/* --- TYPOGRAPHY UTILS --- */
 .text-neon {
   color: var(--primary);
   text-shadow: 0 0 10px var(--primary);
 }
+.text-green {
+  color: #0f0;
+  text-shadow: 0 0 10px #0f0;
+}
+.text-red {
+  color: var(--secondary);
+}
 .text-warning {
   color: var(--accent);
 }
-.text-danger {
-  color: var(--secondary);
+.text-info {
+  color: var(--primary);
 }
-.hidden {
-  display: none !important;
+.d-flex {
+  display: flex;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.align-center {
+  align-items: center;
 }
 .mt-3 {
   margin-top: 1rem;
@@ -95,7 +98,7 @@ body {
   width: 100%;
 }
 
-/* Cursor (Desktop) */
+/* --- CURSOR (DESKTOP ONLY) --- */
 .cursor-dot {
   width: 6px;
   height: 6px;
@@ -124,9 +127,54 @@ body.hover .cursor-ring {
   mix-blend-mode: screen;
 }
 
-/* =========================================
-   2. HEADER & AUTH (UPDATED / HYBRID)
-   ========================================= */
+/* --- BOOT SCREEN --- */
+#boot-layer {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.boot-content {
+  width: 80%;
+  max-width: 300px;
+  text-align: center;
+}
+.boot-logo {
+  font-family: var(--font-head);
+  font-size: 30px;
+  letter-spacing: 5px;
+  color: #333;
+  margin-bottom: 20px;
+}
+.boot-logo .accent {
+  color: #fff;
+  text-shadow: 0 0 15px #fff;
+}
+.boot-bar-track {
+  width: 100%;
+  height: 2px;
+  background: #222;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.boot-bar {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  box-shadow: 0 0 15px var(--primary);
+}
+.boot-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--primary);
+  animation: blink 0.5s infinite;
+}
+
+/* --- HEADER --- */
 .cyber-header {
   position: fixed;
   top: 0;
@@ -136,13 +184,12 @@ body.hover .cursor-ring {
   z-index: 100;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--glass-border);
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   padding: 0 max(20px, env(safe-area-inset-right));
   padding-left: max(20px, env(safe-area-inset-left));
 }
-
 .header-inner {
   width: 100%;
   max-width: 1400px;
@@ -151,7 +198,6 @@ body.hover .cursor-ring {
   justify-content: space-between;
   align-items: center;
 }
-
 .brand {
   display: flex;
   align-items: center;
@@ -194,64 +240,58 @@ body.hover .cursor-ring {
   color: #666;
 }
 
-/* --- USER INFO (Style Baru diadaptasi ke Cyberpunk) --- */
+/* [BARU] Integrasi User Info dari desain baru ke Tema Lama */
 .auth-container {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
 }
-
 .btn-google {
   background: #fff;
-  color: #000;
+  color: #333;
   border: none;
   padding: 8px 15px;
-  border-radius: 4px;
+  border-radius: 5px;
   font-weight: bold;
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-family: var(--font-body);
-  text-transform: uppercase;
+  font-family: "Rajdhani", sans-serif;
   transition: 0.3s;
-  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
 }
 .btn-google:hover {
   background: var(--primary);
   box-shadow: 0 0 15px var(--primary);
 }
-
 .user-info {
   display: none;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
+  color: #fff;
 }
 .user-avatar {
-  width: 38px;
-  height: 38px;
+  width: 35px;
+  height: 35px;
   border-radius: 50%;
   border: 2px solid var(--primary);
 }
 
-/* Coin Badge yang bisa diklik (Fitur Baru) */
+/* [BARU] Coin Balance Badge agar terlihat interaktif */
 .coin-balance {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--accent);
   color: var(--accent);
-  padding: 5px 12px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 8px;
   border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  border: 1px solid rgba(255, 238, 0, 0.3);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
   transition: 0.3s;
 }
 .coin-balance:hover {
   background: rgba(255, 238, 0, 0.1);
-  box-shadow: 0 0 15px rgba(255, 238, 0, 0.3);
+  box-shadow: 0 0 10px rgba(255, 238, 0, 0.3);
   transform: scale(1.05);
 }
 
@@ -268,9 +308,7 @@ body.hover .cursor-ring {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* =========================================
-   3. HOME PAGE (OLD STYLE - KEPT)
-   ========================================= */
+/* --- VIEWPORT --- */
 #viewport {
   width: 100%;
   height: 100vh;
@@ -288,7 +326,7 @@ body.hover .cursor-ring {
   padding-left: max(20px, env(safe-area-inset-left));
 }
 
-/* Slider */
+/* --- SLIDER --- */
 .hero-slider {
   position: relative;
   height: clamp(400px, 60vh, 700px);
@@ -379,7 +417,7 @@ body.hover .cursor-ring {
   animation: progress 5s linear forwards;
 }
 
-/* Grid Games */
+/* --- GRID SYSTEM & CARDS --- */
 .section-title {
   font-family: var(--font-head);
   font-size: 24px;
@@ -395,6 +433,7 @@ body.hover .cursor-ring {
   padding-bottom: 50px;
   perspective: 1000px;
 }
+
 .tilt-card {
   position: relative;
   width: 100%;
@@ -456,9 +495,7 @@ body.hover .cursor-ring {
   font-weight: bold;
 }
 
-/* =========================================
-   4. ORDER PAGE (OLD STYLE - STRICTLY KEPT)
-   ========================================= */
+/* --- ORDER PAGE --- */
 .game-hero {
   background-size: cover;
   background-position: center top;
@@ -494,13 +531,6 @@ body.hover .cursor-ring {
   text-transform: uppercase;
   font-family: var(--font-head);
 }
-.game-title p {
-  font-size: 1.1rem;
-  opacity: 0.8;
-  margin-top: 10px;
-}
-
-/* Forms */
 .cyber-form {
   background: rgba(10, 10, 15, 0.8);
   backdrop-filter: blur(25px);
@@ -551,7 +581,6 @@ body.hover .cursor-ring {
   box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
 }
 
-/* Item Grid & Cards (PRESERVED) */
 .item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -573,21 +602,6 @@ body.hover .cursor-ring {
   align-items: center;
   text-align: center;
 }
-.item-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: radial-gradient(
-    rgba(255, 255, 255, 0.1) 1px,
-    transparent 1px
-  );
-  background-size: 10px 10px;
-  opacity: 0.3;
-  z-index: 0;
-}
 .item-card:hover,
 .item-card.active {
   transform: translateY(-5px);
@@ -595,51 +609,9 @@ body.hover .cursor-ring {
   box-shadow: 0 10px 20px rgba(0, 243, 255, 0.15);
   background: rgba(20, 20, 35, 0.9);
 }
-.item-card.active {
-  background: rgba(0, 243, 255, 0.1);
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
-}
-/* Premium Card */
 .item-card.card-premium {
   background: linear-gradient(135deg, #2b2000, #1a1a1a);
   border: 1px solid #ffd700;
-}
-.item-card.card-premium:hover {
-  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
-  border-color: #ffed4a;
-}
-/* Content */
-.i-content {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-}
-.i-icon {
-  width: 45px;
-  height: 45px;
-  object-fit: contain;
-  margin-bottom: 10px;
-  transition: transform 0.3s ease;
-}
-.i-name {
-  font-size: 0.85rem;
-  color: #e0e0e0;
-  margin-bottom: 5px;
-  line-height: 1.3;
-  font-weight: 500;
-}
-.card-premium .i-name {
-  color: #ffd700;
-  font-weight: bold;
-}
-.i-price {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: inline-block;
 }
 .hot-badge {
   position: absolute;
@@ -654,19 +626,30 @@ body.hover .cursor-ring {
   z-index: 10;
   animation: pulse-red 2s infinite;
 }
-
-/* =========================================
-   5. BUTTON & MODALS (UPDATED TO NEW STYLE)
-   ========================================= */
-
-/* New Sticky "Buy Now" Button Logic */
-.footer-action {
-  margin-top: 40px;
-  text-align: right;
+.i-icon {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  margin-bottom: 10px;
 }
+.i-name {
+  font-size: 0.85rem;
+  color: #e0e0e0;
+  margin-bottom: 5px;
+}
+.i-price {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
 .btn-pay-now,
 .sp-btn {
-  width: 300px;
+  width: 100%;
   padding: 15px 30px;
   font-size: 1.2rem;
   font-weight: bold;
@@ -676,7 +659,6 @@ body.hover .cursor-ring {
   text-transform: uppercase;
   cursor: pointer;
   transition: 0.3s;
-  font-family: var(--font-head);
   clip-path: polygon(
     10px 0,
     100% 0,
@@ -688,47 +670,64 @@ body.hover .cursor-ring {
 }
 .btn-pay-now:hover,
 .sp-btn:hover {
-  transform: translateX(-5px);
   box-shadow: 0 0 20px #00f3ff;
-  color: #fff;
-}
-.btn-pay-now:disabled {
-  filter: grayscale(1);
-  cursor: not-allowed;
+  color: white;
 }
 
-/* MODAL SYSTEM (Hybrid: Structure New, Look Old) */
-.modal-overlay {
+/* --- MODALS (LAMA + BARU DIGABUNG) --- */
+.modal-overlay,
+.modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   background: rgba(0, 0, 0, 0.9);
   z-index: 2000;
   display: flex;
-  align-items: center;
   justify-content: center;
-  backdrop-filter: blur(8px);
-  opacity: 0;
-  pointer-events: none;
-  transition: 0.3s;
+  align-items: center;
+  backdrop-filter: blur(5px);
 }
-.modal-overlay:not(.hidden) {
-  opacity: 1;
-  pointer-events: auto;
+.hidden {
+  display: none !important;
 }
 
+/* Modal Terminal (Lama) */
+.terminal-window {
+  width: 800px;
+  max-width: 90%;
+  height: 500px;
+  background: #080808;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  font-family: "Courier New", monospace;
+  box-shadow: 0 0 100px rgba(0, 243, 255, 0.15);
+}
+.term-head {
+  background: #111;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #222;
+}
+.term-body {
+  flex: 1;
+  padding: 20px;
+  color: var(--primary);
+  font-size: 12px;
+  overflow-y: auto;
+}
+
+/* [BARU] Modal Glass (Untuk Topup & Payment) - Diadaptasi ke Cyberpunk */
 .modal-glass {
-  background: #0a0e14;
+  background: #0a0e17;
   width: 90%;
   max-width: 450px;
   border-radius: 15px;
   border: 1px solid var(--primary);
-  box-shadow: 0 0 40px rgba(0, 243, 255, 0.15);
+  box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   animation: slideUp 0.3s ease;
 }
 
@@ -742,9 +741,8 @@ body.hover .cursor-ring {
 }
 .modal-head h3 {
   font-family: var(--font-head);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   color: #fff;
-  margin: 0;
 }
 
 .modal-body {
@@ -753,79 +751,54 @@ body.hover .cursor-ring {
   overflow-y: auto;
 }
 
-/* Styles for Topup Grid (from New Style) */
+/* [BARU] Styles untuk Grid Coin & Payment List */
 .coin-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 15px;
-  margin-bottom: 15px;
+  margin-top: 15px;
 }
 .coin-opt {
   padding: 15px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.05);
   text-align: center;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  border: 1px solid #333;
-  color: var(--primary);
+  border: 1px solid transparent;
   font-family: var(--font-mono);
-  font-size: 1.1rem;
-  transition: 0.2s;
+  color: var(--primary);
+  transition: 0.3s;
 }
 .coin-opt:hover {
   border-color: var(--primary);
   background: rgba(0, 243, 255, 0.1);
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
 }
 
-/* Styles for Payment Method List (from New Style) */
 .pay-item {
+  /* Support class lama/baru */
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 12px 15px;
+  padding: 15px;
   background: rgba(255, 255, 255, 0.03);
   margin-bottom: 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: 0.2s;
+  transition: 0.3s;
 }
 .pay-item:hover {
-  background: rgba(255, 255, 255, 0.08);
   border-color: var(--primary);
+  background: rgba(0, 243, 255, 0.05);
 }
+
 .scrollable {
   overflow-y: auto;
   max-height: 60vh;
 }
 
-/* Receipt Modal (Old Style) */
-.receipt-card {
-  width: 400px;
-  max-width: 90%;
-  background: #fff;
-  color: #000;
-  padding: 40px;
-  text-align: center;
-  clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
-  animation: slideUp 0.5s;
-}
-.receipt-icon {
-  font-size: 40px;
-  color: #fff;
-  background: #0f0;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px auto;
-  box-shadow: 0 10px 30px rgba(0, 255, 0, 0.3);
-}
-
-/* --- DOCK (MOBILE) --- */
+/* --- DOCK & MOBILE --- */
 .dock-wrapper {
   position: fixed;
   bottom: 30px;
@@ -886,7 +859,7 @@ body.hover .cursor-ring {
   top: -30px;
 }
 
-/* Sticky Pay Bar (Mobile) */
+/* Sticky Pay Mobile */
 .sticky-pay {
   position: fixed;
   bottom: 80px;
@@ -915,6 +888,31 @@ body.hover .cursor-ring {
   font-size: 16px;
   font-weight: bold;
   color: var(--primary);
+}
+
+/* Receipt */
+.receipt-card {
+  width: 400px;
+  max-width: 90%;
+  background: #fff;
+  color: #000;
+  padding: 40px;
+  text-align: center;
+  clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+  animation: slideUp 0.5s;
+}
+.receipt-icon {
+  font-size: 40px;
+  color: #fff;
+  background: #0f0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 10px 30px rgba(0, 255, 0, 0.3);
 }
 
 /* --- ANIMATIONS --- */
@@ -953,7 +951,7 @@ body.hover .cursor-ring {
   }
 }
 
-/* --- RESPONSIVE --- */
+/* --- MEDIA QUERIES --- */
 .desktop-only {
   display: flex !important;
 }
@@ -972,14 +970,12 @@ body.hover .cursor-ring {
   .cursor-ring {
     display: none;
   }
-
   #viewport {
     padding-bottom: 100px;
   }
   .container {
     padding: 0 20px;
   }
-
   .cyber-header {
     padding: 0 20px;
     height: 60px;
@@ -991,8 +987,6 @@ body.hover .cursor-ring {
     mask-image: none;
     margin-bottom: 20px;
   }
-
-  /* Mobile Order Page */
   .game-hero {
     height: 250px;
   }
@@ -1006,11 +1000,7 @@ body.hover .cursor-ring {
   .game-title h1 {
     font-size: 1.8rem;
   }
-  .cyber-form {
-    padding: 20px 15px;
-  }
-  .grid,
-  .item-grid {
+  .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
@@ -1018,36 +1008,15 @@ body.hover .cursor-ring {
     height: 200px;
     transform: none !important;
   }
+  .item-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
   .item-card {
     min-height: 100px;
     padding: 10px;
   }
 
-  /* Sticky Bottom Action */
-  .footer-action {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: rgba(10, 10, 20, 0.95);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-top: 1px solid rgba(0, 243, 255, 0.3);
-    z-index: 1000;
-    display: flex;
-    justify-content: center;
-    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
-    margin-top: 0;
-  }
-  .btn-pay-now {
-    width: 100% !important;
-    font-size: 1.1rem;
-  }
-  .cyber-form {
-    padding-bottom: 100px !important;
-  }
-
-  /* Mobile Dock */
   .dock-wrapper {
     bottom: 0;
     padding: 0;
