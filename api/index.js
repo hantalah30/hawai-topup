@@ -26,12 +26,10 @@ function initFirebase() {
       return;
     }
 
-    // FIX KHUSUS VERCEL: Mengembalikan karakter newline yang hilang
     if (privateKey.indexOf("\\n") >= 0) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
 
-    // Hapus tanda kutip jika user tidak sengaja meng-copy dengan tanda kutip
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = privateKey.slice(1, -1);
     }
@@ -47,7 +45,6 @@ function initFirebase() {
     }
 
     db = admin.firestore();
-    // PENTING: Mencegah crash jika ada field undefined
     db.settings({ ignoreUndefinedProperties: true });
 
     dbError = null;
@@ -70,7 +67,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // --- Helper Config ---
 async function getConfig() {
-  // Default Config dari Env Vars
   let config = {
     tripay: {
       merchant_code: process.env.TRIPAY_MERCHANT_CODE,
@@ -87,7 +83,6 @@ async function getConfig() {
         const dbConfig = doc.data();
         if (dbConfig.point_reward_percent)
           config.point_reward_percent = dbConfig.point_reward_percent;
-        // Prioritaskan DB jika ada, jika tidak fallback ke ENV
         if (dbConfig.tripay?.api_key)
           config.tripay = { ...config.tripay, ...dbConfig.tripay };
       }
@@ -99,18 +94,20 @@ async function getConfig() {
 }
 
 // ==========================================
-// 3. ROUTES TRANSAKSI (YANG ERROR)
+// 3. ROUTES TRANSAKSI (FIXED SANDBOX MODE)
 // ==========================================
 
-// Endpoint: /api/topup-coin
+// --- LOGIC MODE TRIPAY ---
+// Ubah ke "api" hanya jika Anda sudah siap Live/Production
+const TRIPAY_MODE = "api-sandbox";
+// -------------------------
+
 app.post("/api/topup-coin", async (req, res) => {
-  // 1. Cek Koneksi DB
   if (!db)
     return res
       .status(500)
       .json({ success: false, message: "Database Error: " + dbError });
 
-  // 2. Ambil Config
   const config = await getConfig();
   if (!config.tripay.private_key || !config.tripay.api_key) {
     return res.status(500).json({
@@ -120,7 +117,6 @@ app.post("/api/topup-coin", async (req, res) => {
   }
 
   const { amount, method, user_uid, user_name } = req.body;
-  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
 
   if (!user_uid)
     return res.status(400).json({ success: false, message: "Login Required" });
@@ -129,7 +125,6 @@ app.post("/api/topup-coin", async (req, res) => {
     const merchantRef =
       "DEP-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
 
-    // 3. Buat Signature Tripay
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -146,7 +141,7 @@ app.post("/api/topup-coin", async (req, res) => {
         {
           sku: "DEPOSIT_COIN",
           name: "Topup HAWAI Coin",
-          price: parseInt(amount), // Pastikan Integer
+          price: parseInt(amount),
           quantity: 1,
         },
       ],
@@ -155,15 +150,15 @@ app.post("/api/topup-coin", async (req, res) => {
       signature,
     };
 
-    // 4. Request ke Tripay
-    console.log("Sending to Tripay:", JSON.stringify(payload));
+    console.log(`Sending to Tripay (${TRIPAY_MODE}):`, JSON.stringify(payload));
+
+    // [FIX] Menggunakan TRIPAY_MODE variable
     const tripayRes = await axios.post(
-      `https://tripay.co.id/${mode}/transaction/create`,
+      `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
       payload,
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
-    // 5. Simpan ke Firestore
     await db
       .collection("transactions")
       .doc(tripayRes.data.data.reference)
@@ -181,14 +176,12 @@ app.post("/api/topup-coin", async (req, res) => {
 
     res.json({ success: true, data: tripayRes.data.data });
   } catch (e) {
-    // Error Handling Detail
     console.error("Topup Coin Error:", e.response?.data || e.message);
     const msg = e.response?.data?.message || e.message;
     res.status(500).json({ success: false, message: "Tripay Error: " + msg });
   }
 });
 
-// Endpoint: /api/transaction (Game Topup)
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res
@@ -203,7 +196,6 @@ app.post("/api/transaction", async (req, res) => {
 
   const { sku, amount, customer_no, method, nickname, game, user_uid } =
     req.body;
-  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
 
   try {
     const productDoc = await db.collection("products").doc(sku).get();
@@ -212,8 +204,6 @@ app.post("/api/transaction", async (req, res) => {
       : "Topup Game";
     const merchantRef =
       "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
-
-    // Safety check nickname
     const safeNickname = nickname || "-";
 
     let transactionData = {
@@ -231,7 +221,6 @@ app.post("/api/transaction", async (req, res) => {
       created_at: Date.now(),
     };
 
-    // --- PEMBAYARAN VIA COIN ---
     if (method === "HAWAI_COIN") {
       if (!user_uid)
         return res
@@ -247,7 +236,7 @@ app.post("/api/transaction", async (req, res) => {
         if (currentCoins < amount) throw new Error("Saldo tidak cukup");
 
         t.update(userRef, { hawai_coins: currentCoins - parseInt(amount) });
-        transactionData.status = "PAID"; // Langsung sukses
+        transactionData.status = "PAID";
         transactionData.paid_at = Date.now();
         t.set(db.collection("transactions").doc(merchantRef), transactionData);
       });
@@ -261,7 +250,6 @@ app.post("/api/transaction", async (req, res) => {
       });
     }
 
-    // --- PEMBAYARAN VIA TRIPAY ---
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -282,15 +270,15 @@ app.post("/api/transaction", async (req, res) => {
       signature,
     };
 
+    // [FIX] Menggunakan TRIPAY_MODE variable
     const tripayRes = await axios.post(
-      `https://tripay.co.id/${mode}/transaction/create`,
+      `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
       payload,
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
     const data = tripayRes.data.data;
 
-    // Simpan Transaksi Tripay
     await db
       .collection("transactions")
       .doc(data.reference)
@@ -311,7 +299,7 @@ app.post("/api/transaction", async (req, res) => {
 });
 
 // ==========================================
-// 4. ROUTES LAINNYA (DIPERTAHANKAN)
+// 4. PUBLIC ROUTES
 // ==========================================
 
 app.get("/api/init-data", async (req, res) => {
@@ -342,7 +330,6 @@ app.get("/api/init-data", async (req, res) => {
 
 app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
-  const mode = "api-sandbox";
   try {
     const manualChannels = [
       {
@@ -355,8 +342,9 @@ app.get("/api/channels", async (req, res) => {
     ];
     let tripayChannels = [];
     if (config.tripay.api_key) {
+      // [FIX] Menggunakan TRIPAY_MODE variable
       const response = await axios.get(
-        `https://tripay.co.id/${mode}/merchant/payment-channel`,
+        `https://tripay.co.id/${TRIPAY_MODE}/merchant/payment-channel`,
         { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
       );
       tripayChannels = response.data.data || [];
@@ -387,7 +375,6 @@ app.post("/api/check-nickname", async (req, res) => {
   }
 });
 
-// Route Auth (Google)
 app.post("/api/auth/google", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database Error" });
   const { idToken } = req.body;
@@ -431,5 +418,11 @@ app.get("/api/user/:uid", async (req, res) => {
   }
 });
 
-// Export App untuk Vercel
+// Admin routes & others (retained)
+app.post("/api/admin/login", async (req, res) => {
+  const config = await getConfig();
+  if (req.body.password === config.admin_password) res.json({ success: true });
+  else res.status(401).json({ success: false });
+});
+
 module.exports = app;
