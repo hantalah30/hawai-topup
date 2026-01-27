@@ -9,12 +9,20 @@ const admin = require("firebase-admin");
 // --- 1. SETUP SERVER ---
 const app = express();
 
-// --- 2. SETUP FIREBASE ---
+// --- 2. SETUP FIREBASE (FIXED KEY PARSING) ---
 if (!admin.apps.length) {
   try {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY
-      ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
-      : undefined;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    // Perbaikan format key untuk Vercel
+    if (privateKey) {
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+        // Jika Vercel membungkus dengan quote ganda, kita parse dulu
+        privateKey = JSON.parse(privateKey);
+      }
+      // Ganti literal \n menjadi newline asli
+      privateKey = privateKey.replace(/\\n/g, "\n");
+    }
 
     if (process.env.FIREBASE_PROJECT_ID && privateKey) {
       admin.initializeApp({
@@ -76,7 +84,7 @@ async function getConfig() {
 }
 
 // ==========================================
-// ROUTES PUBLIC (CLIENT)
+// ROUTES PUBLIC
 // ==========================================
 
 app.get("/api/status", async (req, res) => {
@@ -233,7 +241,7 @@ app.post("/api/admin/login", async (req, res) => {
 });
 
 app.get("/api/admin/config", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
+  if (!db) return res.status(500).json({ error: "DB Error: Not Connected" });
   try {
     const config = await getConfig();
     const productsSnap = await db.collection("products").get();
@@ -247,7 +255,8 @@ app.get("/api/admin/config", async (req, res) => {
 
     res.json({ config, products, assets });
   } catch (e) {
-    res.status(500).json({ error: "Gagal load data" });
+    console.error(e);
+    res.status(500).json({ error: "Server Error Fetching Config" });
   }
 });
 
@@ -260,6 +269,7 @@ app.post("/api/admin/save-config", async (req, res) => {
       .set(req.body, { merge: true });
     res.json({ success: true });
   } catch (e) {
+    console.error("Save Config Error:", e);
     res.status(500).json({ error: "Gagal simpan config" });
   }
 });
@@ -270,8 +280,10 @@ app.post("/api/admin/save-products", async (req, res) => {
     const products = req.body;
     const batch = db.batch();
     products.forEach((p) => {
-      const ref = db.collection("products").doc(p.sku);
-      batch.set(ref, p);
+      if (p.sku) {
+        const ref = db.collection("products").doc(p.sku);
+        batch.set(ref, p);
+      }
     });
     await batch.commit();
     res.json({ success: true });
@@ -292,6 +304,7 @@ app.post("/api/admin/save-assets", async (req, res) => {
 
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
+
   const config = await getConfig();
   const { username, api_key } = config.digiflazz;
 

@@ -1,12 +1,12 @@
 // Arahkan ke endpoint API relative path
 const API_BASE_URL = "";
 
-// Default state biar gak undefined
+// Default state agar tidak undefined saat awal load
 let db = {
   config: {
     tripay: {},
     digiflazz: {},
-    admin_password: "admin",
+    admin_password: "admin", // Default password fallback
   },
   products: [],
   assets: { sliders: [], banners: {} },
@@ -16,8 +16,8 @@ let db = {
 async function login() {
   const pass = document.getElementById("adminPass").value;
   const btn = document.querySelector("#loginOverlay button");
-  const originalText = btn.innerText;
 
+  const originalText = btn.innerText;
   btn.innerText = "Loading...";
   btn.disabled = true;
 
@@ -36,7 +36,7 @@ async function login() {
       alert("Password Salah");
     }
   } catch (e) {
-    alert("Server Error / Koneksi Gagal");
+    alert("Gagal Login: Cek Server");
   } finally {
     btn.innerText = originalText;
     btn.disabled = false;
@@ -50,40 +50,43 @@ function logout() {
 async function loadData() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
+
+    if (!res.ok) throw new Error("Server Error");
+
     const data = await res.json();
 
-    // Merge data dari server ke local state
+    // UPDATE STATE DENGAN DATA BARU (Safe Merge)
     if (data) {
-      db.config = data.config || db.config;
-      db.products = data.products || [];
-      db.assets = data.assets || { sliders: [], banners: {} };
+      if (data.config) db.config = data.config;
+      if (data.products) db.products = data.products;
+      if (data.assets) db.assets = data.assets;
     }
 
-    // Fill Config Inputs (Safe Navigation)
-    if (db.config.digiflazz) {
+    // FILL FORM (Dengan Pengecekan Aman)
+    const conf = db.config || {};
+
+    if (conf.digiflazz) {
       document.getElementById("digi_user").value =
-        db.config.digiflazz.username || "";
-      document.getElementById("digi_api").value =
-        db.config.digiflazz.api_key || "";
+        conf.digiflazz.username || "";
+      document.getElementById("digi_api").value = conf.digiflazz.api_key || "";
     }
 
-    if (db.config.tripay) {
+    if (conf.tripay) {
       document.getElementById("tripay_merchant").value =
-        db.config.tripay.merchant_code || "";
-      document.getElementById("tripay_api").value =
-        db.config.tripay.api_key || "";
+        conf.tripay.merchant_code || "";
+      document.getElementById("tripay_api").value = conf.tripay.api_key || "";
       document.getElementById("tripay_private").value =
-        db.config.tripay.private_key || "";
+        conf.tripay.private_key || "";
     }
 
     renderAssets();
     populateBrandFilter();
 
-    // Tampilkan Produk Awal (Opsional, agar tidak kosong melompong)
-    // renderProductTable(db.products.slice(0, 50));
+    // Tampilkan data awal jika ada
+    filterProducts();
   } catch (e) {
     console.error("Gagal load data:", e);
-    alert("Gagal memuat data dari server.");
+    // Jangan alert error terus menerus, cukup log saja agar admin bisa input manual
   }
 }
 
@@ -94,7 +97,6 @@ function populateBrandFilter() {
   ].sort();
   const select = document.getElementById("filterBrand");
 
-  // Reset opsi
   select.innerHTML =
     '<option value="" disabled selected>-- Pilih Game --</option>';
   select.innerHTML += '<option value="ALL_DATA">SEMUA DATA (BERAT)</option>';
@@ -110,9 +112,9 @@ function filterProducts() {
     document.getElementById("searchSku").value || ""
   ).toLowerCase();
 
+  // Jika belum pilih game dan belum cari, jangan tampilkan apa-apa (biar ringan)
   if (!brand && !search) return;
 
-  // Reset Checkbox Header
   const selectAll = document.getElementById("selectAll");
   if (selectAll) selectAll.checked = false;
 
@@ -125,7 +127,7 @@ function filterProducts() {
     return matchBrand && matchSearch;
   });
 
-  renderProductTable(filtered.slice(0, 200)); // Limit display 200 item agar browser tidak lag
+  renderProductTable(filtered.slice(0, 200));
 }
 
 function renderProductTable(data) {
@@ -134,12 +136,11 @@ function renderProductTable(data) {
 
   if (data.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="7" class="text-center py-3">Produk tidak ditemukan.</td></tr>';
+      '<tr><td colspan="7" class="text-center py-3">Produk tidak ditemukan / Belum pilih kategori.</td></tr>';
     return;
   }
 
   data.forEach((p) => {
-    // Cari index asli di array global db.products untuk referensi update
     const realIndex = db.products.findIndex((item) => item.sku === p.sku);
 
     let imgUrl = "assets/default.png";
@@ -152,7 +153,6 @@ function renderProductTable(data) {
     const modal = parseInt(p.price_modal) || 0;
     const markup = parseInt(p.markup) || 0;
     const jual = modal + markup;
-
     const promoClass = p.is_promo
       ? "text-danger fa-beat"
       : "text-secondary opacity-25";
@@ -167,11 +167,11 @@ function renderProductTable(data) {
                     <input type="file" id="file-${realIndex}" class="d-none" onchange="uploadProdImg(this, ${realIndex})">
                 </td>
                 <td>
-                    <div class="fw-bold text-truncate" style="max-width: 200px;">${p.name}</div>
+                    <div class="fw-bold text-truncate" style="max-width: 250px;">${p.name}</div>
                     <small class="sku-text">${p.sku} | ${p.brand}</small>
                 </td>
                 
-                <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})" title="Jadikan Hot Deal">
+                <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})" title="Toggle Hot Deal">
                     <i class="fas fa-fire ${promoClass} fs-5"></i>
                 </td>
 
@@ -202,7 +202,6 @@ function updateMarkup(idx, val) {
     const markup = parseInt(val) || 0;
     db.products[idx].markup = markup;
     db.products[idx].price_sell = (db.products[idx].price_modal || 0) + markup;
-
     const sellElem = document.getElementById(`sell-${idx}`);
     if (sellElem)
       sellElem.innerText = `Rp ${db.products[idx].price_sell.toLocaleString()}`;
@@ -221,28 +220,17 @@ function triggerUpload(idx) {
 async function uploadProdImg(input, idx) {
   const file = input.files[0];
   if (!file) return;
-
   const formData = new FormData();
   formData.append("image", file);
-
   try {
-    // Ubah ikon jadi loading sementara
-    const imgTag = document.querySelector(
-      `img[onclick="triggerUpload(${idx})"]`,
-    );
-    const oldSrc = imgTag.src;
-    imgTag.style.opacity = "0.5";
-
     const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
       method: "POST",
       body: formData,
     });
     const data = await res.json();
-
     if (db.products[idx]) {
       db.products[idx].image = data.filepath;
-      imgTag.src = data.filepath;
-      imgTag.style.opacity = "1";
+      filterProducts(); // Refresh icon
     }
   } catch (e) {
     alert("Gagal Upload Gambar");
@@ -252,12 +240,11 @@ async function uploadProdImg(input, idx) {
 function togglePromo(idx) {
   if (db.products[idx]) {
     db.products[idx].is_promo = !db.products[idx].is_promo;
-    // Refresh baris ini saja atau semua (untuk simplifikasi refresh semua filter)
     filterProducts();
   }
 }
 
-// --- BULK UPDATE IMAGE ---
+// --- BULK ACTION ---
 async function processBulkImage(input) {
   const file = input.files[0];
   if (!file) return;
@@ -269,8 +256,7 @@ async function processBulkImage(input) {
 
   if (selectedIndices.length === 0) {
     const currentBrand = document.getElementById("filterBrand").value;
-    if (!currentBrand) return alert("Pilih Game atau centang produk!");
-
+    if (!currentBrand) return alert("Pilih Kategori Game atau centang produk!");
     if (
       !confirm(
         `⚠️ Ganti gambar untuk SEMUA PRODUK di kategori ${currentBrand}?`,
@@ -279,8 +265,6 @@ async function processBulkImage(input) {
       input.value = "";
       return;
     }
-
-    // Ambil semua yg tampil
     document
       .querySelectorAll(".prod-select")
       .forEach((cb) => selectedIndices.push(parseInt(cb.value)));
@@ -312,11 +296,10 @@ async function processBulkImage(input) {
       if (db.products[idx]) db.products[idx].image = newImg;
     });
 
-    await saveProducts(); // Auto save
-    filterProducts(); // Refresh UI
-    alert(`✅ ${selectedIndices.length} produk diperbarui!`);
+    await saveProducts();
+    filterProducts();
+    alert("✅ Gambar berhasil diupdate massal!");
   } catch (e) {
-    console.error(e);
     alert("Gagal update massal.");
   } finally {
     input.value = "";
@@ -325,7 +308,7 @@ async function processBulkImage(input) {
   }
 }
 
-// --- SYNC & SAVE ---
+// --- SERVER SYNC & SAVE ---
 async function syncDigiflazz() {
   if (!confirm("Tarik data Digiflazz? (Harga modal akan terupdate)")) return;
 
@@ -338,16 +321,12 @@ async function syncDigiflazz() {
     const res = await fetch(`${API_BASE_URL}/api/admin/sync-digiflazz`, {
       method: "POST",
     });
-
-    // Cek status code
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.message || "Gagal Sync");
-    }
-
     const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message || "Gagal Sync");
+
     alert(data.message);
-    loadData(); // Reload data tanpa refresh halaman
+    loadData();
   } catch (e) {
     alert("Error: " + e.message);
   } finally {
@@ -357,14 +336,7 @@ async function syncDigiflazz() {
 }
 
 async function deleteAllProducts() {
-  if (!confirm("⚠️ BAHAYA: Hapus SEMUA produk?")) return;
-  try {
-    // Pastikan endpoint ini ada di backend (kalau belum ada, buat dulu)
-    // Untuk saat ini kita skip implementasi backend delete-all agar aman
-    alert("Fitur reset dimatikan demi keamanan.");
-  } catch (e) {
-    alert("Error");
-  }
+  alert("Fitur Reset dimatikan demi keamanan.");
 }
 
 async function saveProducts() {
@@ -388,7 +360,7 @@ async function saveProducts() {
   }
 }
 
-// --- ASSETS ---
+// --- ASSETS & CONFIG ---
 function renderAssets() {
   const sDiv = document.getElementById("sliderContainer");
   if (sDiv) {
@@ -430,11 +402,9 @@ function renderAssets() {
 
 async function uploadNewSlider() {
   const file = document.getElementById("uploadSlider").files[0];
-  if (!file) return alert("Pilih file gambar slider dulu");
-
+  if (!file) return;
   const formData = new FormData();
   formData.append("image", file);
-
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
       method: "POST",
@@ -444,18 +414,15 @@ async function uploadNewSlider() {
     if (!db.assets.sliders) db.assets.sliders = [];
     db.assets.sliders.push(data.filepath);
     renderAssets();
-    // Auto save asset
     saveAssets(true);
-  } catch (e) {
-    alert("Gagal upload slider");
-  }
+  } catch (e) {}
 }
 
 function delSlider(i) {
-  if (confirm("Hapus slider ini?")) {
+  if (confirm("Hapus slider?")) {
     db.assets.sliders.splice(i, 1);
     renderAssets();
-    saveAssets(true); // Auto save
+    saveAssets(true);
   }
 }
 
@@ -464,7 +431,6 @@ async function uploadBanner(brand, input) {
   if (!file) return;
   const formData = new FormData();
   formData.append("image", file);
-
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
       method: "POST",
@@ -474,10 +440,8 @@ async function uploadBanner(brand, input) {
     if (!db.assets.banners) db.assets.banners = {};
     db.assets.banners[brand] = data.filepath;
     renderAssets();
-    saveAssets(true); // Auto save
-  } catch (e) {
-    alert("Gagal upload banner");
-  }
+    saveAssets(true);
+  } catch (e) {}
 }
 
 async function saveAssets(silent = false) {
@@ -493,24 +457,23 @@ async function saveAssets(silent = false) {
   }
 }
 
-// --- FIX UTAMA ERROR ---
+// --- FIX UNCAUGHT TYPE ERROR ---
 async function saveConfig() {
-  // Ambil password lama jika user tidak mengisi/mengubah
-  // Pastikan properti ada meskipun kosong
-  const currentAdminPass =
+  // Ambil nilai dari DOM, kalau kosong string kosong
+  const digiUser = document.getElementById("digi_user").value || "";
+  const digiApi = document.getElementById("digi_api").value || "";
+  const triMerch = document.getElementById("tripay_merchant").value || "";
+  const triApi = document.getElementById("tripay_api").value || "";
+  const triPriv = document.getElementById("tripay_private").value || "";
+
+  // Ambil password lama dengan aman
+  const oldPass =
     db.config && db.config.admin_password ? db.config.admin_password : "admin";
 
   const cfg = {
-    digiflazz: {
-      username: document.getElementById("digi_user").value || "",
-      api_key: document.getElementById("digi_api").value || "",
-    },
-    tripay: {
-      merchant_code: document.getElementById("tripay_merchant").value || "",
-      api_key: document.getElementById("tripay_api").value || "",
-      private_key: document.getElementById("tripay_private").value || "",
-    },
-    admin_password: currentAdminPass,
+    digiflazz: { username: digiUser, api_key: digiApi },
+    tripay: { merchant_code: triMerch, api_key: triApi, private_key: triPriv },
+    admin_password: oldPass, // Sertakan password agar tidak hilang
   };
 
   try {
@@ -523,13 +486,13 @@ async function saveConfig() {
     const json = await res.json();
     if (json.success) {
       alert("✅ Konfigurasi Tersimpan!");
-      // Update local state
+      // Update local state agar tidak perlu reload
       db.config = cfg;
     } else {
-      alert("Gagal menyimpan.");
+      alert("Gagal menyimpan: " + (json.error || "Unknown Error"));
     }
   } catch (e) {
     console.error(e);
-    alert("Error Saving Config");
+    alert("Error Saving Config: " + e.message);
   }
 }
