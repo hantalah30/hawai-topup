@@ -9,7 +9,7 @@ const admin = require("firebase-admin");
 const app = express();
 
 // ==========================================
-// 1. SETUP FIREBASE (Menggunakan Versi Lama - Lebih Aman)
+// 1. SETUP FIREBASE (Updated & Fixed)
 // ==========================================
 let db = null;
 let dbError = "Menunggu Inisialisasi...";
@@ -20,10 +20,15 @@ function initFirebase() {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
+    // Cek kelengkapan Env Vars (Penting untuk Vercel logs)
     if (!projectId || !clientEmail || !privateKey) {
-      throw new Error("Env Vars Belum Lengkap (Cek ProjectID, Email, Key)");
+      console.warn(
+        "⚠️ Firebase Env Vars belum lengkap. Cek Settings di Vercel.",
+      );
+      return;
     }
 
+    // Fix format Private Key untuk Vercel
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = JSON.parse(privateKey);
     }
@@ -40,8 +45,12 @@ function initFirebase() {
     }
 
     db = admin.firestore();
+
+    // [PENTING] Mencegah error "Cannot use 'undefined' as a Firestore value"
+    db.settings({ ignoreUndefinedProperties: true });
+
     dbError = null;
-    console.log("🔥 Firebase App Initialized");
+    console.log("🔥 Firebase App Initialized Successfully");
   } catch (error) {
     dbError = error.message;
     console.error("❌ Firebase Init Error:", error.message);
@@ -72,7 +81,7 @@ async function getConfig() {
       api_key: process.env.DIGI_KEY || "",
     },
     admin_password: process.env.ADMIN_PASSWORD || "admin",
-    point_reward_percent: 5, // [BARU] Default reward 5%
+    point_reward_percent: 5, // Default reward 5%
   };
 
   if (db) {
@@ -86,7 +95,6 @@ async function getConfig() {
           config.digiflazz = { ...config.digiflazz, ...dbConfig.digiflazz };
         if (dbConfig.admin_password)
           config.admin_password = dbConfig.admin_password;
-        // [BARU] Ambil config reward dari DB
         if (dbConfig.point_reward_percent)
           config.point_reward_percent = dbConfig.point_reward_percent;
       }
@@ -112,7 +120,6 @@ app.post("/api/auth/google", async (req, res) => {
     const name = decodedToken.name || "User";
     const picture = decodedToken.picture || "";
 
-    // Check or create user in Firestore
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
@@ -122,17 +129,14 @@ app.post("/api/auth/google", async (req, res) => {
         email,
         name,
         picture,
-        hawai_coins: 0, // Default balance
+        hawai_coins: 0,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // Update basic info on login
       await userRef.update({ name, picture, email });
     }
 
-    // Get latest data including coins
     const userData = (await userRef.get()).data();
-
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error("Auth Error:", error);
@@ -140,7 +144,6 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
-// Endpoint to get user data (balance refresh)
 app.get("/api/user/:uid", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database Error" });
   try {
@@ -194,14 +197,13 @@ app.get("/api/init-data", async (req, res) => {
       if (doc.exists) assets = doc.data();
     } catch (e) {}
 
-    // [BARU] Kirim info reward percent ke frontend
     const config = await getConfig();
 
     res.json({
       sliders: assets.sliders,
       banners: assets.banners,
       products,
-      reward_percent: config.point_reward_percent, // [BARU]
+      reward_percent: config.point_reward_percent,
     });
   } catch (e) {
     console.error(e);
@@ -232,7 +234,6 @@ app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
   try {
-    // Add HAWAI Coin as a manual channel
     const manualChannels = [
       {
         code: "HAWAI_COIN",
@@ -259,20 +260,12 @@ app.get("/api/channels", async (req, res) => {
     console.error("Channel Error:", error.message);
     res.json({
       success: true,
-      data: [
-        {
-          code: "HAWAI_COIN",
-          name: "HAWAI Coin",
-          group: "Balance",
-          icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
-          total_fee: { flat: 0 },
-        },
-      ],
+      data: manualChannels || [],
     });
   }
 });
 
-// [BARU] Endpoint Khusus Topup Coin (Deposit)
+// [ENDPOINT] Topup Coin (Deposit)
 app.post("/api/topup-coin", async (req, res) => {
   if (!db) return res.status(500).json({ message: "DB Error" });
   const config = await getConfig();
@@ -317,11 +310,10 @@ app.post("/api/topup-coin", async (req, res) => {
       },
     );
 
-    // Simpan Transaksi Deposit
     await db.collection("transactions").doc(tripayRes.data.data.reference).set({
       ref_id: tripayRes.data.data.reference,
       merchant_ref: merchantRef,
-      type: "DEPOSIT", // Penanda ini Deposit Saldo
+      type: "DEPOSIT",
       user_uid: user_uid,
       amount: amount,
       method: method,
@@ -337,6 +329,7 @@ app.post("/api/topup-coin", async (req, res) => {
   }
 });
 
+// [ENDPOINT] Transaksi Game (FIXED)
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res.status(500).json({ message: "Database Error: " + dbError });
@@ -353,15 +346,18 @@ app.post("/api/transaction", async (req, res) => {
     const merchantRef =
       "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
 
+    // [FIX] Nickname fallback to "-" if undefined to prevent Firestore crash
+    const safeNickname = nickname || "-";
+
     let transactionData = {
       ref_id: merchantRef,
       merchant_ref: merchantRef,
-      type: "GAME_TOPUP", // [BARU] Penanda Tipe Transaksi
+      type: "GAME_TOPUP",
       game,
       productName,
-      nickname,
-      user_id: customer_no, // ID Game User
-      user_uid: user_uid || null, // [BARU] ID Akun Web (untuk reward)
+      nickname: safeNickname,
+      user_id: customer_no,
+      user_uid: user_uid || null,
       amount,
       method,
       status: "UNPAID",
@@ -399,9 +395,6 @@ app.post("/api/transaction", async (req, res) => {
         t.set(db.collection("transactions").doc(merchantRef), transactionData);
       });
 
-      // TODO: Panggil API Digiflazz disini karena sudah PAID
-      // await processDigiflazz(transactionData);
-
       return res.json({
         success: true,
         data: {
@@ -421,7 +414,7 @@ app.post("/api/transaction", async (req, res) => {
       method,
       merchant_ref: merchantRef,
       amount,
-      customer_name: nickname || "Guest",
+      customer_name: safeNickname, // Gunakan safe nickname
       customer_email: "cust@email.com",
       customer_phone: customer_no,
       order_items: [{ sku, name: productName, price: amount, quantity: 1 }],
@@ -534,7 +527,7 @@ app.post("/api/admin/save-assets", async (req, res) => {
   }
 });
 
-// SYNC DIGIFLAZZ (Logika Lama yang lebih detail)
+// SYNC DIGIFLAZZ
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db) return res.status(500).json({ error: "Database Error: " + dbError });
 
@@ -558,7 +551,6 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       },
     );
 
-    // VALIDASI RESPON DIGIFLAZZ SEBELUM PROSES
     if (!response.data || !Array.isArray(response.data.data)) {
       const errMsg = JSON.stringify(response.data);
       console.error("Digiflazz Error Respon:", errMsg);
@@ -572,7 +564,6 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       (item) => item.category === "Games",
     );
 
-    // Batching diperkecil jadi 100 agar aman dari timeout/limit
     const chunkSize = 100;
     for (let i = 0; i < gameProducts.length; i += chunkSize) {
       const batch = db.batch();
@@ -613,7 +604,7 @@ app.post("/api/admin/upload", upload.single("image"), (req, res) => {
   res.json({ filepath: `data:${req.file.mimetype};base64,${b64}` });
 });
 
-// [BARU] --- ADMIN USER MANAGEMENT ---
+// --- ADMIN USER MANAGEMENT ---
 app.get("/api/admin/users", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
   try {

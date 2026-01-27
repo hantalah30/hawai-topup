@@ -3,9 +3,9 @@ if (typeof API_URL === "undefined") {
   var API_URL = "/api";
 }
 
-// [BARU] Konfigurasi Global
+// Konfigurasi Global
 const CONFIG = {
-  rewardPercent: 5, // Default, akan diupdate dari server
+  rewardPercent: 5,
 };
 
 // --- AUTH SYSTEM ---
@@ -67,7 +67,6 @@ const Auth = {
         info.style.display = "flex";
         document.getElementById("userName").innerText =
           Auth.user.name.split(" ")[0];
-        // Update Coin Balance
         document.getElementById("userCoins").innerText = (
           Auth.user.hawai_coins || 0
         ).toLocaleString();
@@ -80,7 +79,7 @@ const Auth = {
   },
 };
 
-// --- PRESET ASSETS (LAMA - DIPERTAHANKAN) ---
+// --- PRESET ASSETS ---
 const PRESET_ASSETS = {
   "MOBILE LEGENDS": {
     logo: "assets/lance2.png",
@@ -114,7 +113,7 @@ const DEFAULT_ASSETS = {
   },
 };
 
-// --- AUDIO SYSTEM (LAMA - DIPERTAHANKAN) ---
+// --- AUDIO SYSTEM ---
 const Sound = {
   ctx: new (window.AudioContext || window.webkitAudioContext)(),
   play: (f, t, d, v = 0.05) => {
@@ -140,7 +139,7 @@ const Sound = {
   },
 };
 
-// --- TEXT SCRAMBLER (LAMA - DIPERTAHANKAN) ---
+// --- TEXT SCRAMBLER ---
 class TextScramble {
   constructor(el) {
     this.el = el;
@@ -203,8 +202,9 @@ const App = {
     serverBanners: {},
     serverSliders: [],
     selectedItem: null,
-    transactionType: "GAME", // [BARU] Default transaksi game, bisa berubah jadi 'COIN'
+    transactionType: "GAME",
     refId: null,
+    nickname: null, // Store nickname here
   },
 
   init: async () => {
@@ -241,7 +241,6 @@ const App = {
       App.state.serverSliders = data.sliders || [];
       App.state.serverBanners = data.banners || {};
 
-      // [BARU] Update Config Reward dari Server
       if (data.reward_percent) CONFIG.rewardPercent = data.reward_percent;
 
       const uniqueBrands = [
@@ -296,7 +295,6 @@ const App = {
     else if (page === "order") App.renderOrderPage(vp, param);
   },
 
-  // [BARU] Logika Modal Topup Coin
   openTopupModal: () => {
     if (!Auth.user) return alert("Silakan Login terlebih dahulu!");
     const modal = document.getElementById("coinModal");
@@ -315,16 +313,15 @@ const App = {
     const amount = document.getElementById("customCoin").value;
     if (amount < 10000) return alert("Minimal Topup Rp 10.000");
 
-    // Set state seolah-olah user memilih item "DEPOSIT"
     App.state.selectedItem = {
       code: "DEPOSIT",
       price: parseInt(amount),
       name: "Topup Coin",
     };
-    App.state.transactionType = "COIN"; // Tandai ini transaksi Coin
+    App.state.transactionType = "COIN";
 
     App.closeModal("coinModal");
-    Terminal.openPaymentSelect(); // Buka modal pembayaran
+    Terminal.openPaymentSelect();
   },
 
   renderHome: (container) => {
@@ -361,7 +358,8 @@ const App = {
   },
 
   renderOrderPage: (container, brandName) => {
-    App.state.transactionType = "GAME"; // Reset tipe transaksi ke Game
+    App.state.transactionType = "GAME";
+    App.state.nickname = null; // Reset nickname
 
     const items = App.state.rawProducts
       .filter((p) => p.brand === brandName && p.is_active !== false)
@@ -444,8 +442,6 @@ const App = {
   renderItemCard: (p) => {
     let cardClass = "item-card";
     let badgeHtml = "";
-
-    // [BARU] Hitung Potensi Reward
     const points = Math.floor(p.price_sell * (CONFIG.rewardPercent / 100));
 
     if (p.is_promo) {
@@ -516,9 +512,10 @@ const App = {
                         <span style="color:#fff; font-weight:bold; font-size:0.9rem;">${data.name}</span>
                     </div>`;
         Sound.success();
-        App.state.nickname = data.name;
+        App.state.nickname = data.name; // Simpan Nickname di State!
       } else {
         res.innerHTML = `<span style="color:#ff4444; font-size:0.9rem; margin-top:5px; display:block;"><i class="fas fa-times-circle"></i> ID Tidak Ditemukan</span>`;
+        App.state.nickname = null;
       }
     } catch (e) {
       console.error(e);
@@ -532,7 +529,7 @@ const App = {
       .forEach((i) => i.classList.remove("active"));
     el.classList.add("active");
     App.state.selectedItem = { code, price, name };
-    App.state.transactionType = "GAME"; // Pastikan tipe transaksi adalah GAME
+    App.state.transactionType = "GAME";
     Sound.click();
   },
 
@@ -598,12 +595,11 @@ const App = {
   },
 };
 
-// --- LOGIC TRANSAKSI (UPDATED) ---
+// --- LOGIC TRANSAKSI (FIXED) ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels, transactionType } = App.state;
 
-    // [BARU] Validasi beda antara GAME dan COIN
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
       if (!uid) return alert("Masukkan User ID dulu!");
@@ -618,14 +614,12 @@ const Terminal = {
       listDiv.innerHTML = `<div class="alert alert-danger text-center">Metode Pembayaran Tidak Tersedia.</div>`;
     } else {
       paymentChannels.forEach((ch) => {
-        // [BARU] Sembunyikan HAWAI COIN jika sedang Topup Deposit
         if (transactionType === "COIN" && ch.code === "HAWAI_COIN") return;
 
         let fee = ch.total_fee?.flat || 0;
         let total = selectedItem.price + fee;
         let balanceCheck = "";
 
-        // UI KHUSUS UNTUK HAWAI COIN
         if (ch.code === "HAWAI_COIN") {
           const userBalance = Auth.user ? Auth.user.hawai_coins : 0;
           if (!Auth.user) {
@@ -652,13 +646,12 @@ const Terminal = {
       });
     }
 
-    document.getElementById("paymentModal").classList.remove("hidden"); // Gunakan class hidden
+    document.getElementById("paymentModal").classList.remove("hidden");
   },
 
   processTransaction: async (method) => {
     const { selectedItem, transactionType } = App.state;
 
-    // Siapkan Payload
     const payload = {
       sku: selectedItem.code,
       amount: selectedItem.price,
@@ -667,9 +660,8 @@ const Terminal = {
       user_name: Auth.user ? Auth.user.name : "Guest",
     };
 
-    let endpoint = "/transaction"; // Default
+    let endpoint = "/transaction";
 
-    // [BARU] Logic Endpoint berdasarkan tipe
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
       const zone = document.getElementById("zone")
@@ -678,19 +670,31 @@ const Terminal = {
       payload.customer_no = uid + (zone ? ` (${zone})` : "");
       payload.game = "Game";
 
-      // Cek Saldo Coin lagi untuk keamanan client-side
+      // --- PERBAIKAN PENTING DI SINI ---
+      // Cek apakah ada nickname di state (hasil dari checkNickname)
+      let finalNickname = App.state.nickname;
+
+      // Jika state kosong, coba cek elemen HTML siapa tau user cek tapi state belum update (jarang, tapi aman)
+      if (!finalNickname) {
+        const nickElement = document.querySelector("#nick-result span span"); // Span didalam span hasil sukses
+        if (nickElement) finalNickname = nickElement.innerText;
+      }
+
+      // Default ke "-" agar Backend tidak error 500
+      payload.nickname = finalNickname || "-";
+      // ---------------------------------
+
       if (method === "HAWAI_COIN" && !Auth.user) {
         alert("Silakan Login terlebih dahulu.");
         return;
       }
     } else if (transactionType === "COIN") {
       endpoint = "/topup-coin";
-      // Deposit tidak butuh customer_no game
     }
 
     const btn =
       document.querySelector(".btn-pay-now") ||
-      document.querySelector("button.sp-btn"); // Support tombol modal baru
+      document.querySelector("button.sp-btn");
     if (btn) {
       btn.innerHTML = "Memproses...";
       btn.disabled = true;
@@ -735,7 +739,7 @@ const Receipt = {
   },
 };
 
-// --- 3D WORLD (LAMA - DIPERTAHANKAN) ---
+// --- 3D WORLD ---
 const World = {
   init: () => {
     const cvs = document.getElementById("webgl-canvas");
