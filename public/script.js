@@ -203,6 +203,7 @@ const App = {
     serverSliders: [],
     selectedItem: null,
     transactionType: "GAME",
+    activeBrand: null, // [FIX] Menyimpan nama game yang sedang aktif
     refId: null,
     nickname: null,
   },
@@ -363,7 +364,8 @@ const App = {
 
   renderOrderPage: (container, brandName) => {
     App.state.transactionType = "GAME";
-    App.state.nickname = null; // Reset nickname
+    App.state.nickname = null;
+    App.state.activeBrand = brandName; // [FIX] Simpan nama game aktif
 
     const items = App.state.rawProducts
       .filter((p) => p.brand === brandName && p.is_active !== false)
@@ -599,7 +601,7 @@ const App = {
   },
 };
 
-// --- LOGIC TRANSAKSI (FIXED REDIRECT) ---
+// --- LOGIC TRANSAKSI (FIXED REDIRECT & BRAND NAME) ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels, transactionType } = App.state;
@@ -654,7 +656,7 @@ const Terminal = {
   },
 
   processTransaction: async (method) => {
-    const { selectedItem, transactionType } = App.state;
+    const { selectedItem, transactionType, activeBrand } = App.state;
 
     const payload = {
       sku: selectedItem.code,
@@ -672,7 +674,9 @@ const Terminal = {
         ? document.getElementById("zone").value
         : "";
       payload.customer_no = uid + (zone ? ` (${zone})` : "");
-      payload.game = "Game";
+
+      // [FIX] Menggunakan nama game asli, bukan string "Game"
+      payload.game = activeBrand || "Game";
 
       let finalNickname = App.state.nickname;
       if (!finalNickname) {
@@ -708,7 +712,6 @@ const Terminal = {
       const json = await res.json();
 
       if (json.success) {
-        // [FIXED] Redirect ke invoice.html internal, bukan checkout_url Tripay
         window.location.href = `/invoice.html?ref=${json.data.reference}`;
       } else {
         throw new Error(json.message || "Gagal Transaksi");
