@@ -3,25 +3,18 @@ if (typeof API_URL === "undefined") {
   var API_URL = "/api";
 }
 
-// --- AUTH SYSTEM (NEW) ---
+// --- AUTH SYSTEM (UPDATED) ---
 const Auth = {
   user: null,
 
   init: () => {
-    // Konfigurasi Firebase Client (WAJIB DIGANTI DENGAN CONFIG KAMU SENDIRI)
-    // Ambil dari Firebase Console -> Project Settings -> General -> Your Apps -> SDK Setup/Configuration
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID",
-    };
+    // HAPUS KONFIGURASI DI SINI.
+    // Kita asumsikan firebase.initializeApp() sudah jalan di file firebase-config.js
 
-    // Initialize only if not already initialized
+    // Cek apakah Firebase sudah jalan
     if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
+      console.error("Firebase belum di-init! Cek file firebase-config.js");
+      return;
     }
 
     // Listen for auth state changes
@@ -78,8 +71,9 @@ const Auth = {
         info.style.display = "flex";
         document.getElementById("userName").innerText =
           Auth.user.name.split(" ")[0]; // First name
-        document.getElementById("userCoins").innerText =
-          Auth.user.hawai_coins.toLocaleString();
+        document.getElementById("userCoins").innerText = (
+          Auth.user.hawai_coins || 0
+        ).toLocaleString();
         document.getElementById("userImg").src = Auth.user.picture;
       }
     } else {
@@ -236,7 +230,7 @@ const App = {
 
     // 4. Hapus Boot Loader & Init World
     const bootLayer = document.getElementById("boot-layer");
-    if (bootLayer) bootLayer.style.display = "none"; // Hapus loading screen
+    if (bootLayer) bootLayer.style.display = "none";
 
     if (typeof World !== "undefined") World.init();
 
@@ -301,7 +295,7 @@ const App = {
   router: (page, param = null) => {
     const vp = document.getElementById("viewport");
     if (!vp) return;
-    // Transisi cepat tanpa animasi boot
+
     vp.innerHTML = "";
     window.scrollTo(0, 0);
     if (page === "home") App.renderHome(vp);
