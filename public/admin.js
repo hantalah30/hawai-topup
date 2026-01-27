@@ -3,7 +3,11 @@ const API_BASE_URL = "";
 
 // Default state agar tidak undefined saat awal load
 let db = {
-  config: { tripay: {}, digiflazz: {}, admin_password: "admin" },
+  config: {
+    tripay: {},
+    digiflazz: {},
+    admin_password: "admin",
+  },
   products: [],
   assets: { sliders: [], banners: {} },
 };
@@ -12,6 +16,8 @@ let db = {
 async function login() {
   const pass = document.getElementById("adminPass").value;
   const btn = document.querySelector("#loginOverlay button");
+  const originalText = btn.innerText;
+
   btn.innerText = "Loading...";
   btn.disabled = true;
 
@@ -30,9 +36,9 @@ async function login() {
       alert("Password Salah");
     }
   } catch (e) {
-    alert("Server Error");
+    alert("Gagal Login: Cek Koneksi / Server");
   } finally {
-    btn.innerText = "Masuk";
+    btn.innerText = originalText;
     btn.disabled = false;
   }
 }
@@ -46,28 +52,31 @@ async function loadData() {
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
     const data = await res.json();
 
-    // ALERT ERROR DARI BACKEND
+    // ALERT JIKA DB ERROR (PENTING!)
     if (data.db_connected === false) {
       alert(
-        "⚠️ DATABASE ERROR: " +
+        "🚨 DATABASE ERROR: " +
           (data.db_error || "Unknown Error") +
-          "\n\nSilakan cek Environment Variables di Vercel!",
+          "\n\nPeriksa Environment Variables di Vercel (Private Key, Project ID, dll)!",
       );
     }
 
+    // UPDATE STATE
     if (data) {
       if (data.config) db.config = data.config;
       if (data.products) db.products = data.products;
       if (data.assets) db.assets = data.assets;
     }
 
-    // Fill Forms
+    // FILL FORM
     const conf = db.config || {};
+
     if (conf.digiflazz) {
       document.getElementById("digi_user").value =
         conf.digiflazz.username || "";
       document.getElementById("digi_api").value = conf.digiflazz.api_key || "";
     }
+
     if (conf.tripay) {
       document.getElementById("tripay_merchant").value =
         conf.tripay.merchant_code || "";
@@ -80,8 +89,8 @@ async function loadData() {
     populateBrandFilter();
     filterProducts();
   } catch (e) {
-    console.error(e);
-    alert("Gagal terhubung ke server backend.");
+    console.error("Gagal load data:", e);
+    alert("Server Error saat memuat data.");
   }
 }
 
@@ -91,9 +100,11 @@ function populateBrandFilter() {
     ...new Set(db.products.map((p) => p.brand || "Lainnya")),
   ].sort();
   const select = document.getElementById("filterBrand");
+
   select.innerHTML =
     '<option value="" disabled selected>-- Pilih Game --</option>';
   select.innerHTML += '<option value="ALL_DATA">SEMUA DATA (BERAT)</option>';
+
   brands.forEach(
     (b) => (select.innerHTML += `<option value="${b}">${b}</option>`),
   );
@@ -293,7 +304,7 @@ async function processBulkImage(input) {
 
 // --- SERVER SYNC & SAVE ---
 async function syncDigiflazz() {
-  if (!confirm("Tarik data Digiflazz? (Harga modal akan terupdate)")) return;
+  if (!confirm("Tarik data Digiflazz?")) return;
   const btn = document.getElementById("btnSync");
   const oldHtml = btn.innerHTML;
   btn.innerHTML = "⏳ Syncing...";
@@ -305,9 +316,8 @@ async function syncDigiflazz() {
     });
     const data = await res.json();
 
-    if (!res.ok) {
-      throw new Error(data.message || data.detail || "Server Error 500");
-    }
+    if (!res.ok)
+      throw new Error(data.message || data.error || "Server Error 500");
 
     alert(data.message);
     loadData();
@@ -427,18 +437,20 @@ async function saveAssets(silent = false) {
 }
 
 async function saveConfig() {
-  // Ambil Data Form
+  const digiUser = document.getElementById("digi_user").value || "";
+  const digiApi = document.getElementById("digi_api").value || "";
+  const triMerch = document.getElementById("tripay_merchant").value || "";
+  const triApi = document.getElementById("tripay_api").value || "";
+  const triPriv = document.getElementById("tripay_private").value || "";
+
+  // Safe navigation for admin_password
+  const oldPass =
+    db.config && db.config.admin_password ? db.config.admin_password : "admin";
+
   const cfg = {
-    digiflazz: {
-      username: document.getElementById("digi_user").value,
-      api_key: document.getElementById("digi_api").value,
-    },
-    tripay: {
-      merchant_code: document.getElementById("tripay_merchant").value,
-      api_key: document.getElementById("tripay_api").value,
-      private_key: document.getElementById("tripay_private").value,
-    },
-    admin_password: db.config.admin_password || "admin",
+    digiflazz: { username: digiUser, api_key: digiApi },
+    tripay: { merchant_code: triMerch, api_key: triApi, private_key: triPriv },
+    admin_password: oldPass,
   };
 
   try {
@@ -449,17 +461,11 @@ async function saveConfig() {
     });
 
     const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Server Error");
 
-    // Handle Error 500 dari Backend
-    if (!res.ok) {
-      throw new Error(json.error || "Server Error");
-    }
-
-    if (json.success) {
-      alert("✅ Tersimpan!");
-      db.config = cfg;
-    }
+    alert("✅ Konfigurasi Tersimpan!");
+    db.config = cfg;
   } catch (e) {
-    alert("❌ GAGAL SIMPAN: " + e.message);
+    alert("Error Saving Config: " + e.message);
   }
 }

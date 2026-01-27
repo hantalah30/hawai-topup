@@ -8,12 +8,12 @@ const admin = require("firebase-admin");
 
 const app = express();
 
-// Variable Global untuk menyimpan status error database
+// Variable Global untuk menyimpan status error
 let db = null;
 let dbError = "Initializing...";
 
 // ==========================================
-// 1. SETUP FIREBASE (ROBUST & DEBUG MODE)
+// 1. SETUP FIREBASE (DIAGNOSTIC MODE)
 // ==========================================
 function initFirebase() {
   try {
@@ -21,29 +21,32 @@ function initFirebase() {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    // Cek kelengkapan variable
+    // 1. Cek Kelengkapan Variable
     if (!projectId)
-      throw new Error("FIREBASE_PROJECT_ID tidak ada di Env Vars");
+      throw new Error("FIREBASE_PROJECT_ID tidak ada di Environment Variable.");
     if (!clientEmail)
-      throw new Error("FIREBASE_CLIENT_EMAIL tidak ada di Env Vars");
+      throw new Error(
+        "FIREBASE_CLIENT_EMAIL tidak ada di Environment Variable.",
+      );
     if (!privateKey)
-      throw new Error("FIREBASE_PRIVATE_KEY tidak ada di Env Vars");
+      throw new Error(
+        "FIREBASE_PRIVATE_KEY tidak ada di Environment Variable.",
+      );
 
-    // Format Private Key agar diterima Vercel
-    // 1. Hapus tanda kutip jika user tidak sengaja mengikutkannya
+    // 2. Pembersihan Format Private Key (Vercel Fix)
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = JSON.parse(privateKey);
     }
-    // 2. Ganti literal \n dengan karakter enter asli
     privateKey = privateKey.replace(/\\n/g, "\n");
 
-    // 3. Validasi format PEM sederhana
+    // 3. Validasi Format PEM
     if (!privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
       throw new Error(
         "Format Private Key SALAH. Harus diawali -----BEGIN PRIVATE KEY-----",
       );
     }
 
+    // 4. Inisialisasi
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert({
@@ -55,16 +58,16 @@ function initFirebase() {
     }
 
     db = admin.firestore();
-    dbError = null; // Sukses!
-    console.log("🔥 Firebase Connected!");
+    dbError = null; // Reset error jika sukses
+    console.log("🔥 Firebase Connected Successfully!");
   } catch (error) {
     dbError = error.message;
-    console.error("❌ Firebase Error:", error.message);
+    console.error("❌ Firebase Connection Failed:", error.message);
     db = null;
   }
 }
 
-// Jalankan inisialisasi
+// Jalankan Inisialisasi
 initFirebase();
 
 // ==========================================
@@ -79,6 +82,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // 3. HELPER CONFIG
 // ==========================================
 async function getConfig() {
+  // Default dari Environment Variable (Fallback)
   let config = {
     tripay: {
       merchant_code: process.env.TRIPAY_MERCHANT_CODE || "",
@@ -92,7 +96,7 @@ async function getConfig() {
     admin_password: process.env.ADMIN_PASSWORD || "admin",
   };
 
-  // Jika DB Hidup, ambil settingan terbaru
+  // Jika DB Hidup, timpa dengan data dari database
   if (db) {
     try {
       const doc = await db.collection("settings").doc("general").get();
@@ -116,20 +120,19 @@ async function getConfig() {
 // 4. PUBLIC ROUTES
 // ==========================================
 
-// Endpoint Status (DEBUGGING)
+// Cek Status (Penting untuk Debugging)
 app.get("/api/status", async (req, res) => {
   const config = await getConfig();
   res.json({
     status: "Online",
-    firebase: db ? "Connected" : "ERROR",
-    // Tampilkan pesan error detail jika DB mati
-    db_error_message: db ? null : dbError,
+    firebase: db ? "Connected" : "DISCONNECTED",
+    db_error: db ? null : dbError, // Kirim alasan error ke user
     tripay_configured: !!config.tripay.api_key,
   });
 });
 
 app.get("/api/init-data", async (req, res) => {
-  // Jangan return 500 agar frontend tetap tampil (fallback mode)
+  // Fallback: Jika DB mati, kirim array kosong agar frontend tidak crash
   if (!db) return res.json({ sliders: [], banners: {}, products: [] });
 
   try {
@@ -159,6 +162,7 @@ app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
   try {
+    if (!config.tripay.api_key) throw new Error("Tripay API Key Missing");
     const response = await axios.get(
       `https://tripay.co.id/${mode}/merchant/payment-channel`,
       {
@@ -255,7 +259,7 @@ app.post("/api/transaction", async (req, res) => {
 });
 
 // ==========================================
-// 5. ROUTES ADMIN (BACKOFFICE)
+// 5. ROUTES ADMIN (FIXED ERROR 500)
 // ==========================================
 
 app.post("/api/admin/login", async (req, res) => {
@@ -267,6 +271,7 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
+// GET CONFIG: Jangan Return 500 jika DB mati, berikan info error
 app.get("/api/admin/config", async (req, res) => {
   try {
     const config = await getConfig();
@@ -274,11 +279,11 @@ app.get("/api/admin/config", async (req, res) => {
     let products = [];
     let assets = { sliders: [], banners: {} };
 
+    // Hanya coba akses DB jika DB hidup
     if (db) {
       try {
         const productsSnap = await db.collection("products").get();
         products = productsSnap.docs.map((doc) => doc.data());
-
         const assetsDoc = await db.collection("settings").doc("assets").get();
         if (assetsDoc.exists) assets = assetsDoc.data();
       } catch (err) {}
@@ -289,10 +294,10 @@ app.get("/api/admin/config", async (req, res) => {
       products,
       assets,
       db_connected: !!db,
-      db_error: dbError, // Kirim error ke frontend agar admin tahu
+      db_error: dbError, // Kirim error spesifik ke frontend
     });
   } catch (e) {
-    res.status(500).json({ error: "Gagal load data" });
+    res.status(500).json({ error: "Gagal load data: " + e.message });
   }
 });
 
@@ -313,7 +318,7 @@ app.post("/api/admin/save-products", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error: " + dbError });
   try {
     const products = req.body;
-    const chunkSize = 400; // Batch limit safe
+    const chunkSize = 400; // Batch limit aman
     for (let i = 0; i < products.length; i += chunkSize) {
       const batch = db.batch();
       const chunk = products.slice(i, i + chunkSize);
