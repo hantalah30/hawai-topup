@@ -1,158 +1,160 @@
-/* =========================================
-   1. IMPORTS & VARIABLES
-   ========================================= */
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&family=Syncopate:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600&display=swap");
-
 :root {
-  /* Core Colors */
-  --primary: #00f3ff; /* Cyan Neon */
-  --secondary: #ff0055; /* Cyber Pink */
-  --accent: #ffee00; /* Warning Yellow */
-  --bg-void: #020203; /* Deepest Black */
-  --bg-panel: rgba(15, 20, 30, 0.6);
-
-  /* Semantic Colors (From Old CSS) */
-  --success: #2ed573;
-  --danger: #ff4757;
-  --warning: #ffa502;
-  --text-main: #ffffff;
-  --text-muted: #8892b0;
-
-  /* Glassmorphism */
-  --glass: rgba(255, 255, 255, 0.05);
+  --primary: #00f3ff;
+  --secondary: #ff0055;
+  --accent: #ffee00;
+  --bg-void: #020203;
+  --glass: rgba(15, 20, 30, 0.7);
   --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-glow: 0 0 20px rgba(0, 243, 255, 0.15);
-
-  /* Typography */
-  --font-head: "Syncopate", sans-serif; /* Untuk Judul Besar */
-  --font-hud: "Orbitron", sans-serif; /* Untuk Angka/Data */
-  --font-body: "Rajdhani", sans-serif; /* Untuk UI Text */
-  --font-read: "Plus Jakarta Sans", sans-serif; /* Untuk teks panjang */
-
-  /* Dimensions */
+  --font-head: "Syncopate", sans-serif;
+  --font-body: "Rajdhani", sans-serif;
+  --font-mono: "Orbitron", sans-serif;
   --header-h: 70px;
   --dock-h: 80px;
 }
 
-/* =========================================
-   2. RESET & BASE
-   ========================================= */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-  outline: none;
+  user-select: none;
 }
-
 body {
   background: var(--bg-void);
-  color: var(--text-main);
+  color: #fff;
   font-family: var(--font-body);
-  overflow-x: hidden;
-  min-height: 100vh;
+  overflow: hidden;
+  height: 100vh;
   width: 100vw;
-  line-height: 1.5;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #000;
-}
-::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
-}
-
-/* =========================================
-   3. VISUAL FX LAYERS (Cyber Overlay)
-   ========================================= */
+/* --- VFX LAYERS --- */
 #webgl-canvas {
   position: fixed;
   inset: 0;
   z-index: 0;
-  pointer-events: none;
 }
-
-.fx-overlay {
+.fx-scanlines {
   position: fixed;
   inset: 0;
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Scanlines Effect - Optimized */
-.fx-scanlines {
   background: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0),
     rgba(255, 255, 255, 0) 50%,
-    rgba(0, 0, 0, 0.2) 50%,
-    rgba(0, 0, 0, 0.2)
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.1)
   );
   background-size: 100% 4px;
-  opacity: 0.3;
-}
-
-/* Vignette */
-.fx-vignette {
-  background: radial-gradient(circle, transparent 50%, #000 120%);
+  pointer-events: none;
   z-index: 2;
+  opacity: 0.5;
+}
+.fx-noise {
+  position: fixed;
+  inset: 0;
+  background: url("https://grainy-gradients.vercel.app/noise.svg");
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 1;
+}
+.fx-vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle, transparent 40%, #000 100%);
+  pointer-events: none;
+  z-index: 3;
 }
 
-/* =========================================
-   4. TYPOGRAPHY & UTILS
-   ========================================= */
+/* --- TYPOGRAPHY UTILS --- */
 .text-neon {
   color: var(--primary);
   text-shadow: 0 0 10px var(--primary);
 }
+.text-green {
+  color: #0f0;
+  text-shadow: 0 0 10px #0f0;
+}
 .text-red {
   color: var(--secondary);
-  text-shadow: 0 0 10px var(--secondary);
-}
-.text-gold {
-  color: var(--accent);
-}
-.text-muted {
-  color: var(--text-muted);
-  font-size: 0.9em;
 }
 
-.hidden {
-  display: none !important;
+/* --- CURSOR (DESKTOP ONLY) --- */
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  position: fixed;
+  border-radius: 50%;
+  z-index: 9999;
+  pointer-events: none;
+  mix-blend-mode: difference;
 }
-.d-flex {
+.cursor-ring {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--primary);
+  position: fixed;
+  border-radius: 50%;
+  z-index: 9998;
+  pointer-events: none;
+  transition: transform 0.1s ease-out;
+}
+body.hover .cursor-ring {
+  width: 60px;
+  height: 60px;
+  background: rgba(0, 243, 255, 0.1);
+  border-color: var(--secondary);
+  mix-blend-mode: screen;
+}
+
+/* --- BOOT SCREEN --- */
+#boot-layer {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 10000;
   display: flex;
-}
-.align-center {
   align-items: center;
+  justify-content: center;
 }
-.justify-between {
-  justify-content: space-between;
+.boot-content {
+  width: 80%;
+  max-width: 300px;
+  text-align: center;
 }
-
-/* Section Title */
-.section-title {
+.boot-logo {
   font-family: var(--font-head);
-  font-size: clamp(20px, 3vw, 28px);
-  margin-bottom: 30px;
-  border-left: 4px solid var(--secondary);
-  padding-left: 20px;
-  background: linear-gradient(90deg, rgba(255, 0, 85, 0.1), transparent);
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  font-size: 30px;
+  letter-spacing: 5px;
+  color: #333;
+  margin-bottom: 20px;
+}
+.boot-logo .accent {
+  color: #fff;
+  text-shadow: 0 0 15px #fff;
+}
+.boot-bar-track {
+  width: 100%;
+  height: 2px;
+  background: #222;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.boot-bar {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  box-shadow: 0 0 15px var(--primary);
+}
+.boot-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--primary);
+  animation: blink 0.5s infinite;
 }
 
-/* =========================================
-   5. HEADER & NAVIGATION
-   ========================================= */
+/* --- HEADER --- */
 .cyber-header {
   position: fixed;
   top: 0;
@@ -160,15 +162,14 @@ body {
   right: 0;
   height: var(--header-h);
   z-index: 100;
-  background: rgba(2, 2, 3, 0.85);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
-  padding: 0 max(20px, env(safe-area-inset-right)) 0
-    max(20px, env(safe-area-inset-left));
+  padding: 0 max(20px, env(safe-area-inset-right));
+  padding-left: max(20px, env(safe-area-inset-left));
 }
-
 .header-inner {
   width: 100%;
   max-width: 1400px;
@@ -177,15 +178,12 @@ body {
   justify-content: space-between;
   align-items: center;
 }
-
 .brand {
   display: flex;
   align-items: center;
   gap: 15px;
   cursor: pointer;
-  text-decoration: none;
 }
-
 .brand-logo {
   width: 40px;
   height: 40px;
@@ -197,97 +195,77 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  clip-path: polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%);
+  clip-path: polygon(25% 0, 100% 0, 100% 75%, 75% 100%, 0 100%, 0 25%);
   box-shadow: 0 0 15px var(--primary);
-  transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.brand:hover .brand-logo {
-  transform: rotate(180deg) scale(1.1);
-  background: var(--secondary);
-  box-shadow: 0 0 25px var(--secondary);
-}
-
-.brand-txt .b-title {
-  font-family: var(--font-head);
-  font-size: 18px;
-  letter-spacing: 1px;
-  color: #fff;
-}
-.brand-txt .b-ver {
-  font-family: var(--font-hud);
-  font-size: 10px;
-  color: var(--primary);
-}
-
-/* User Profile Pill (Integrated from Old Style) */
-.user-pill {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 6px 15px 6px 6px;
-  border-radius: 50px;
-  border: 1px solid var(--glass-border);
-  cursor: pointer;
   transition: 0.3s;
 }
-.user-pill:hover {
-  border-color: var(--primary);
-  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+.brand:hover .brand-logo {
+  transform: rotate(180deg);
+  background: var(--secondary);
+  box-shadow: 0 0 20px var(--secondary);
 }
-.user-avatar {
-  width: 32px;
-  height: 32px;
+.brand-txt {
+  display: flex;
+  flex-direction: column;
+}
+.b-title {
+  font-family: var(--font-head);
+  font-size: 18px;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+.b-ver {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: #666;
+}
+.desktop-nav {
+  display: flex;
+  gap: 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.mobile-refresh {
+  font-size: 18px;
+  color: var(--primary);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
   border-radius: 50%;
-  border: 2px solid var(--primary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-/* =========================================
-   6. CURSOR (Desktop Only)
-   ========================================= */
-@media (hover: hover) and (pointer: fine) {
-  .cursor-dot {
-    width: 6px;
-    height: 6px;
-    background: #fff;
-    position: fixed;
-    border-radius: 50%;
-    z-index: 9999;
-    pointer-events: none;
-    mix-blend-mode: difference;
-  }
-  .cursor-ring {
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--primary);
-    position: fixed;
-    border-radius: 50%;
-    z-index: 9998;
-    pointer-events: none;
-    transition: transform 0.1s ease-out;
-  }
-  body.hover .cursor-ring {
-    width: 60px;
-    height: 60px;
-    background: rgba(0, 243, 255, 0.1);
-    border-color: var(--secondary);
-    mix-blend-mode: screen;
-  }
+/* --- VIEWPORT --- */
+#viewport {
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+  padding-top: var(--header-h);
+  padding-bottom: 120px;
+  position: relative;
+  z-index: 10;
+}
+.container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 max(20px, env(safe-area-inset-right));
+  padding-left: max(20px, env(safe-area-inset-left));
 }
 
-/* =========================================
-   7. HERO SLIDER
-   ========================================= */
+/* --- SLIDER --- */
 .hero-slider {
   position: relative;
   height: clamp(400px, 60vh, 700px);
   margin-bottom: 50px;
   overflow: hidden;
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  display: flex;
+  align-items: center;
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
 }
-
 .slide {
   position: absolute;
   inset: 0;
@@ -298,7 +276,6 @@ body {
   opacity: 1;
   z-index: 2;
 }
-
 .slide-bg {
   position: absolute;
   inset: 0;
@@ -311,22 +288,18 @@ body {
 .slide.active .slide-bg {
   transform: scale(1);
 }
-
 .slide-ui {
   position: relative;
   z-index: 10;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  height: 100%;
-  display: flex;
-  align-items: center;
   padding: 0 5%;
+  pointer-events: none;
 }
-
 .cyber-pane {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(15px);
   border-left: 4px solid var(--primary);
   padding: 40px;
   max-width: 600px;
@@ -339,27 +312,50 @@ body {
   transform: skewX(-10deg) translateX(0);
   opacity: 1;
 }
-
 .glitch-title {
   font-family: var(--font-head);
-  font-size: clamp(32px, 5vw, 70px);
+  font-size: clamp(36px, 5vw, 80px);
   line-height: 0.9;
   color: #fff;
+  margin: 0;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
   transform: skewX(10deg);
 }
-
-/* =========================================
-   8. CARD SYSTEM (Unified Tilt & Panel)
-   ========================================= */
-.container {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 max(20px, env(safe-area-inset-right));
-  padding-left: max(20px, env(safe-area-inset-left));
+.slide-sub {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--primary);
+  letter-spacing: 3px;
+  margin-top: 15px;
+  transform: skewX(10deg);
+  font-weight: bold;
+  border-bottom: 2px solid var(--accent);
+  display: inline-block;
+  padding-bottom: 5px;
+}
+.slider-timer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--primary);
+  width: 0%;
+  z-index: 20;
+  box-shadow: 0 0 20px var(--primary);
+}
+.slide.active .slider-timer {
+  animation: progress 5s linear forwards;
 }
 
+/* --- GRID SYSTEM --- */
+.section-title {
+  font-family: var(--font-head);
+  font-size: 24px;
+  margin-bottom: 30px;
+  border-left: 4px solid var(--secondary);
+  padding-left: 15px;
+  color: #fff;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -367,85 +363,99 @@ body {
   padding-bottom: 50px;
   perspective: 1000px;
 }
+/* --- GRID SYSTEM --- */
+.grid {
+  display: grid;
+  gap: 15px;
+  padding-bottom: 50px;
+}
 
-/* Base Card Style */
-.cyber-card {
+/* --- GANTI STYLE TILT-CARD LAMA DENGAN INI --- */
+
+.tilt-card {
   position: relative;
-  height: 320px;
+  width: 100%;
+  height: 320px; /* Tinggi kartu diperbesar agar seperti poster */
   background-color: #1a1a1a;
   border-radius: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 243, 255, 0.2);
   overflow: hidden;
   cursor: pointer;
   transition:
     transform 0.3s ease,
-    box-shadow 0.3s ease,
-    border-color 0.3s;
+    box-shadow 0.3s ease;
+
+  /* Agar gambar background cover full */
   background-size: cover;
   background-position: center;
+
+  /* Flex untuk menaruh teks di bawah */
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
 }
 
-.cyber-card:hover {
+/* Efek Hover: Kartu naik dan glow */
+.tilt-card:hover {
   transform: translateY(-10px) scale(1.02);
-  box-shadow: 0 10px 30px rgba(0, 243, 255, 0.2);
-  border-color: var(--primary);
+  box-shadow: 0 10px 30px rgba(0, 243, 255, 0.3);
+  border-color: #00f3ff;
 }
 
+/* Overlay Hitam di bawah agar teks terbaca */
 .card-overlay {
   background: linear-gradient(
     to top,
     rgba(0, 0, 0, 0.95),
-    rgba(0, 0, 0, 0.5),
+    rgba(0, 0, 0, 0.6),
     transparent
   );
   padding: 20px;
   width: 100%;
-  transform: translateY(10px);
+  transform: translateY(10px); /* Sedikit turun */
   transition: 0.3s;
 }
-.cyber-card:hover .card-overlay {
-  transform: translateY(0);
+
+.tilt-card:hover .card-overlay {
+  transform: translateY(0); /* Naik saat hover */
+}
+
+/* Logo Kecil di atas teks (Opsional) */
+.mini-logo {
+  width: 5vh;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .card-info h3 {
-  font-family: var(--font-hud);
-  font-size: 1.2rem;
   margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-size: 1.2rem;
   color: #fff;
+  text-transform: uppercase;
+  font-family: var(--font-hud);
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
+
 .card-info p {
-  color: var(--primary);
+  margin: 5px 0 0;
   font-size: 0.8rem;
-  margin-top: 5px;
+  color: #00f3ff; /* Warna Neon */
   font-weight: bold;
 }
-
-/* Status Dot */
 .status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
+  background: #0f0;
   border-radius: 50%;
-  margin-right: 6px;
-  box-shadow: 0 0 5px currentColor;
-}
-.status-dot.online {
-  background: var(--success);
-  color: var(--success);
-}
-.status-dot.offline {
-  background: var(--danger);
-  color: var(--danger);
+  box-shadow: 0 0 5px #0f0;
+  margin-right: 5px;
 }
 
-/* =========================================
-   9. ORDER PAGE & FORMS
-   ========================================= */
+/* --- ORDER PAGE --- */
 .order-stage {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -454,7 +464,11 @@ body {
   position: relative;
   z-index: 20;
 }
-
+.game-poster-wrap {
+  position: sticky;
+  top: 100px;
+  perspective: 1000px;
+}
 .game-poster {
   width: 100%;
   border-radius: 20px;
@@ -486,122 +500,95 @@ body {
   height: 100%;
   background: linear-gradient(to bottom, var(--primary), transparent);
 }
-
-/* Input Fields */
-.input-group {
-  margin-bottom: 20px;
-}
-.input-label {
-  display: block;
-  font-family: var(--font-hud);
+.sec-title {
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--primary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  display: block;
   letter-spacing: 1px;
 }
+.input-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
 .input-neon {
-  width: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid #333;
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #444;
   color: #fff;
   padding: 15px;
-  font-family: var(--font-hud);
+  font-family: var(--font-mono);
   font-size: 14px;
   border-radius: 8px;
+  outline: none;
   transition: 0.3s;
 }
 .input-neon:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
 }
 
-/* Item Grid (Topup Packets) */
 .item-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
   margin-bottom: 30px;
 }
-
 .item-card {
-  position: relative;
-  background: rgba(20, 20, 35, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #333;
   padding: 15px;
+  text-align: center;
+  border-radius: 10px;
   cursor: pointer;
+  transition: 0.2s;
+  position: relative;
   overflow: hidden;
-  transition: all 0.3s;
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
+  justify-content: center;
+  min-height: 120px;
 }
-/* Grid Pattern on Card */
-.item-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(
-    rgba(255, 255, 255, 0.1) 1px,
-    transparent 1px
-  );
-  background-size: 8px 8px;
-  opacity: 0.3;
-  z-index: 0;
-}
-
 .item-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--primary);
-  background: rgba(20, 20, 35, 0.9);
+  border-color: #777;
+  background: rgba(255, 255, 255, 0.05);
 }
 .item-card.active {
   border-color: var(--primary);
-  background: rgba(0, 243, 255, 0.1);
-  box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.2);
+  background: rgba(0, 243, 255, 0.05);
+  box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.1);
 }
-
-.i-content {
-  position: relative;
-  z-index: 2;
+.item-card.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
+  height: 3px;
+  background: var(--primary);
 }
 .i-icon {
-  width: 40px;
-  height: 40px;
+  width: 35px;
+  height: 35px;
   object-fit: contain;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .i-name {
-  font-size: 0.85rem;
-  color: #e0e0e0;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1.2;
   margin-bottom: 5px;
-  font-weight: 500;
+  color: #ddd;
 }
 .i-price {
-  font-family: var(--font-hud);
-  font-size: 1rem;
-  font-weight: 800;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 4px 8px;
-  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
 }
 
-/* Premium Card Style */
-.item-card.card-premium {
-  background: linear-gradient(135deg, #2b2000, #1a1a1a);
-  border: 1px solid #ffd700;
-}
-.item-card.card-premium .i-name {
-  color: #ffd700;
-}
-.item-card.card-premium.active {
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
-}
-
-/* Glitch Button */
 .btn-glitch {
   width: 100%;
   background: #fff;
@@ -630,94 +617,25 @@ body {
   transform: scale(1.02);
 }
 
-/* =========================================
-   10. MODALS & PAYMENT
-   ========================================= */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(8px);
-  z-index: 9000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.modal.hidden {
+.nick-res {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(0, 255, 0, 0.05);
+  border: 1px dashed #0f0;
+  color: #0f0;
+  font-family: var(--font-mono);
+  font-size: 11px;
   display: none;
-}
-
-.payment-content {
-  background: #111;
-  width: 90%;
-  max-width: 500px;
-  border-radius: 15px;
-  border: 1px solid #333;
-  box-shadow: 0 0 50px rgba(0, 243, 255, 0.1);
-  animation: slideUp 0.3s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.pm-header {
-  padding: 15px 20px;
-  background: #0a0a0a;
-  border-bottom: 1px solid #222;
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-}
-.pm-title {
-  font-family: var(--font-head);
-  font-size: 14px;
-  color: #fff;
-}
-.close-modal {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 24px;
-  cursor: pointer;
+  gap: 10px;
+  animation: slideUp 0.3s;
 }
 
-.pm-body {
-  padding: 20px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.pm-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #1f1f1f;
-  padding: 15px;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: 0.2s;
-}
-.pm-item:hover {
-  background: #2a2a2a;
-  border-color: var(--primary);
-}
-.pm-name {
-  font-weight: bold;
-  color: #fff;
-  font-size: 0.9rem;
-}
-.pm-fee {
-  font-size: 0.8rem;
-  color: #888;
-}
-
-/* =========================================
-   11. DESKTOP DOCK (Floating)
-   ========================================= */
+/* --- DOCK & MODALS --- */
 .dock-wrapper {
   position: fixed;
   bottom: 30px;
+  left: 0;
   width: 100%;
   display: flex;
   justify-content: center;
@@ -725,15 +643,15 @@ body {
   z-index: 500;
 }
 .dock {
-  background: rgba(10, 10, 15, 0.7);
-  backdrop-filter: blur(15px);
+  background: rgba(10, 10, 15, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 10px 30px;
   border-radius: 50px;
   display: flex;
   gap: 25px;
+  backdrop-filter: blur(20px);
   pointer-events: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 .dock-btn {
   font-size: 20px;
@@ -742,6 +660,7 @@ body {
   height: 50px;
   border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -755,11 +674,158 @@ body {
   transform: translateY(-10px);
   box-shadow: 0 0 20px var(--primary);
 }
+.dock-btn.active .dock-lbl {
+  opacity: 1;
+  top: -30px;
+}
+.dock-lbl {
+  position: absolute;
+  top: -20px;
+  background: #fff;
+  color: #000;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: 0.3s;
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+.dock-sep {
+  width: 1px;
+  height: 30px;
+  background: #444;
+  align-self: center;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 9000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.hidden {
+  display: none !important;
+}
+.terminal-window {
+  width: 800px;
+  max-width: 90%;
+  height: 500px;
+  background: #080808;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  font-family: "Courier New", monospace;
+  box-shadow: 0 0 100px rgba(0, 243, 255, 0.15);
+}
+.term-head {
+  background: #111;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #222;
+}
+.traffic-lights span {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+.light.red {
+  background: #ff5f56;
+}
+.light.yellow {
+  background: #ffbd2e;
+}
+.light.green {
+  background: #27c93f;
+}
+.term-title {
+  font-size: 11px;
+  color: #666;
+}
+.term-body {
+  flex: 1;
+  padding: 20px;
+  color: var(--primary);
+  font-size: 12px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+.receipt-card {
+  width: 400px;
+  max-width: 90%;
+  background: #fff;
+  color: #000;
+  padding: 40px;
+  text-align: center;
+  clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+  animation: slideUp 0.5s;
+}
+.receipt-icon {
+  font-size: 40px;
+  color: #fff;
+  background: #0f0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 10px 30px rgba(0, 255, 0, 0.3);
+}
+.receipt-content {
+  margin: 20px 0;
+  border-top: 2px dashed #ccc;
+  border-bottom: 2px dashed #ccc;
+  padding: 15px 0;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.rc-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+/* ANIMATIONS */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
 
 /* =========================================
-   12. MOBILE RESPONSIVE (Strict)
-   ========================================= */
-/* Utility Helpers */
+    === RESPONSIVE MUTATION (MOBILE) ===
+    ========================================= */
 .desktop-only {
   display: flex !important;
 }
@@ -768,6 +834,7 @@ body {
 }
 
 @media (max-width: 768px) {
+  /* HIDE DESKTOP ELEMENTS */
   .desktop-only {
     display: none !important;
   }
@@ -777,20 +844,20 @@ body {
   .cursor-dot,
   .cursor-ring {
     display: none;
-  } /* No Hover on Touch */
+  }
 
-  /* Layout Adjustments */
+  /* RESET LAYOUT */
   #viewport {
     padding-bottom: 100px;
   }
   .container {
-    padding: 0 15px;
+    padding: 0 20px;
   }
 
-  /* Header */
+  /* MOBILE HEADER */
   .cyber-header {
+    padding: 0 20px;
     height: 60px;
-    padding: 0 15px;
     background: rgba(5, 5, 5, 0.95);
   }
   .brand-logo {
@@ -802,169 +869,694 @@ body {
     font-size: 16px;
   }
 
-  /* Hero */
+  /* MOBILE SLIDER */
   .hero-slider {
-    height: 45vh;
+    height: 50vh;
     min-height: 350px;
     mask-image: none;
     margin-bottom: 20px;
   }
   .slide-ui {
-    padding: 0 15px;
-    align-items: flex-end;
-    padding-bottom: 40px;
+    padding: 0 20px;
+    justify-content: flex-end;
+    padding-bottom: 50px;
   }
   .cyber-pane {
-    transform: none;
+    padding: 20px;
     border-left-width: 3px;
+    transform: skewX(0);
     background: rgba(0, 0, 0, 0.7);
     width: 100%;
-    padding: 20px;
   }
   .slide.active .cyber-pane {
-    transform: none;
+    transform: skewX(0);
   }
   .glitch-title {
-    font-size: 28px;
-    transform: none;
+    font-size: 32px;
+    transform: skewX(0);
+  }
+  .slide-sub {
+    font-size: 10px;
+    transform: skewX(0);
   }
 
-  /* Grid & Cards */
+  /* MOBILE GRID */
+  .section-title {
+    font-size: 20px;
+    border-left-width: 3px;
+    margin-bottom: 20px;
+  }
   .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
-  .cyber-card {
+  .tilt-card {
     height: 200px;
+    border-radius: 12px;
     transform: none !important;
-  } /* Disable Tilt */
+  } /* Disable Tilt on Mobile */
   .card-info {
-    padding: 10px;
-    background: linear-gradient(to top, #000, transparent);
+    padding: 12px;
+    transform: none !important;
+    background: rgba(0, 0, 0, 0.8);
   }
   .card-info h3 {
-    font-size: 0.9rem;
+    font-size: 12px;
   }
   .card-info p {
-    font-size: 0.7rem;
+    font-size: 8px;
   }
 
-  /* Order Page Mobile */
+  /* MOBILE ORDER PAGE */
   .order-stage {
     grid-template-columns: 1fr;
     margin-top: 0;
+    padding: 0 20px;
     gap: 20px;
   }
   .game-poster-wrap {
     display: none;
-  } /* Hide big poster */
-
-  /* Header Game Mobile */
-  .game-header-wrap {
-    margin-top: -80px;
-    display: flex;
-    align-items: flex-end;
-    gap: 15px;
-    padding: 0 15px 20px 15px;
-    position: relative;
-    z-index: 5;
-  }
-  .game-poster-img-mob {
-    width: 90px;
-    border-radius: 12px;
-    border: 2px solid #fff;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-  }
+  } /* Hide Poster on Mobile */
 
   .cyber-form {
+    padding: 20px;
+    border-radius: 15px;
     background: transparent;
     border: none;
-    padding: 0;
     backdrop-filter: none;
   }
   .cyber-form::after {
     display: none;
   }
 
-  /* Mobile Dock (Bottom Bar) */
+  .input-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+  .item-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .item-card {
+    min-height: 100px;
+    padding: 10px;
+  }
+  .i-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .i-name {
+    font-size: 10px;
+  }
+
+  /* MOBILE DOCK (NATIVE APP STYLE) */
   .dock-wrapper {
     bottom: 0;
+    padding: 0;
     background: #0a0a0a;
     border-top: 1px solid #222;
-    padding: 0;
-    width: 100%;
   }
   .dock {
     width: 100%;
     border-radius: 0;
-    border: none;
     background: transparent;
+    border: none;
     box-shadow: none;
     justify-content: space-around;
-    padding: 8px 0;
+    padding: 10px 0;
+    backdrop-filter: none;
   }
   .dock-btn {
     width: auto;
     height: auto;
+    border-radius: 0;
     background: transparent !important;
     box-shadow: none !important;
     transform: none !important;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 22px;
-    color: #555;
+    color: #666;
+    font-size: 20px;
   }
   .dock-btn.active {
     color: var(--primary);
   }
   .dock-lbl {
+    position: static;
+    opacity: 1;
     font-size: 9px;
-    font-family: var(--font-body);
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    margin-top: 4px;
+    pointer-events: auto;
   }
 
-  /* Sticky Pay Bar (Above Dock) */
+  /* STICKY PAY BAR */
   .mobile-pay-bar {
     position: fixed;
-    bottom: 70px; /* Above Dock */
-    left: 15px;
-    right: 15px;
-    background: rgba(20, 20, 30, 0.95);
+    bottom: 80px;
+    left: 20px;
+    right: 20px;
+    background: rgba(15, 15, 20, 0.95);
     border: 1px solid var(--primary);
     border-radius: 12px;
-    padding: 12px 20px;
+    padding: 15px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    z-index: 400;
+    z-index: 800;
     backdrop-filter: blur(10px);
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     animation: slideUp 0.3s;
   }
-  .mp-price {
-    font-size: 18px;
+  .mp-info {
+    display: flex;
+    flex-direction: column;
+  }
+  #mp-item {
+    font-size: 11px;
+    color: #aaa;
+  }
+  #mp-price {
+    font-size: 16px;
     font-weight: bold;
     font-family: var(--font-hud);
-    color: #fff;
   }
   .mp-btn {
     background: var(--primary);
     color: #000;
     border: none;
-    padding: 8px 20px;
-    border-radius: 6px;
+    padding: 10px 20px;
+    border-radius: 8px;
     font-weight: bold;
     font-family: var(--font-head);
+    font-size: 14px;
+  }
+}
+/* --- GAME ORDER PAGE STYLES --- */
+
+/* 1. Banner Atas */
+.game-hero {
+  background-size: cover;
+  background-position: center top;
+  height: 400px; /* Desktop tinggi */
+  width: 100%;
+  position: relative;
+  mask-image: linear-gradient(to bottom, black 50%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent);
+}
+
+/* 2. Container Header (Poster + Judul) */
+.game-header-wrap {
+  margin-top: -180px; /* Menarik konten ke atas banner */
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  gap: 30px;
+  padding-bottom: 30px;
+}
+
+/* 3. Poster Game */
+.game-poster-img {
+  width: 220px; /* Ukuran Desktop Fixed */
+  height: auto;
+  aspect-ratio: 2/3;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  transition: transform 0.3s ease;
+}
+
+.game-title h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  font-family: var(
+    --font-hud
+  ); /* Pastikan font ini ada, atau ganti sans-serif */
+}
+
+.game-title p {
+  font-size: 1.1rem;
+  opacity: 0.8;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- MOBILE RESPONSIVE (Layar < 768px) --- */
+@media (max-width: 768px) {
+  .game-hero {
+    height: 250px; /* Banner lebih pendek di HP */
+  }
+
+  .game-header-wrap {
+    margin-top: -100px;
+    flex-direction: row; /* Tetap sebaris tapi lebih padat */
+    align-items: flex-end;
+    gap: 15px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .game-poster-img {
+    width: 110px; /* Poster mengecil di HP */
+    border-radius: 12px;
+    border-width: 2px !important; /* Paksa border lebih tipis */
+  }
+
+  .game-title h1 {
+    font-size: 1.8rem; /* Judul mengecil */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+  }
+
+  .game-title p {
+    font-size: 0.8rem;
+  }
+
+  /* Form input lebih rapat di HP */
+  .cyber-form {
+    padding: 20px 15px;
   }
 }
 
-/* Animations */
+/* --- FIXED BOTTOM BUTTON FOR MOBILE --- */
+
+.footer-action {
+  margin-top: 40px;
+  text-align: right; /* Desktop: Kanan */
+}
+
+/* Tombol Default Desktop */
+.btn-pay-now {
+  width: 300px;
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  background: linear-gradient(90deg, #00f3ff, #0066ff);
+  border: none;
+  color: #000;
+  text-transform: uppercase;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+  cursor: pointer;
+  transition: 0.3s;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.btn-pay-now:hover {
+  transform: translateX(-5px);
+  box-shadow: 0 0 20px #00f3ff;
+  color: white;
+}
+
+/* Tampilan Mobile: Tombol Menempel di Bawah */
+@media (max-width: 768px) {
+  .footer-action {
+    position: relative;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(10, 10, 20, 0.95); /* Latar gelap transparan */
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-top: 1px solid rgba(0, 243, 255, 0.3);
+    z-index: 1000; /* Pastikan di atas elemen lain */
+    display: flex;
+    justify-content: center;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .btn-pay-now {
+    width: 100% !important; /* Full lebar di HP */
+    font-size: 1.1rem;
+  }
+
+  /* Tambahan padding agar konten terbawah tidak tertutup tombol */
+  .cyber-form {
+    padding-bottom: 100px !important;
+  }
+}
+
+/* =========================================
+   NEW ITEM CARD DESIGN (Cyber & Premium)
+   ========================================= */
+
+/* Grid Layout yang lebih rapi */
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(140px, 1fr)
+  ); /* Responsive Grid */
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+/* --- 1. BASE CARD STYLE (Regular Items) --- */
+.item-card {
+  position: relative;
+  background: rgba(20, 20, 35, 0.6); /* Dark Glass */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 15px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Pola Grid di Background (Pattern) */
+.item-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.1) 1px,
+    transparent 1px
+  );
+  background-size: 10px 10px; /* Pola Titik-titik */
+  opacity: 0.3;
+  z-index: 0;
+}
+
+/* Hover Effect Regular */
+.item-card:hover {
+  transform: translateY(-5px);
+  border-color: #00f3ff;
+  box-shadow: 0 10px 20px rgba(0, 243, 255, 0.15);
+  background: rgba(20, 20, 35, 0.9);
+}
+
+.item-card:hover .i-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.item-card.active {
+  border-color: #00f3ff;
+  background: rgba(0, 243, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+}
+
+/* --- 2. PREMIUM CARD STYLE (Membership) --- */
+.item-card.card-premium {
+  background: linear-gradient(135deg, #2b2000, #1a1a1a);
+  border: 1px solid #ffd700; /* Gold Border */
+}
+
+/* Efek Kilau (Shine Animation) untuk Premium */
+.item-card.card-premium::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 215, 0, 0.2),
+    transparent
+  );
+  transform: skewX(-25deg);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+  20% {
+    left: 200%;
+  } /* Cepat lewat */
+  100% {
+    left: 200%;
+  } /* Jeda lama */
+}
+
+.item-card.card-premium:hover {
+  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+  border-color: #ffed4a;
+}
+
+.item-card.card-premium.active {
+  background: linear-gradient(135deg, #423200, #2b2000);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+
+/* --- 3. CONTENT STYLING --- */
+.i-content {
+  position: relative;
+  z-index: 2; /* Agar di atas pattern */
+  width: 100%;
+}
+
+.i-icon {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  transition: transform 0.3s ease;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+}
+
+.i-name {
+  font-size: 0.85rem;
+  color: #e0e0e0;
+  margin-bottom: 5px;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+.card-premium .i-name {
+  color: #ffd700; /* Gold Text */
+  font-weight: bold;
+}
+
+.i-price {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* Responsive adjustment */
+@media (max-width: 768px) {
+  .item-grid {
+    grid-template-columns: repeat(3, 1fr); /* 3 Kolom di HP */
+    gap: 10px;
+  }
+  .item-card {
+    padding: 10px 5px;
+  }
+  .i-icon {
+    width: 35px;
+    height: 35px;
+  }
+  .i-name {
+    font-size: 0.7rem;
+    height: 30px; /* Limit height text */
+    overflow: hidden;
+  }
+  .i-price {
+    font-size: 0.8rem;
+  }
+}
+
+/* --- HOT DEALS / PROMO STYLES --- */
+
+/* Badge HOT di pojok kartu */
+.hot-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: linear-gradient(45deg, #ff0000, #ff4d00);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 2px 10px;
+  border-bottom-left-radius: 10px;
+  box-shadow: -2px 2px 10px rgba(255, 0, 0, 0.5);
+  z-index: 10;
+  animation: pulse-red 2s infinite;
+}
+
+/* Card khusus Promo (Efek Api) */
+.item-card.card-promo {
+  border: 1px solid #ff4d00;
+  background: linear-gradient(
+    180deg,
+    rgba(50, 10, 0, 0.8),
+    rgba(20, 20, 35, 0.9)
+  );
+}
+
+.item-card.card-promo:hover {
+  box-shadow: 0 0 20px rgba(255, 69, 0, 0.6);
+  border-color: #ff8c00;
+  transform: translateY(-5px) scale(1.02);
+}
+
+/* Label Section Hot Deals */
+.cat-label.hot-label {
+  color: #ff4d00;
+  text-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #ff4d00;
+  padding-bottom: 5px;
+  display: inline-block;
+}
+
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+  }
+}
+
+/* --- PAYMENT METHOD MODAL --- */
+.payment-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  display: none; /* Hidden by default */
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+
+.payment-content {
+  background: #1a1a1a;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  border-radius: 15px;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
 @keyframes slideUp {
   from {
-    transform: translateY(20px);
+    transform: translateY(50px);
     opacity: 0;
   }
   to {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+.pm-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #111;
+}
+
+.pm-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.pm-group-title {
+  font-size: 0.9rem;
+  color: #888;
+  margin: 15px 0 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.pm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #252525;
+  padding: 12px 15px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: 0.2s;
+}
+
+.pm-item:hover {
+  background: #333;
+  border-color: #00f3ff;
+}
+
+.pm-item img {
+  height: 25px;
+  object-fit: contain;
+}
+
+.pm-item-info {
+  flex: 1;
+  margin-left: 15px;
+}
+
+.pm-name {
+  font-weight: bold;
+  color: #fff;
+  font-size: 0.9rem;
+}
+.pm-fee {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+/* INVOICE RESULT */
+.invoice-box {
+  text-align: center;
+  padding: 20px;
+}
+.invoice-qr {
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
+  display: inline-block;
+  margin: 15px 0;
+}
+.invoice-va {
+  font-family: monospace;
+  font-size: 1.5rem;
+  color: #00f3ff;
+  background: rgba(0, 243, 255, 0.1);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px dashed #00f3ff;
+  margin: 15px 0;
 }
