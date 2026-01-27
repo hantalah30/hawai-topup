@@ -1,17 +1,19 @@
 :root {
+  /* --- COLORS (OLD STYLE BASE) --- */
   --primary: #00f3ff; /* Cyan Neon */
   --secondary: #ff0055; /* Red Neon */
-  --accent: #ffee00; /* Yellow Neon */
+  --accent: #ffee00; /* Yellow/Gold */
   --bg-void: #020203; /* Deep Dark */
   --glass: rgba(15, 20, 30, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.1);
 
+  /* --- FONTS --- */
   --font-head: "Syncopate", sans-serif;
   --font-body: "Rajdhani", sans-serif;
   --font-mono: "Orbitron", sans-serif;
 
+  /* --- DIMENSIONS --- */
   --header-h: 70px;
-  --dock-h: 80px;
 }
 
 * {
@@ -31,48 +33,14 @@ body {
 }
 
 /* =========================================
-   1. UTILITIES (TAMBAHAN DARI YANG BARU)
-   Agar layout JS baru tetap jalan
-   ========================================= */
-.hidden {
-  display: none !important;
-}
-.d-flex {
-  display: flex;
-}
-.align-center {
-  align-items: center;
-}
-.justify-between {
-  justify-content: space-between;
-}
-.mt-3 {
-  margin-top: 1rem;
-}
-.text-center {
-  text-align: center;
-}
-.text-danger {
-  color: var(--secondary);
-}
-.text-warning {
-  color: var(--accent);
-}
-.text-success {
-  color: #0f0;
-}
-.full {
-  width: 100%;
-}
-
-/* =========================================
-   2. VFX LAYERS (LAMA - DIPERTAHANKAN)
+   1. VFX & BACKGROUND (OLD STYLE - KEPT)
    ========================================= */
 #webgl-canvas {
   position: fixed;
   inset: 0;
   z-index: 0;
 }
+
 .fx-scanlines {
   position: fixed;
   inset: 0;
@@ -88,6 +56,7 @@ body {
   z-index: 2;
   opacity: 0.5;
 }
+
 .fx-noise {
   position: fixed;
   inset: 0;
@@ -96,6 +65,7 @@ body {
   pointer-events: none;
   z-index: 1;
 }
+
 .fx-vignette {
   position: fixed;
   inset: 0;
@@ -104,8 +74,58 @@ body {
   z-index: 3;
 }
 
+/* --- UTILS --- */
+.text-neon {
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--primary);
+}
+.text-warning {
+  color: var(--accent);
+}
+.text-danger {
+  color: var(--secondary);
+}
+.hidden {
+  display: none !important;
+}
+.mt-3 {
+  margin-top: 1rem;
+}
+.full {
+  width: 100%;
+}
+
+/* Cursor (Desktop) */
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  position: fixed;
+  border-radius: 50%;
+  z-index: 9999;
+  pointer-events: none;
+  mix-blend-mode: difference;
+}
+.cursor-ring {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--primary);
+  position: fixed;
+  border-radius: 50%;
+  z-index: 9998;
+  pointer-events: none;
+  transition: transform 0.1s ease-out;
+}
+body.hover .cursor-ring {
+  width: 60px;
+  height: 60px;
+  background: rgba(0, 243, 255, 0.1);
+  border-color: var(--secondary);
+  mix-blend-mode: screen;
+}
+
 /* =========================================
-   3. HEADER & AUTH (DIGABUNG)
+   2. HEADER & AUTH (UPDATED / HYBRID)
    ========================================= */
 .cyber-header {
   position: fixed;
@@ -122,6 +142,7 @@ body {
   padding: 0 max(20px, env(safe-area-inset-right));
   padding-left: max(20px, env(safe-area-inset-left));
 }
+
 .header-inner {
   width: 100%;
   max-width: 1400px;
@@ -130,6 +151,7 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+
 .brand {
   display: flex;
   align-items: center;
@@ -172,25 +194,28 @@ body {
   color: #666;
 }
 
-/* Styles untuk Auth Button & User Info */
+/* --- USER INFO (Style Baru diadaptasi ke Cyberpunk) --- */
 .auth-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 15px;
 }
+
 .btn-google {
   background: #fff;
-  color: #333;
+  color: #000;
   border: none;
   padding: 8px 15px;
-  border-radius: 5px;
+  border-radius: 4px;
   font-weight: bold;
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-family: "Rajdhani", sans-serif;
+  font-family: var(--font-body);
+  text-transform: uppercase;
   transition: 0.3s;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
 }
 .btn-google:hover {
   background: var(--primary);
@@ -200,30 +225,29 @@ body {
 .user-info {
   display: none;
   align-items: center;
-  gap: 10px;
-  color: #fff;
+  gap: 15px;
 }
 .user-avatar {
-  width: 35px;
-  height: 35px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid var(--primary);
 }
 
-/* [MODIFIKASI] Coin Balance agar terlihat bisa diklik (Topup) */
+/* Coin Badge yang bisa diklik (Fitur Baru) */
 .coin-balance {
-  color: var(--accent);
-  font-weight: bold;
-  font-size: 0.9rem;
   background: rgba(0, 0, 0, 0.5);
-  padding: 2px 10px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 5px 12px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 238, 0, 0.3);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
   cursor: pointer;
-  transition: 0.3s;
   display: flex;
   align-items: center;
   gap: 5px;
+  transition: 0.3s;
 }
 .coin-balance:hover {
   background: rgba(255, 238, 0, 0.1);
@@ -245,7 +269,7 @@ body {
 }
 
 /* =========================================
-   4. LAYOUT & SLIDER (LAMA)
+   3. HOME PAGE (OLD STYLE - KEPT)
    ========================================= */
 #viewport {
   width: 100%;
@@ -264,6 +288,7 @@ body {
   padding-left: max(20px, env(safe-area-inset-left));
 }
 
+/* Slider */
 .hero-slider {
   position: relative;
   height: clamp(400px, 60vh, 700px);
@@ -354,9 +379,7 @@ body {
   animation: progress 5s linear forwards;
 }
 
-/* =========================================
-   5. HOME GRID & TILT CARDS (LAMA)
-   ========================================= */
+/* Grid Games */
 .section-title {
   font-family: var(--font-head);
   font-size: 24px;
@@ -434,8 +457,7 @@ body {
 }
 
 /* =========================================
-   6. ORDER PAGE & ITEM CARDS (STRICTLY LAMA)
-   User minta bagian ini JANGAN diubah
+   4. ORDER PAGE (OLD STYLE - STRICTLY KEPT)
    ========================================= */
 .game-hero {
   background-size: cover;
@@ -463,7 +485,6 @@ body {
   object-fit: cover;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   border: 2px solid rgba(255, 255, 255, 0.1);
-  transition: transform 0.3s;
 }
 .game-title h1 {
   font-size: 3.5rem;
@@ -479,6 +500,7 @@ body {
   margin-top: 10px;
 }
 
+/* Forms */
 .cyber-form {
   background: rgba(10, 10, 15, 0.8);
   backdrop-filter: blur(25px);
@@ -510,8 +532,6 @@ body {
   gap: 10px;
   margin-bottom: 20px;
 }
-
-/* Input Neon tetap sama */
 .input-neon,
 .input-clean {
   flex: 1;
@@ -531,20 +551,7 @@ body {
   box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
 }
 
-.nick-res {
-  margin-top: 10px;
-  padding: 12px;
-  background: rgba(0, 255, 0, 0.05);
-  border: 1px dashed #0f0;
-  color: #0f0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  display: none;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Item Grid & Cards Style Lama */
+/* Item Grid & Cards (PRESERVED) */
 .item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -590,7 +597,18 @@ body {
 }
 .item-card.active {
   background: rgba(0, 243, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
 }
+/* Premium Card */
+.item-card.card-premium {
+  background: linear-gradient(135deg, #2b2000, #1a1a1a);
+  border: 1px solid #ffd700;
+}
+.item-card.card-premium:hover {
+  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+  border-color: #ffed4a;
+}
+/* Content */
 .i-content {
   position: relative;
   z-index: 2;
@@ -601,13 +619,18 @@ body {
   height: 45px;
   object-fit: contain;
   margin-bottom: 10px;
-  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+  transition: transform 0.3s ease;
 }
 .i-name {
   font-size: 0.85rem;
   color: #e0e0e0;
   margin-bottom: 5px;
+  line-height: 1.3;
   font-weight: 500;
+}
+.card-premium .i-name {
+  color: #ffd700;
+  font-weight: bold;
 }
 .i-price {
   font-size: 1rem;
@@ -618,22 +641,6 @@ body {
   border-radius: 6px;
   display: inline-block;
 }
-
-/* Premium Card (Gold) */
-.item-card.card-premium {
-  background: linear-gradient(135deg, #2b2000, #1a1a1a);
-  border: 1px solid #ffd700;
-}
-.item-card.card-premium:hover {
-  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
-  border-color: #ffed4a;
-}
-.item-card.card-premium .i-name {
-  color: #ffd700;
-  font-weight: bold;
-}
-
-/* Hot Promo Card */
 .hot-badge {
   position: absolute;
   top: 0;
@@ -647,29 +654,12 @@ body {
   z-index: 10;
   animation: pulse-red 2s infinite;
 }
-.item-card.card-promo {
-  border: 1px solid #ff4d00;
-  background: linear-gradient(
-    180deg,
-    rgba(50, 10, 0, 0.8),
-    rgba(20, 20, 35, 0.9)
-  );
-}
-.cat-label {
-  font-size: 1.1rem;
-  color: #fff;
-  margin-bottom: 15px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 5px;
-  display: inline-block;
-}
-.cat-label.hot-label {
-  color: #ff4d00;
-  border-color: #ff4d00;
-  text-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
-}
 
-/* Tombol Footer Action (Desktop/Mobile) */
+/* =========================================
+   5. BUTTON & MODALS (UPDATED TO NEW STYLE)
+   ========================================= */
+
+/* New Sticky "Buy Now" Button Logic */
 .footer-action {
   margin-top: 40px;
   text-align: right;
@@ -686,6 +676,7 @@ body {
   text-transform: uppercase;
   cursor: pointer;
   transition: 0.3s;
+  font-family: var(--font-head);
   clip-path: polygon(
     10px 0,
     100% 0,
@@ -697,46 +688,50 @@ body {
 }
 .btn-pay-now:hover,
 .sp-btn:hover {
-  box-shadow: 0 0 20px #00f3ff;
-  color: white;
   transform: translateX(-5px);
+  box-shadow: 0 0 20px #00f3ff;
+  color: #fff;
+}
+.btn-pay-now:disabled {
+  filter: grayscale(1);
+  cursor: not-allowed;
 }
 
-/* =========================================
-   7. MODAL BARU (ADAPTASI KE CYBERPUNK)
-   Ini style tambahan agar Modal Topup & Payment
-   yang ada di HTML baru terlihat Cyberpunk
-   ========================================= */
+/* MODAL SYSTEM (Hybrid: Structure New, Look Old) */
 .modal-overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.9);
   z-index: 2000;
   display: flex;
-  justify-content: center;
   align-items: center;
-  backdrop-filter: blur(5px);
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
   transition: 0.3s;
 }
-.hidden {
-  display: none !important;
+.modal-overlay:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-/* Modal Glass Container */
 .modal-glass {
-  background: #0a0e17; /* Dark BG */
+  background: #0a0e14;
   width: 90%;
   max-width: 450px;
   border-radius: 15px;
-  border: 1px solid var(--primary); /* Neon Border */
-  box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
+  border: 1px solid var(--primary);
+  box-shadow: 0 0 40px rgba(0, 243, 255, 0.15);
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s ease;
-  position: relative;
   overflow: hidden;
+  animation: slideUp 0.3s ease;
 }
-/* Modal Header */
+
 .modal-head {
   padding: 15px 20px;
   border-bottom: 1px solid rgba(0, 243, 255, 0.3);
@@ -751,13 +746,14 @@ body {
   color: #fff;
   margin: 0;
 }
+
 .modal-body {
   padding: 20px;
   max-height: 60vh;
   overflow-y: auto;
 }
 
-/* Grid Pilihan Coin (Topup) */
+/* Styles for Topup Grid (from New Style) */
 .coin-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -766,62 +762,70 @@ body {
 }
 .coin-opt {
   padding: 15px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   text-align: center;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid transparent;
-  font-family: var(--font-mono);
+  border: 1px solid #333;
   color: var(--primary);
-  transition: 0.3s;
+  font-family: var(--font-mono);
   font-size: 1.1rem;
-  font-weight: bold;
+  transition: 0.2s;
 }
 .coin-opt:hover {
   border-color: var(--primary);
   background: rgba(0, 243, 255, 0.1);
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
 }
 
-/* List Metode Pembayaran */
-.scrollable {
-  overflow-y: auto;
-  max-height: 50vh;
-}
+/* Styles for Payment Method List (from New Style) */
 .pay-item {
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 12px;
+  padding: 12px 15px;
   background: rgba(255, 255, 255, 0.03);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid #333;
-  transition: 0.3s;
+  border: 1px solid transparent;
+  transition: 0.2s;
 }
 .pay-item:hover {
+  background: rgba(255, 255, 255, 0.08);
   border-color: var(--primary);
-  background: rgba(0, 243, 255, 0.05);
 }
-.pay-icon {
-  width: 40px;
-  background: #fff;
-  padding: 2px;
-  border-radius: 4px;
-}
-.pay-info {
-  flex: 1;
-}
-.pay-price {
-  font-family: var(--font-mono);
-  color: var(--accent);
-  font-weight: bold;
+.scrollable {
+  overflow-y: auto;
+  max-height: 60vh;
 }
 
-/* =========================================
-   8. DOCK & MOBILE
-   ========================================= */
+/* Receipt Modal (Old Style) */
+.receipt-card {
+  width: 400px;
+  max-width: 90%;
+  background: #fff;
+  color: #000;
+  padding: 40px;
+  text-align: center;
+  clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+  animation: slideUp 0.5s;
+}
+.receipt-icon {
+  font-size: 40px;
+  color: #fff;
+  background: #0f0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 10px 30px rgba(0, 255, 0, 0.3);
+}
+
+/* --- DOCK (MOBILE) --- */
 .dock-wrapper {
   position: fixed;
   bottom: 30px;
@@ -881,14 +885,8 @@ body {
   opacity: 1;
   top: -30px;
 }
-.dock-sep {
-  width: 1px;
-  height: 30px;
-  background: #444;
-  align-self: center;
-}
 
-/* Sticky Pay Mobile (Jika needed) */
+/* Sticky Pay Bar (Mobile) */
 .sticky-pay {
   position: fixed;
   bottom: 80px;
@@ -910,13 +908,16 @@ body {
   flex-direction: column;
   font-size: 12px;
 }
+.sp-info span:first-child {
+  color: #aaa;
+}
 .sp-info span:last-child {
   font-size: 16px;
   font-weight: bold;
   color: var(--primary);
 }
 
-/* Animations */
+/* --- ANIMATIONS --- */
 @keyframes blink {
   50% {
     opacity: 0;
@@ -952,7 +953,7 @@ body {
   }
 }
 
-/* Media Queries */
+/* --- RESPONSIVE --- */
 .desktop-only {
   display: flex !important;
 }
@@ -971,12 +972,14 @@ body {
   .cursor-ring {
     display: none;
   }
+
   #viewport {
     padding-bottom: 100px;
   }
   .container {
     padding: 0 20px;
   }
+
   .cyber-header {
     padding: 0 20px;
     height: 60px;
@@ -988,13 +991,14 @@ body {
     mask-image: none;
     margin-bottom: 20px;
   }
+
+  /* Mobile Order Page */
   .game-hero {
     height: 250px;
   }
   .game-header-wrap {
     margin-top: -100px;
     padding-left: 10px;
-    flex-wrap: wrap;
   }
   .game-poster-img {
     width: 110px;
@@ -1002,7 +1006,11 @@ body {
   .game-title h1 {
     font-size: 1.8rem;
   }
-  .grid {
+  .cyber-form {
+    padding: 20px 15px;
+  }
+  .grid,
+  .item-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
@@ -1010,35 +1018,36 @@ body {
     height: 200px;
     transform: none !important;
   }
-
-  /* Mobile Order & Grid */
-  .item-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
   .item-card {
     min-height: 100px;
     padding: 10px;
   }
-  .btn-pay-now {
-    width: 100%;
-    font-size: 1rem;
-  }
+
+  /* Sticky Bottom Action */
   .footer-action {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
     background: rgba(10, 10, 20, 0.95);
+    backdrop-filter: blur(10px);
     padding: 15px;
-    border-top: 1px solid var(--primary);
+    border-top: 1px solid rgba(0, 243, 255, 0.3);
     z-index: 1000;
+    display: flex;
+    justify-content: center;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
+    margin-top: 0;
+  }
+  .btn-pay-now {
+    width: 100% !important;
+    font-size: 1.1rem;
   }
   .cyber-form {
-    padding-bottom: 100px;
+    padding-bottom: 100px !important;
   }
 
-  /* Mobile Dock Custom */
+  /* Mobile Dock */
   .dock-wrapper {
     bottom: 0;
     padding: 0;
@@ -1059,8 +1068,6 @@ body {
     box-shadow: none !important;
     transform: none !important;
     color: #666;
-    width: auto;
-    height: auto;
   }
   .dock-btn.active {
     color: var(--primary);
@@ -1072,6 +1079,5 @@ body {
     color: inherit;
     padding: 0;
     margin-top: 4px;
-    pointer-events: auto;
   }
 }
