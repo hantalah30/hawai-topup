@@ -437,20 +437,17 @@ async function saveAssets(silent = false) {
 }
 
 async function saveConfig() {
-  const digiUser = document.getElementById("digi_user").value || "";
-  const digiApi = document.getElementById("digi_api").value || "";
-  const triMerch = document.getElementById("tripay_merchant").value || "";
-  const triApi = document.getElementById("tripay_api").value || "";
-  const triPriv = document.getElementById("tripay_private").value || "";
-
-  // Safe navigation for admin_password
-  const oldPass =
-    db.config && db.config.admin_password ? db.config.admin_password : "admin";
-
   const cfg = {
-    digiflazz: { username: digiUser, api_key: digiApi },
-    tripay: { merchant_code: triMerch, api_key: triApi, private_key: triPriv },
-    admin_password: oldPass,
+    digiflazz: {
+      username: document.getElementById("digi_user").value,
+      api_key: document.getElementById("digi_api").value,
+    },
+    tripay: {
+      merchant_code: document.getElementById("tripay_merchant").value,
+      api_key: document.getElementById("tripay_api").value,
+      private_key: document.getElementById("tripay_private").value,
+    },
+    admin_password: db.config.admin_password || "admin",
   };
 
   try {
@@ -461,11 +458,15 @@ async function saveConfig() {
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "Server Error");
+
+    if (!res.ok) {
+      // TAMPILKAN ERROR ASLI DARI GOOGLE / FIREBASE
+      throw new Error(json.error || json.message || "Unknown Server Error");
+    }
 
     alert("✅ Konfigurasi Tersimpan!");
     db.config = cfg;
   } catch (e) {
-    alert("Error Saving Config: " + e.message);
+    alert("❌ ERROR: " + e.message);
   }
 }
