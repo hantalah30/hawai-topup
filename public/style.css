@@ -699,15 +699,84 @@ body.hover .cursor-ring {
   align-self: center;
 }
 
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.95);
-  backdrop-filter: blur(10px);
-  z-index: 9000;
+/* [BARU] Modal Glass (Untuk Topup & Payment) - Diadaptasi ke Cyberpunk */
+.modal-glass {
+  background: #0a0e17;
+  width: 90%;
+  max-width: 450px;
+  border-radius: 15px;
+  border: 1px solid var(--primary);
+  box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  animation: slideUp 0.3s ease;
+}
+
+.modal-head {
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(0, 243, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  background: rgba(0, 243, 255, 0.05);
+}
+.modal-head h3 {
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* [BARU] Styles untuk Grid Coin & Payment List */
+.coin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-top: 15px;
+}
+.coin-opt {
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  text-align: center;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  color: var(--primary);
+  transition: 0.3s;
+}
+.coin-opt:hover {
+  border-color: var(--primary);
+  background: rgba(0, 243, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+}
+
+.pay-item {
+  /* Support class lama/baru */
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: 0.3s;
+}
+.pay-item:hover {
+  border-color: var(--primary);
+  background: rgba(0, 243, 255, 0.05);
+}
+
+.scrollable {
+  overflow-y: auto;
+  max-height: 60vh;
 }
 .hidden {
   display: none !important;
