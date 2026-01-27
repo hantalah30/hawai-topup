@@ -36,7 +36,7 @@ async function login() {
       alert("Password Salah");
     }
   } catch (e) {
-    alert("Gagal Login: Cek Koneksi Internet / Server");
+    alert("Gagal Login: Cek Koneksi / Server");
   } finally {
     btn.innerText = originalText;
     btn.disabled = false;
@@ -51,19 +51,22 @@ async function loadData() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
 
-    // Jika server error (500), jangan crash, pakai default state
-    if (!res.ok) throw new Error("Gagal mengambil data dari server");
+    // Jangan throw error, handle gracefully
+    if (!res.ok) {
+      console.warn("Server belum dikonfigurasi atau DB kosong.");
+      return;
+    }
 
     const data = await res.json();
 
-    // SAFE MERGE: Hanya update jika data valid
+    // SAFE MERGE
     if (data) {
       if (data.config) db.config = data.config;
       if (data.products) db.products = data.products;
       if (data.assets) db.assets = data.assets;
     }
 
-    // FILL FORM (Dengan Pengecekan Aman)
+    // FILL FORM
     const conf = db.config || {};
 
     if (conf.digiflazz) {
@@ -84,8 +87,7 @@ async function loadData() {
     populateBrandFilter();
     filterProducts();
   } catch (e) {
-    console.warn("Mode Offline / Server Error:", e);
-    // Tidak alert agar admin tetap bisa input manual jika perlu
+    console.warn("Gagal load data:", e);
   }
 }
 
@@ -95,11 +97,9 @@ function populateBrandFilter() {
     ...new Set(db.products.map((p) => p.brand || "Lainnya")),
   ].sort();
   const select = document.getElementById("filterBrand");
-
   select.innerHTML =
     '<option value="" disabled selected>-- Pilih Game --</option>';
   select.innerHTML += '<option value="ALL_DATA">SEMUA DATA (BERAT)</option>';
-
   brands.forEach(
     (b) => (select.innerHTML += `<option value="${b}">${b}</option>`),
   );
@@ -134,7 +134,7 @@ function renderProductTable(data) {
 
   if (data.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="7" class="text-center py-3">Produk tidak ditemukan / Belum pilih kategori.</td></tr>';
+      '<tr><td colspan="7" class="text-center py-3">Produk tidak ditemukan.</td></tr>';
     return;
   }
 
@@ -299,7 +299,7 @@ async function processBulkImage(input) {
 
 // --- SERVER SYNC & SAVE ---
 async function syncDigiflazz() {
-  if (!confirm("Tarik data Digiflazz?")) return;
+  if (!confirm("Tarik data Digiflazz? (Harga modal akan terupdate)")) return;
   const btn = document.getElementById("btnSync");
   const oldHtml = btn.innerHTML;
   btn.innerHTML = "⏳ Syncing...";
@@ -310,11 +310,15 @@ async function syncDigiflazz() {
       method: "POST",
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Server Error");
+
+    if (!res.ok) {
+      throw new Error(data.message || data.detail || "Server Error 500");
+    }
+
     alert(data.message);
     loadData();
   } catch (e) {
-    alert("Error: " + e.message);
+    alert("Gagal Sync: " + e.message);
   } finally {
     btn.innerHTML = oldHtml;
     btn.disabled = false;
@@ -423,10 +427,11 @@ async function saveAssets(silent = false) {
       body: JSON.stringify(db.assets),
     });
     if (!silent) alert("Asset tersimpan!");
-  } catch (e) {}
+  } catch (e) {
+    if (!silent) alert("Gagal simpan asset");
+  }
 }
 
-// --- FIX UNCAUGHT TYPE ERROR HERE ---
 async function saveConfig() {
   const digiUser = document.getElementById("digi_user").value || "";
   const digiApi = document.getElementById("digi_api").value || "";
@@ -434,7 +439,7 @@ async function saveConfig() {
   const triApi = document.getElementById("tripay_api").value || "";
   const triPriv = document.getElementById("tripay_private").value || "";
 
-  // Ambil password lama dengan aman (fallback ke "admin")
+  // Safe navigation for admin_password
   const oldPass =
     db.config && db.config.admin_password ? db.config.admin_password : "admin";
 
@@ -454,7 +459,7 @@ async function saveConfig() {
     const json = await res.json();
     if (json.success) {
       alert("✅ Konfigurasi Tersimpan!");
-      db.config = cfg; // Update local
+      db.config = cfg;
     } else {
       alert("Gagal menyimpan: " + (json.error || "Server Error"));
     }
