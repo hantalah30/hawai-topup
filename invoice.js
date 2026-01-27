@@ -2,7 +2,7 @@ const API_URL = "http://localhost:3000/api";
 
 const ASSETS = {
   "Mobile Legends": {
-    logo: "assets/lance.png",
+    logo: "assets/lance2.png",
     banner: "assets/ml-banner.png",
   },
   "Free Fire": { logo: "assets/ff.jpg", banner: "assets/ff-banner.jpg" },
@@ -22,7 +22,6 @@ const ASSETS = {
 
 let checkInt, timerInt;
 
-// --- INIT ---
 document.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(window.location.search);
   const ref = params.get("ref");
@@ -31,20 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadData(ref);
   checkInt = setInterval(() => checkStatus(ref), 3000);
 
-  // 3D TILT EFFECT (Desktop Only)
-  const card = document.querySelector(".visual-side");
-  const logo = document.getElementById("logoWrap");
-
-  if (window.innerWidth > 768) {
-    card.addEventListener("mousemove", (e) => {
-      const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
-      const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
-      logo.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
-    });
-    card.addEventListener("mouseleave", () => {
-      logo.style.transform = `rotateY(0deg) rotateX(0deg)`;
-    });
-  }
+  initParticles();
+  setupTiltEffect();
 });
 
 async function loadData(ref) {
@@ -55,6 +42,10 @@ async function loadData(ref) {
 
     renderAll(json.data);
     document.getElementById("loader").style.display = "none";
+    setTimeout(
+      () => (document.getElementById("progFill").style.width = "50%"),
+      500,
+    );
   } catch (e) {
     alert("Error: " + e.message);
   }
@@ -73,17 +64,21 @@ function renderAll(data) {
   document.getElementById("gameTitle").innerText = data.game;
   document.getElementById("refIdSmall").innerText = data.ref_id;
 
-  // 2. Details
+  // 2. Data Text
   document.getElementById("dItem").innerText = data.product_name;
   document.getElementById("dUid").innerText = data.user_id;
-  document.getElementById("dNick").innerText = data.nickname || "-";
   document.getElementById("dMethod").innerText = data.method;
   document.getElementById("dTotal").innerText =
     "Rp " + parseInt(data.amount).toLocaleString();
 
-  // 3. Status Logic
+  // 3. ANIMASI NICKNAME
+  // Jalankan efek decoding text pada nickname
+  const finalNick = data.nickname || "User Game";
+  animateNickname("dNick", finalNick);
+
+  // 4. Status Check
   if (data.status === "PAID") {
-    showSuccess();
+    showSuccess(true);
   } else if (data.status === "EXPIRED") {
     showExpired();
   } else {
@@ -92,91 +87,146 @@ function renderAll(data) {
   }
 }
 
+// --- FITUR BARU: ANIMASI DECODING TEXT ---
+function animateNickname(elementId, finalText) {
+  const el = document.getElementById(elementId);
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+  let iterations = 0;
+
+  const interval = setInterval(() => {
+    el.innerText = finalText
+      .split("")
+      .map((letter, index) => {
+        if (index < iterations) return finalText[index];
+        return chars[Math.floor(Math.random() * chars.length)];
+      })
+      .join("");
+
+    if (iterations >= finalText.length) clearInterval(interval);
+    iterations += 1 / 3; // Kecepatan decoding
+  }, 30);
+}
+
 function renderPay(data) {
   const area = document.getElementById("paymentArea");
   if (data.qr_url) {
     area.innerHTML = `
-            <div class="small text-muted mb-2 text-uppercase fw-bold">Scan QRIS</div>
-            <div class="qr-box"><img src="${data.qr_url}" width="180"></div>
-            <div class="mt-3">
-                <a href="${data.qr_url}" download class="btn btn-dark btn-sm rounded-pill px-3">
-                    <i class="fas fa-download me-1"></i> Simpan
-                </a>
-            </div>
+            <div class="small text-muted mb-2 fw-bold text-uppercase">Scan QRIS</div>
+            <div class="qr-wrapper"><div class="qr-laser"></div><img src="${data.qr_url}" width="180"></div>
+            <div class="mt-2 text-muted small">Support: DANA, OVO, Shopee, LinkAja</div>
         `;
   } else if (data.pay_code) {
     area.innerHTML = `
-            <div class="small text-muted mb-1 text-uppercase fw-bold">Nomor Virtual Account</div>
-            <div class="va-display" onclick="copy('${data.pay_code}')" title="Klik Copy">
-                ${data.pay_code} <i class="far fa-copy text-primary fs-5 ms-2"></i>
+            <div class="small text-muted mb-1 fw-bold text-uppercase">Nomor Virtual Account</div>
+            <div class="va-display" onclick="copy('${data.pay_code}')">
+                ${data.pay_code} <i class="far fa-copy text-primary ms-2 fs-5"></i>
+                <span class="copy-tooltip">Salin!</span>
             </div>
-            <div class="small text-muted mb-3">Total: <b>Rp ${parseInt(data.amount).toLocaleString()}</b></div>
-            <a href="${data.checkout_url}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill">Cara Bayar</a>
+            <div class="alert alert-info py-1 px-2 d-inline-block small mb-2 border-0">
+                <i class="fas fa-info-circle"></i> Cek otomatis
+            </div>
+            <br>
+            <a href="${data.checkout_url}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3">Petunjuk</a>
         `;
   }
 }
 
-function showSuccess() {
+function showSuccess(isInstant = false) {
   clearInterval(checkInt);
   clearInterval(timerInt);
-
-  // Update Timeline
+  document.getElementById("progFill").style.width = "100%";
   document.getElementById("stepPay").classList.add("completed");
   document.getElementById("stepPay").classList.remove("active");
   document.getElementById("stepDone").classList.add("completed", "active");
 
-  // Hide Timer & Pay
-  document.getElementById("alertBox").style.display = "none";
-
-  const area = document.getElementById("paymentArea");
-  area.style.background = "#d1e7dd";
-  area.style.color = "#0f5132";
-  area.innerHTML = `
-        <i class="fas fa-check-circle fa-5x mb-3 text-success"></i>
-        <h3 class="fw-bold">Pembayaran Berhasil!</h3>
-        <p class="small">Pesanan Anda sedang diproses sistem.</p>
-    `;
-
-  // TRIGGER CONFETTI
-  confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+  if (!isInstant) {
+    document.getElementById("sfx-success").play();
+    confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
+  }
+  document.getElementById("successOverlay").style.display = "flex";
 }
 
 function showExpired() {
   clearInterval(checkInt);
-  document.getElementById("alertBox").className =
-    "alert alert-danger border-0 text-center mb-4 small fw-bold";
-  document.getElementById("alertBox").innerHTML = "WAKTU HABIS";
-
-  const area = document.getElementById("paymentArea");
-  area.style.opacity = "0.5";
-  area.innerHTML = `<h3 class="text-danger fw-bold py-4">TRANSAKSI BATAL</h3>`;
+  document.getElementById("paymentArea").style.opacity = "0.5";
+  document.getElementById("paymentArea").innerHTML =
+    `<h3 class="text-danger fw-bold py-4">WAKTU HABIS</h3>`;
+  document.getElementById("countdown").innerText = "EXPIRED";
 }
 
 function startTimer(created) {
   const end = created + 24 * 3600 * 1000;
   timerInt = setInterval(() => {
     const diff = end - Date.now();
-    if (diff <= 0) {
-      showExpired();
-      return;
-    }
+    if (diff <= 0) return showExpired();
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
-    document.getElementById("timer").innerText = `${h}:${m}:${s}`;
+    document.getElementById("countdown").innerText =
+      `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }, 1000);
 }
 
 function copy(txt) {
   navigator.clipboard.writeText(txt);
-  const el = document.querySelector(".va-display");
-  const ori = el.innerHTML;
-  el.innerHTML = `<span class="text-success">TERSALIN!</span>`;
-  setTimeout(() => (el.innerHTML = ori), 1000);
+  document.getElementById("sfx-click").play();
+  const el = document.querySelector(".copy-tooltip");
+  el.innerText = "Tersalin!";
+  el.style.opacity = 1;
+  setTimeout(() => {
+    el.style.opacity = 0;
+    el.innerText = "Salin!";
+  }, 1500);
 }
 
 async function checkStatus(ref) {
-  const res = await fetch(`${API_URL}/transaction/${ref}`);
-  const json = await res.json();
-  if (json.success && json.data.status === "PAID") showSuccess();
+  try {
+    const res = await fetch(`${API_URL}/transaction/${ref}`);
+    const json = await res.json();
+    if (json.success && json.data.status === "PAID") showSuccess();
+  } catch (e) {}
+}
+
+function setupTiltEffect() {
+  if (window.innerWidth < 768) return;
+  const card = document.getElementById("visualSide");
+  const logo = document.getElementById("logoWrap");
+  card.addEventListener("mousemove", (e) => {
+    const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
+    const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
+    logo.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+    document.getElementById("bgImg").style.transform = "scale(1.2)";
+  });
+  card.addEventListener("mouseleave", () => {
+    logo.style.transform = `rotateY(0deg) rotateX(0deg)`;
+    document.getElementById("bgImg").style.transform = "scale(1.1)";
+  });
+}
+
+function initParticles() {
+  const canvas = document.getElementById("particles");
+  const ctx = canvas.getContext("2d");
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  let particles = [];
+  for (let i = 0; i < 50; i++)
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      size: Math.random() * 2,
+      speedY: Math.random() * 0.5 + 0.1,
+    });
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+    particles.forEach((p) => {
+      p.y -= p.speedY;
+      if (p.y < 0) p.y = canvas.height;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
 }

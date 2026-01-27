@@ -1,137 +1,324 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
+const admin = require("firebase-admin");
+const path = require("path");
 
+// --- 1. INISIALISASI FIREBASE ---
+// Pastikan file service-account.json ada di folder root
+const serviceAccount = require("./service-account.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const db = admin.firestore();
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-// --- MIDDLEWARE PENTING (Agar server bisa baca JSON) ---
+// --- MIDDLEWARE ---
+// Limit diperbesar karena kita kirim gambar base64 yang ukurannya besar
 app.use(cors());
-app.use(express.json()); // Pengganti body-parser
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(express.static(path.join(__dirname, ".")));
 
-// Multer Setup
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "assets/"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
+// Multer (Simpan di Memory RAM untuk dikonversi ke Base64)
+const upload = multer({ storage: multer.memoryStorage() });
+
+// --- HELPER FUNCTIONS ---
+
+// Ambil Config dari Firestore (Collection: 'settings', Doc: 'general')
+async function getConfig() {
+  const doc = await db.collection("settings").doc("general").get();
+  if (!doc.exists) {
+    // Default Config jika belum ada di database
+    return {
+      tripay: {
+        merchant_code: process.env.TRIPAY_MERCHANT,
+        api_key: process.env.TRIPAY_API_KEY,
+        private_key: process.env.TRIPAY_PRIVATE_KEY,
+      },
+      digiflazz: {
+        username: process.env.DIGI_USER,
+        api_key: process.env.DIGI_KEY,
+      },
+      admin_password: process.env.ADMIN_PASSWORD || "admin",
+    };
+  }
+  return doc.data();
+}
+
+// --- PUBLIC API ENDPOINTS ---
+
+// 1. Get Data Awal (Produk Aktif, Slider, Banner)
+app.get("/api/init-data", async (req, res) => {
+  try {
+    // Ambil Produk Aktif
+    const productsSnap = await db
+      .collection("products")
+      .where("is_active", "==", true)
+      .get();
+
+    const products = productsSnap.docs.map((doc) => doc.data());
+
+    // Ambil Assets (Slider & Banner)
+    const assetsDoc = await db.collection("settings").doc("assets").get();
+    const assets = assetsDoc.exists
+      ? assetsDoc.data()
+      : { sliders: [], banners: {} };
+
+    res.json({
+      sliders: assets.sliders || [],
+      banners: assets.banners || {},
+      products: products,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Gagal memuat data" });
+  }
 });
-const upload = multer({ storage: storage });
 
-const DB_FILE = "./database.json";
+// 2. Cek Nickname Game (Proxy ke API Isan)
+app.post("/api/check-nickname", async (req, res) => {
+  const { game, id, zone } = req.body;
+  try {
+    let apiUrl = "";
+    let response;
 
-// --- AUTO GENERATE DATABASE ---
-if (!fs.existsSync(DB_FILE)) {
-  console.log("⚠️ Database tidak ditemukan. Membuat database.json baru...");
-  const initialData = {
-    config: {
-      tripay: { merchant_code: "", api_key: "", private_key: "" },
-      digiflazz: { username: "", api_key: "" },
-      admin_password: "admin", // Password Default
-    },
-    assets: { sliders: [], banners: {} },
-    products: [],
-  };
+    if (game.toLowerCase().includes("mobile")) {
+      apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
+      response = await axios.get(apiUrl);
+      if (response.data.success) {
+        return res.json({ success: true, name: response.data.name });
+      }
+    } else if (game.toLowerCase().includes("free")) {
+      apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
+      response = await axios.get(apiUrl);
+      if (response.data.success) {
+        return res.json({ success: true, name: response.data.name });
+      }
+    }
 
-  fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
-  console.log("✅ Database dibuat! Password admin default: 'admin'");
-} else {
-  // Migrasi: Pastikan ada array transactions di DB lama
-  const db = getDB();
-  if (!db.transactions) {
-    db.transactions = [];
-    saveDB(db);
+    return res.json({ success: false, message: "ID Tidak Ditemukan" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Gagal cek ID" });
   }
-}
+});
 
-function getDB() {
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-}
-function saveDB(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
+// 3. Ambil Channel Pembayaran Tripay
+app.get("/api/channels", async (req, res) => {
+  const config = await getConfig();
+  const mode = "api-sandbox"; // Ubah ke 'api' jika production
 
-// --- API LOGIN (DENGAN DEBUG LOG) ---
-app.post("/api/admin/login", (req, res) => {
-  const db = getDB();
-  const inputPass = req.body.password;
-  const realPass = db.config.admin_password;
-
-  console.log("-----------------------------------------");
-  console.log("📡 Menerima Request Login...");
-  console.log("🔑 Password yang diketik :", inputPass);
-  console.log("💾 Password di Database  :", realPass);
-
-  if (!inputPass) {
-    console.log("❌ ERROR: Password kosong/tidak terbaca oleh server.");
-    return res.status(400).json({ success: false, message: "Input Kosong" });
+  try {
+    const response = await axios.get(
+      `https://tripay.co.id/${mode}/merchant/payment-channel`,
+      {
+        headers: { Authorization: "Bearer " + config.tripay.api_key },
+      },
+    );
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ success: false, data: [] });
   }
+});
 
-  if (inputPass === realPass) {
-    console.log("✅ LOGIN SUKSES!");
+// 4. Buat Transaksi
+app.post("/api/transaction", async (req, res) => {
+  const config = await getConfig();
+  const { sku, amount, customer_no, method, nickname, game } = req.body;
+  const mode = "api-sandbox";
+
+  // Validasi Produk di Database (Untuk ambil nama asli)
+  const productDoc = await db.collection("products").doc(sku).get();
+  const productName = productDoc.exists ? productDoc.data().name : "Topup Game";
+
+  const merchantRef = "INV-" + Math.floor(Math.random() * 100000) + Date.now();
+  const signature = crypto
+    .createHmac("sha256", config.tripay.private_key)
+    .update(config.tripay.merchant_code + merchantRef + amount)
+    .digest("hex");
+
+  try {
+    const payload = {
+      method,
+      merchant_ref: merchantRef,
+      amount,
+      customer_name: nickname || "Gamer",
+      customer_email: "user@example.com",
+      customer_phone: customer_no,
+      order_items: [{ sku, name: productName, price: amount, quantity: 1 }],
+      return_url: "https://websitekamu.com", // Ganti domain kamu nanti
+      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      signature,
+    };
+
+    const tripayRes = await axios.post(
+      `https://tripay.co.id/${mode}/transaction/create`,
+      payload,
+      { headers: { Authorization: "Bearer " + config.tripay.api_key } },
+    );
+
+    const data = tripayRes.data.data;
+
+    // Simpan Transaksi ke Firestore
+    await db.collection("transactions").doc(data.reference).set({
+      ref_id: data.reference,
+      merchant_ref: merchantRef,
+      game: game,
+      product_name: productName,
+      nickname: nickname,
+      user_id: customer_no,
+      amount: amount,
+      method: method,
+      status: "UNPAID",
+      qr_url: data.qr_url,
+      pay_code: data.pay_code,
+      checkout_url: data.checkout_url,
+      created_at: Date.now(),
+    });
+
+    res.json({ success: true, data: { ...data, ref_id: data.reference } });
+  } catch (error) {
+    console.error("Trx Error:", error.response?.data || error.message);
+    res.status(500).json({ success: false, message: "Transaksi Gagal" });
+  }
+});
+
+// 5. Cek Status Transaksi (Realtime ke Tripay)
+app.get("/api/transaction/:ref", async (req, res) => {
+  const ref = req.params.ref;
+  const config = await getConfig();
+  const mode = "api-sandbox";
+
+  try {
+    const docRef = db.collection("transactions").doc(ref);
+    const doc = await docRef.get();
+
+    if (!doc.exists)
+      return res.status(404).json({ success: false, message: "Not Found" });
+
+    let transaction = doc.data();
+
+    // Jika belum lunas, cek ke Tripay
+    if (transaction.status === "UNPAID") {
+      try {
+        const tripayDetail = await axios.get(
+          `https://tripay.co.id/${mode}/transaction/detail?reference=${ref}`,
+          {
+            headers: { Authorization: "Bearer " + config.tripay.api_key },
+          },
+        );
+
+        const remoteStatus = tripayDetail.data.data.status;
+
+        if (remoteStatus !== transaction.status) {
+          // Update Status di Firestore
+          await docRef.update({ status: remoteStatus });
+          transaction.status = remoteStatus;
+
+          // --- TODO: PROSES KE DIGIFLAZZ JIKA PAID ---
+          // if (remoteStatus === 'PAID') { await processDigiflazz(transaction); }
+        }
+      } catch (err) {
+        console.log("Cek Tripay Gagal, gunakan data lokal.");
+      }
+    }
+
+    res.json({ success: true, data: transaction });
+  } catch (e) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+// --- ADMIN API ENDPOINTS ---
+
+// Login Admin
+app.post("/api/admin/login", async (req, res) => {
+  const config = await getConfig();
+  if (req.body.password === config.admin_password) {
     res.json({ success: true });
   } else {
-    console.log("⛔ LOGIN GAGAL: Password salah.");
-    res.status(401).json({ success: false, message: "Password Salah" });
+    res.status(401).json({ success: false });
   }
-  console.log("-----------------------------------------");
 });
 
-// --- API LAINNYA ---
-app.get("/api/init-data", (req, res) => {
-  const db = getDB();
-  const activeProducts = db.products.filter((p) => p.is_active);
+// Get Config Admin
+app.get("/api/admin/config", async (req, res) => {
+  const config = await getConfig();
+
+  // Ambil semua produk (termasuk yg tidak aktif)
+  const productsSnap = await db.collection("products").get();
+  const products = productsSnap.docs.map((doc) => doc.data());
+
+  // Ambil Assets
+  const assetsDoc = await db.collection("settings").doc("assets").get();
+  const assets = assetsDoc.exists
+    ? assetsDoc.data()
+    : { sliders: [], banners: {} };
+
   res.json({
-    sliders: db.assets.sliders,
-    products: activeProducts,
-    banners: db.assets.banners,
+    config: config,
+    products: products,
+    assets: assets,
   });
 });
 
-app.get("/api/admin/config", (req, res) => {
-  res.json(getDB());
-});
-
-app.post("/api/admin/save-config", (req, res) => {
-  const db = getDB();
-  db.config = { ...db.config, ...req.body };
-  saveDB(db);
+// Simpan Config API
+app.post("/api/admin/save-config", async (req, res) => {
+  // Simpan ke collection 'settings', doc 'general'
+  await db.collection("settings").doc("general").set(req.body, { merge: true });
   res.json({ success: true });
 });
 
+// UPLOAD GAMBAR -> BASE64 (Database)
 app.post("/api/admin/upload", upload.single("image"), (req, res) => {
   if (!req.file) return res.status(400).send("No file.");
-  res.json({ filepath: `assets/${req.file.filename}` });
+
+  // Convert Buffer ke Base64 Data URI
+  // Format: data:image/png;base64,.....
+  const b64 = Buffer.from(req.file.buffer).toString("base64");
+  const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+
+  // Kirim string ini ke frontend, nanti frontend yang akan menyimpannya
+  // bersamaan dengan data produk saat klik "Simpan".
+  res.json({ filepath: dataURI });
 });
 
-app.post("/api/admin/save-products", (req, res) => {
-  const db = getDB();
-  db.products = req.body;
-  saveDB(db);
+// Simpan Produk (Bulk)
+app.post("/api/admin/save-products", async (req, res) => {
+  const products = req.body; // Array of products
+  const batch = db.batch();
+
+  products.forEach((prod) => {
+    // Gunakan SKU sebagai ID Dokumen agar unik
+    if (prod.sku) {
+      const ref = db.collection("products").doc(prod.sku);
+      batch.set(ref, prod);
+    }
+  });
+
+  await batch.commit();
   res.json({ success: true });
 });
 
-app.post("/api/admin/save-assets", (req, res) => {
-  const db = getDB();
-  db.assets = req.body;
-  saveDB(db);
+// Simpan Assets (Slider & Banner)
+app.post("/api/admin/save-assets", async (req, res) => {
+  await db.collection("settings").doc("assets").set(req.body);
   res.json({ success: true });
 });
 
-// --- UPDATE SYNC LOGIC (LEBIH RAPI) ---
+// Sync Digiflazz
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
-  const db = getDB();
-  const { username, api_key } = db.config.digiflazz;
+  const config = await getConfig();
+  const { username, api_key } = config.digiflazz;
 
   if (!username || !api_key)
-    return res
-      .status(400)
-      .json({ success: false, message: "Set API Key dulu!" });
+    return res.status(400).json({ message: "Set API Key dulu!" });
 
   try {
     const sign = crypto
@@ -148,258 +335,63 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
     );
 
     const digiProducts = response.data.data;
-    let newProductList = [...db.products]; // Mulai dengan data lama agar settingan user ga hilang
+    const batch = db.batch();
+    let count = 0;
 
-    digiProducts.forEach((digiItem) => {
-      // Filter: Hanya ambil kategori GAME agar tidak campur dengan pulsa/token
-      if (digiItem.category !== "Games") return;
+    // Ambil data lama dulu untuk cek gambar/markup
+    const oldDataSnap = await db.collection("products").get();
+    const oldDataMap = {};
+    oldDataSnap.forEach((doc) => {
+      oldDataMap[doc.id] = doc.data();
+    });
 
-      // Cari produk yang sudah ada berdasarkan SKU
-      const index = newProductList.findIndex(
-        (p) => p.sku === digiItem.buyer_sku_code,
-      );
+    digiProducts.forEach((item) => {
+      if (item.category === "Games") {
+        const sku = item.buyer_sku_code;
+        const oldItem = oldDataMap[sku];
 
-      if (index !== -1) {
-        // UPDATE HARGA MODAL SAJA (JANGAN TIMPA GAMBAR/MARKUP USER)
-        newProductList[index].price_modal = digiItem.price;
-        newProductList[index].name = digiItem.product_name; // Update nama jaga-jaga ada revisi pusat
-        // Update harga jual otomatis jika markup ada
-        if (newProductList[index].markup) {
-          newProductList[index].price_sell =
-            digiItem.price + newProductList[index].markup;
-        }
-      } else {
-        // PRODUK BARU
-        newProductList.push({
-          sku: digiItem.buyer_sku_code,
-          name: digiItem.product_name,
-          brand: digiItem.brand, // PENTING: Ini pengelompokan gamenya (Mobile Legends, Free Fire, dll)
-          category: digiItem.category,
-          price_modal: digiItem.price,
-          markup: 0, // Default markup 0
-          price_sell: digiItem.price, // Harga jual = modal dulu
-          image: "assets/default.png",
-          is_active: false, // Default MATI agar admin bisa cek dulu
-        });
+        const newData = {
+          sku: sku,
+          name: item.product_name, // Update nama dari pusat
+          brand: item.brand,
+          category: item.category,
+          price_modal: item.price,
+          // Pertahankan data lama jika ada
+          markup: oldItem ? oldItem.markup || 0 : 0,
+          price_sell: oldItem ? item.price + (oldItem.markup || 0) : item.price,
+          image: oldItem
+            ? oldItem.image || "assets/default.png"
+            : "assets/default.png",
+          is_active: oldItem ? oldItem.is_active : false,
+          // Penanda promo
+          is_promo: oldItem ? oldItem.is_promo || false : false,
+        };
+
+        const ref = db.collection("products").doc(sku);
+        batch.set(ref, newData);
+        count++;
       }
     });
 
-    db.products = newProductList;
-    saveDB(db);
-    res.json({
-      success: true,
-      message: `Berhasil menarik ${digiProducts.length} data dari Digiflazz!`,
-    });
+    await batch.commit();
+    res.json({ success: true, message: `Berhasil sync ${count} produk!` });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({ success: false, message: "Gagal koneksi ke Digiflazz" });
+    res.status(500).json({ success: false, message: "Gagal Sync Digiflazz" });
   }
 });
 
-// --- FITUR HAPUS SEMUA PRODUK (RESET) ---
-app.post("/api/admin/delete-all-products", (req, res) => {
-  const db = getDB();
-  db.products = []; // Kosongkan array produk
-  saveDB(db);
-  res.json({ success: true, message: "Semua produk berhasil dihapus!" });
-});
-
-// ... (Kode sebelumnya tetap sama)
-
-// --- API CEK NICKNAME (REAL API) ---
-app.post("/api/check-nickname", async (req, res) => {
-  const { game, id, zone } = req.body;
-
-  console.log(`🔍 Checking Nickname: ${game} - ID: ${id} (${zone || "-"})`);
-
-  try {
-    let apiUrl = "";
-    let response;
-
-    // 1. CEK MOBILE LEGENDS (Pakai API yang kamu kirim)
-    if (
-      game.toLowerCase().includes("mobile") ||
-      game.toLowerCase().includes("legends")
-    ) {
-      if (!id || !zone)
-        return res.json({ success: false, message: "ID & Zone wajib diisi" });
-
-      // URL dari Postman yang kamu berikan
-      apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
-
-      response = await axios.get(apiUrl);
-
-      // API ini biasanya mengembalikan JSON: { "success": true, "name": "NamaPlayer", ... }
-      if (response.data.success && response.data.name) {
-        return res.json({
-          success: true,
-          name: response.data.name, // Nama asli dari server Moonton
-          id: id,
-          zone: zone,
-        });
-      }
-    }
-
-    // 2. CEK FREE FIRE (Bonus: Menggunakan API Free Fire dari provider yang sama/serupa)
-    else if (game.toLowerCase().includes("free")) {
-      // Contoh endpoint FF (isan.eu.org juga punya endpoint ff biasanya, atau kita pakai logic lain)
-      apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
-      response = await axios.get(apiUrl);
-
-      if (response.data.success && response.data.name) {
-        return res.json({ success: true, name: response.data.name, id: id });
-      }
-    }
-
-    // 3. JIKA GAGAL / GAME LAIN (Simulasi Fallback agar tidak error)
-    // Jika API mati atau game tidak didukung API, kembalikan simulasi
-    console.log("⚠️ API Gagal/Game lain, menggunakan fallback.");
-    return res.json({ success: false, message: "ID Tidak Ditemukan" });
-  } catch (error) {
-    // Tangkap error jika ID salah (biasanya API return 404 atau format error)
-    console.error("Cek Nickname Error:", error.message);
-    return res.json({ success: false, message: "ID Salah / Server Sibuk" });
-  }
-});
-
-// ... (Kode endpoint login/admin tetap sama, update bagian Public API ini)
-
-// 1. Ambil Channel Pembayaran Aktif dari TriPay
-app.get("/api/channels", async (req, res) => {
-  const db = getDB();
-  const { api_key } = db.config.tripay;
-  const mode = "api-sandbox"; // Ganti 'api' jika sudah production
-
-  if (!api_key) return res.json({ success: false, data: [] });
-
-  try {
-    const response = await axios.get(
-      `https://tripay.co.id/${mode}/merchant/payment-channel`,
-      {
-        headers: { Authorization: "Bearer " + api_key },
-      },
-    );
-    res.json(response.data);
-  } catch (error) {
-    console.error(
-      "Gagal ambil channel:",
-      error.response?.data || error.message,
-    );
-    res.status(500).json({ success: false, data: [] });
-  }
-});
-
-// 2. Transaksi (Updated: Support Dynamic Method)
-app.post("/api/transaction", async (req, res) => {
-  const db = getDB();
-  const { sku, amount, customer_no, method, nickname, game } = req.body; // Tambah parameter
-  const { merchant_code, api_key, private_key } = db.config.tripay;
-  const mode = "api-sandbox";
-
-  const merchantRef = "INV-" + Math.floor(Math.random() * 100000) + Date.now();
-  const signature = crypto
-    .createHmac("sha256", private_key)
-    .update(merchant_code + merchantRef + amount)
-    .digest("hex");
-
-  try {
-    // Cari detail produk untuk nama
-    const product = db.products.find((p) => p.sku === sku);
-    const productName = product ? product.name : "Topup Game";
-
-    const payload = {
-      method: method,
-      merchant_ref: merchantRef,
-      amount: amount,
-      customer_name: nickname || "Gamer",
-      customer_email: "user@email.com",
-      customer_phone: customer_no,
-      order_items: [
-        { sku: sku, name: productName, price: amount, quantity: 1 },
-      ],
-      return_url: "http://localhost:3000",
-      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
-      signature: signature,
-    };
-
-    const response = await axios.post(
-      `https://tripay.co.id/${mode}/transaction/create`,
-      payload,
-      { headers: { Authorization: "Bearer " + api_key } },
-    );
-
-    // SIMPAN KE DATABASE LOKAL
-    const newTrans = {
-      ref_id: response.data.data.reference, // Ref dari Tripay
-      merchant_ref: merchantRef,
-      game: game,
-      product_name: productName,
-      nickname: nickname,
-      user_id: customer_no,
-      amount: amount,
-      method: method,
-      status: "UNPAID", // Status awal
-      qr_url: response.data.data.qr_url,
-      pay_code: response.data.data.pay_code,
-      checkout_url: response.data.data.checkout_url,
-      created_at: Date.now(),
-    };
-
-    if (!db.transactions) db.transactions = [];
-    db.transactions.push(newTrans);
-    saveDB(db);
-
-    res.json({ success: true, data: newTrans }); // Kirim data lengkap
-  } catch (error) {
-    console.error("TriPay Error:", error.response?.data || error.message);
-    res.status(500).json({ success: false, message: "Transaksi Gagal" });
-  }
-});
-
-// 2. API CEK STATUS & DETAIL (Dipanggil oleh Halaman Invoice)
-app.get("/api/transaction/:ref", async (req, res) => {
-  const db = getDB();
-  const ref = req.params.ref;
-  const { api_key } = db.config.tripay;
-  const mode = "api-sandbox";
-
-  // Cari di DB Lokal dulu
-  const transIndex = db.transactions.findIndex((t) => t.ref_id === ref);
-  if (transIndex === -1)
-    return res
-      .status(404)
-      .json({ success: false, message: "Transaksi tidak ditemukan" });
-
-  let transaction = db.transactions[transIndex];
-
-  // Jika status masih UNPAID, Cek ke Tripay (Real-time Check)
-  if (transaction.status === "UNPAID") {
-    try {
-      const tripayRes = await axios.get(
-        `https://tripay.co.id/${mode}/transaction/detail?reference=${ref}`,
-        {
-          headers: { Authorization: "Bearer " + api_key },
-        },
-      );
-
-      const remoteStatus = tripayRes.data.data.status; // UNPAID / PAID / EXPIRED
-
-      // Jika status berubah, update DB Lokal
-      if (remoteStatus !== transaction.status) {
-        transaction.status = remoteStatus;
-        db.transactions[transIndex] = transaction; // Update
-        saveDB(db);
-      }
-    } catch (e) {
-      console.error("Gagal cek status ke Tripay", e.message);
-    }
-  }
-
-  res.json({ success: true, data: transaction });
+// Hapus Semua Produk
+app.post("/api/admin/delete-all-products", async (req, res) => {
+  const snap = await db.collection("products").get();
+  const batch = db.batch();
+  snap.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+  res.json({ success: true });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
+  console.log(`Server running at port ${PORT}`);
 });

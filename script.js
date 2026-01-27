@@ -8,7 +8,7 @@ const API_URL = "http://localhost:3000/api";
 // --- PRESET ASSETS ---
 const PRESET_ASSETS = {
   "MOBILE LEGENDS": {
-    logo: "assets/lance.png",
+    logo: "assets/lance2.png",
     banner: "assets/ml-banner.png",
     theme: "#00f3ff",
   },

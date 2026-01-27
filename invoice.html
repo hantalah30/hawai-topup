@@ -13,17 +13,19 @@
     />
     <link
       rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
+      /* --- STYLE DASAR (Sama seperti sebelumnya) --- */
       :root {
         --primary: #00f3ff;
-        --secondary: #7000ff;
+        --secondary: #bc13fe;
         --bg-dark: #050507;
-        --panel-bg: #0f0f13;
+        --panel-bg: #0e0e12;
         --border: rgba(255, 255, 255, 0.08);
+        --font-mono: "Consolas", "Monaco", monospace;
       }
 
       body {
@@ -50,8 +52,9 @@
         overflow: hidden;
         box-shadow: 0 0 80px rgba(0, 243, 255, 0.05);
         position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.05);
         opacity: 0;
-        animation: fadeIn 0.8s forwards;
+        animation: fadeIn 1s forwards;
       }
       @keyframes fadeIn {
         to {
@@ -59,7 +62,7 @@
         }
       }
 
-      /* --- SISI VISUAL (KIRI) --- */
+      /* --- SISI KIRI (VISUAL) --- */
       .visual-side {
         flex: 4;
         position: relative;
@@ -70,63 +73,80 @@
         align-items: center;
         text-align: center;
         z-index: 1;
+        background: #000;
       }
-
-      /* Background Image & Effects */
       .visual-bg {
         position: absolute;
         inset: 0;
         background-size: cover;
         background-position: center;
-        filter: brightness(0.6);
-        transition: transform 10s ease;
+        opacity: 0.6;
+        transition: transform 0.2s;
         z-index: -2;
       }
-      .visual-side:hover .visual-bg {
-        transform: scale(1.1);
-      }
-
-      /* Overlay Gradient */
-      .visual-overlay {
+      .crt-overlay {
         position: absolute;
         inset: 0;
-        background: linear-gradient(
-          to right,
-          rgba(5, 5, 7, 0.8),
-          rgba(5, 5, 7, 0.3)
-        );
-        z-index: -1;
-      }
-
-      /* Scanline Effect */
-      .scanlines {
-        background: linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0),
-          rgba(255, 255, 255, 0) 50%,
-          rgba(0, 0, 0, 0.2) 50%,
-          rgba(0, 0, 0, 0.2)
-        );
-        background-size: 100% 4px;
-        position: absolute;
-        inset: 0;
+        background:
+          linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+          linear-gradient(
+            90deg,
+            rgba(255, 0, 0, 0.06),
+            rgba(0, 255, 0, 0.02),
+            rgba(0, 0, 255, 0.06)
+          );
+        background-size:
+          100% 2px,
+          3px 100%;
         pointer-events: none;
         z-index: 0;
       }
+      #particles {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+      }
 
-      /* 3D Logo Wrapper */
+      /* Logo 3D */
       .logo-container {
         perspective: 1000px;
         margin-bottom: 20px;
+        position: relative;
       }
       .game-logo-large {
+        width: 130px;
+        height: 130px;
+        border-radius: 30px;
+        box-shadow: 0 0 50px rgba(0, 243, 255, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        background: #000;
+        z-index: 2;
+        position: relative;
+      }
+      .logo-glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         width: 140px;
         height: 140px;
-        border-radius: 30px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        transition: transform 0.1s;
-        background: #000;
+        border-radius: 50%;
+        background: var(--primary);
+        filter: blur(60px);
+        opacity: 0.4;
+        z-index: 1;
+        animation: pulseGlow 3s infinite;
+      }
+      @keyframes pulseGlow {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: translate(-50%, -50%) scale(1.1);
+        }
       }
 
       .game-title-large {
@@ -134,95 +154,175 @@
         font-weight: 900;
         line-height: 1;
         text-transform: uppercase;
-        text-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
-        margin-bottom: 10px;
+        color: #fff;
         position: relative;
+        text-shadow:
+          2px 2px var(--secondary),
+          -2px -2px var(--primary);
+        animation: glitch 3s infinite alternate;
+      }
+      @keyframes glitch {
+        0% {
+          text-shadow:
+            2px 2px var(--secondary),
+            -2px -2px var(--primary);
+        }
+        100% {
+          text-shadow:
+            2px 2px var(--secondary),
+            -2px -2px var(--primary);
+        }
       }
 
-      /* --- SISI DETAIL (KANAN) --- */
+      /* --- SISI KANAN (DETAIL) --- */
       .detail-side {
-        flex: 5;
+        flex: 6;
         background: var(--panel-bg);
         padding: 40px 50px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         border-left: 1px solid var(--border);
+        position: relative;
       }
 
-      /* Scrollbar Halus */
-      .detail-side::-webkit-scrollbar {
-        width: 6px;
-      }
-      .detail-side::-webkit-scrollbar-track {
-        background: var(--bg-dark);
-      }
-      .detail-side::-webkit-scrollbar-thumb {
-        background: #333;
-        border-radius: 3px;
-      }
-
-      /* --- TIMELINE (STEPPER) --- */
+      /* Timeline */
       .stepper-wrapper {
         display: flex;
         justify-content: space-between;
         margin-bottom: 30px;
         position: relative;
       }
-      .stepper-wrapper::before {
-        content: "";
+      .progress-line {
         position: absolute;
         top: 15px;
         left: 0;
         width: 100%;
         height: 2px;
-        background: #333;
+        background: #222;
         z-index: 0;
+      }
+      .progress-fill {
+        position: absolute;
+        top: 15px;
+        left: 0;
+        height: 2px;
+        background: var(--primary);
+        z-index: 0;
+        width: 0%;
+        transition: width 1s ease;
+        box-shadow: 0 0 10px var(--primary);
       }
       .stepper-item {
         position: relative;
         z-index: 1;
         text-align: center;
         width: 33%;
+        opacity: 0.5;
+        transition: 0.3s;
+      }
+      .stepper-item.active {
+        opacity: 1;
       }
       .step-counter {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        background: #333;
-        color: #888;
-        margin: 0 auto 10px;
+        background: #111;
+        color: #fff;
+        border: 2px solid #333;
+        margin: 0 auto 8px;
         display: flex;
         justify-content: center;
         align-items: center;
         font-weight: bold;
-        border: 2px solid var(--bg-dark);
         transition: 0.3s;
       }
-      .step-name {
-        font-size: 0.8rem;
-        color: #666;
-        font-weight: 600;
-        text-transform: uppercase;
-      }
-
-      /* Active Step */
       .stepper-item.active .step-counter {
-        background: var(--primary);
-        color: #000;
+        border-color: var(--primary);
         box-shadow: 0 0 15px var(--primary);
-      }
-      .stepper-item.active .step-name {
-        color: #fff;
+        color: var(--primary);
       }
       .stepper-item.completed .step-counter {
-        background: #00ff00;
+        background: var(--primary);
+        border-color: var(--primary);
         color: #000;
       }
 
-      /* --- INFO BOX --- */
+      /* --- UPGRADE: NICKNAME BADGE --- */
+      .nick-wrapper {
+        background: rgba(0, 255, 136, 0.1);
+        border: 1px solid rgba(0, 255, 136, 0.3);
+        border-radius: 50px;
+        padding: 5px 15px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 5px;
+        box-shadow: 0 0 15px rgba(0, 255, 136, 0.1);
+        position: relative;
+        overflow: hidden;
+      }
+      /* Kilau Berjalan */
+      .nick-wrapper::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        animation: shine 3s infinite;
+      }
+      @keyframes shine {
+        0% {
+          left: -100%;
+        }
+        20% {
+          left: 100%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+
+      .nick-text {
+        color: #00ff88;
+        font-family: var(--font-mono);
+        font-weight: bold;
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+      }
+
+      .verified-icon {
+        color: #00ff88;
+        animation: pulse-verify 2s infinite;
+      }
+      @keyframes pulse-verify {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.2);
+          text-shadow: 0 0 10px #00ff88;
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      /* Detail Box */
       .info-card {
-        background: rgba(255, 255, 255, 0.02);
+        background: linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.03),
+          rgba(255, 255, 255, 0.01)
+        );
         border: 1px solid var(--border);
         border-radius: 16px;
         padding: 25px;
@@ -231,116 +331,115 @@
       .row-item {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
         font-size: 0.95rem;
-        border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
-        padding-bottom: 10px;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+        padding-bottom: 8px;
       }
       .row-item:last-child {
         border: 0;
-        margin: 0;
         padding: 0;
+        margin: 0;
       }
-      .lbl {
-        color: #888;
-      }
-      .val {
-        font-weight: 600;
+      .val-hl {
+        color: var(--primary);
+        font-family: var(--font-mono);
+        letter-spacing: 1px;
       }
 
-      /* --- PAYMENT AREA --- */
+      /* Payment Zone */
       .payment-zone {
         background: #fff;
         color: #000;
         border-radius: 20px;
-        padding: 30px;
+        padding: 25px;
         text-align: center;
         margin-top: auto;
         position: relative;
         overflow: hidden;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
       }
-      .payment-zone::before {
-        content: "";
+
+      /* QR & VA */
+      .qr-wrapper {
+        position: relative;
+        display: inline-block;
+        border: 10px solid #fff;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+      }
+      .qr-laser {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 5px;
-        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        background: rgba(255, 0, 0, 0.5);
+        box-shadow: 0 0 10px red;
+        animation: scan 2s infinite ease-in-out;
       }
-
-      .qr-box {
-        background: #fff;
-        padding: 10px;
-        border-radius: 15px;
-        display: inline-block;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      @keyframes scan {
+        0%,
+        100% {
+          top: 0;
+        }
+        50% {
+          top: 100%;
+        }
       }
 
       .va-display {
-        font-family: monospace;
+        font-family: var(--font-mono);
         font-size: 2.2rem;
         font-weight: 800;
         letter-spacing: 2px;
         color: #333;
-        margin: 15px 0;
+        margin: 10px 0;
         cursor: pointer;
+        position: relative;
         transition: 0.2s;
-      }
-      .va-display:hover {
-        color: var(--primary);
-        transform: scale(1.05);
       }
       .va-display:active {
         transform: scale(0.95);
       }
+      .copy-tooltip {
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #000;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        opacity: 0;
+        transition: 0.2s;
+        pointer-events: none;
+      }
+      .va-display:hover .copy-tooltip {
+        opacity: 1;
+        top: -40px;
+      }
 
-      /* --- MOBILE MODE --- */
-      @media (max-width: 768px) {
-        body {
-          display: block;
-          overflow-y: auto;
-          height: auto;
+      /* Success */
+      .success-overlay {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        z-index: 10;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        animation: expand 0.5s ease;
+      }
+      @keyframes expand {
+        from {
+          clip-path: circle(0% at 50% 50%);
         }
-        .invoice-layout {
-          flex-direction: column;
-          border-radius: 0;
-          height: auto;
-          max-height: none;
-        }
-
-        .visual-side {
-          height: 280px;
-          padding: 20px;
-          justify-content: flex-end;
-        }
-        .visual-bg {
-          filter: brightness(0.5);
-        }
-        .game-logo-large {
-          width: 80px;
-          height: 80px;
-          border-radius: 20px;
-          margin-bottom: 10px;
-        }
-        .game-title-large {
-          font-size: 2rem;
-        }
-
-        .detail-side {
-          padding: 30px 20px;
-          border-top-left-radius: 30px;
-          border-top-right-radius: 30px;
-          margin-top: -30px;
-          border-top: 1px solid var(--primary);
-          min-height: 70vh;
-        }
-        .payment-zone {
-          border-radius: 15px;
-          padding: 20px;
-        }
-        .va-display {
-          font-size: 1.6rem;
+        to {
+          clip-path: circle(150% at 50% 50%);
         }
       }
 
@@ -348,68 +447,141 @@
         position: fixed;
         inset: 0;
         background: #000;
-        z-index: 999;
+        z-index: 99;
         display: flex;
-        justify-content: center;
         align-items: center;
+        justify-content: center;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          display: block;
+          overflow-y: auto;
+          height: auto;
+          background: #0e0e12;
+        }
+        .invoice-layout {
+          flex-direction: column;
+          border-radius: 0;
+          height: auto;
+          max-height: none;
+          border: none;
+        }
+        .visual-side {
+          height: 320px;
+          padding: 20px;
+          justify-content: flex-end;
+          padding-bottom: 50px;
+        }
+        .game-logo-large {
+          width: 90px;
+          height: 90px;
+          margin-bottom: 10px;
+        }
+        .game-title-large {
+          font-size: 2.2rem;
+        }
+        .detail-side {
+          margin-top: -30px;
+          border-top-left-radius: 30px;
+          border-top-right-radius: 30px;
+          border-top: 2px solid var(--primary);
+          padding: 30px 20px;
+          min-height: 60vh;
+          background: #0e0e12;
+        }
+        .va-display {
+          font-size: 1.6rem;
+        }
       }
     </style>
   </head>
   <body>
+    <audio
+      id="sfx-success"
+      src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
+    ></audio>
+    <audio
+      id="sfx-click"
+      src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"
+    ></audio>
+
     <div id="loader">
       <div class="text-center">
-        <i class="fas fa-circle-notch fa-spin fa-3x text-info mb-3"></i>
-        <div class="small fw-bold text-secondary">LOADING DATA...</div>
+        <div
+          class="spinner-border text-info mb-3"
+          style="width: 3rem; height: 3rem"
+        ></div>
+        <div class="small fw-bold text-secondary ls-2">SECURE CHECKOUT...</div>
       </div>
     </div>
 
     <div class="invoice-layout">
-      <div class="visual-side">
+      <div class="visual-side" id="visualSide">
         <div class="visual-bg" id="bgImg"></div>
-        <div class="visual-overlay"></div>
-        <div class="scanlines"></div>
+        <canvas id="particles"></canvas>
+        <div class="crt-overlay"></div>
 
         <div class="logo-container" id="logoWrap">
+          <div class="logo-glow"></div>
           <img src="" id="gameLogo" class="game-logo-large" />
         </div>
 
         <div id="gameTitle" class="game-title-large">GAME</div>
-        <div class="text-secondary small font-monospace" id="refIdSmall">
+        <div
+          class="badge bg-dark border border-secondary text-secondary font-monospace"
+          id="refIdSmall"
+        >
           TRX-...
         </div>
       </div>
 
       <div class="detail-side">
         <div class="d-flex justify-content-between align-items-center mb-4">
-          <h4 class="m-0 fw-bold">Rincian Pesanan</h4>
-          <a
-            href="index.html"
-            class="btn btn-outline-secondary btn-sm rounded-pill px-3"
-            ><i class="fas fa-arrow-left"></i> Home</a
-          >
+          <h4 class="m-0 fw-bold">
+            <i class="fas fa-receipt text-primary me-2"></i>Invoice
+          </h4>
+          <div>
+            <button
+              onclick="window.print()"
+              class="btn btn-dark btn-sm rounded-pill me-2"
+            >
+              <i class="fas fa-print"></i>
+            </button>
+            <a
+              href="index.html"
+              class="btn btn-outline-secondary btn-sm rounded-pill"
+            >
+              <i class="fas fa-times"></i> Tutup
+            </a>
+          </div>
         </div>
 
         <div class="stepper-wrapper">
+          <div class="progress-line">
+            <div class="progress-fill" id="progFill"></div>
+          </div>
           <div class="stepper-item completed">
             <div class="step-counter"><i class="fas fa-check"></i></div>
-            <div class="step-name">Dibuat</div>
+            Order
           </div>
           <div class="stepper-item active" id="stepPay">
             <div class="step-counter">2</div>
-            <div class="step-name">Bayar</div>
+            Bayar
           </div>
           <div class="stepper-item" id="stepDone">
             <div class="step-counter">3</div>
-            <div class="step-name">Selesai</div>
+            Selesai
           </div>
         </div>
 
-        <div
-          id="alertBox"
-          class="alert alert-warning border-0 text-center mb-4 py-2 small fw-bold"
-        >
-          <i class="fas fa-clock me-1"></i> Selesaikan dalam:
-          <span id="timer" class="fs-6 ms-1 text-dark">--:--:--</span>
+        <div id="timerWrap" class="text-center mb-3">
+          <div
+            class="d-inline-block px-3 py-1 rounded bg-danger bg-opacity-10 text-danger fw-bold border border-danger border-opacity-25"
+          >
+            <i class="fas fa-stopwatch me-1"></i>
+            <span id="countdown">--:--:--</span>
+          </div>
         </div>
 
         <div class="info-card">
@@ -418,26 +590,53 @@
             <span class="val text-white" id="dItem">...</span>
           </div>
           <div class="row-item">
-            <span class="lbl">ID / Nick</span>
+            <span class="lbl">ID Player</span>
+            <span class="val text-end"
+              ><span id="dUid" class="val-hl">...</span></span
+            >
+          </div>
+
+          <div class="row-item">
+            <span class="lbl">Nickname</span>
             <span class="val text-end">
-              <span id="dUid">...</span><br />
-              <span class="text-success small" id="dNick">...</span>
+              <div class="nick-wrapper">
+                <i class="fas fa-check-circle verified-icon"></i>
+                <span id="dNick" class="nick-text">Checking...</span>
+              </div>
             </span>
           </div>
+
           <div class="row-item">
             <span class="lbl">Metode</span>
             <span class="val text-info" id="dMethod">...</span>
           </div>
           <div
-            class="row-item border-0 pt-2 mt-2"
-            style="border-top: 1px solid #333 !important"
+            class="row-item pt-2 mt-2"
+            style="border-top: 1px dashed #444 !important"
           >
-            <span class="lbl">Total Tagihan</span>
-            <span class="val fs-4 text-warning" id="dTotal">Rp 0</span>
+            <span class="lbl">Total Bayar</span>
+            <span class="val fs-3 text-warning" id="dTotal">Rp 0</span>
           </div>
         </div>
 
         <div id="paymentArea" class="payment-zone"></div>
+
+        <div id="successOverlay" class="success-overlay text-center">
+          <i
+            class="fas fa-check-circle fa-6x text-success mb-4"
+            style="filter: drop-shadow(0 0 30px #00ff00)"
+          ></i>
+          <h1 class="fw-bold text-white mb-2">PEMBAYARAN SUKSES!</h1>
+          <p class="text-secondary mb-4">
+            Item Anda sedang dikirim secara otomatis.
+          </p>
+          <button
+            onclick="window.location.href = 'index.html'"
+            class="btn btn-outline-light rounded-pill px-4"
+          >
+            Buat Pesanan Baru
+          </button>
+        </div>
       </div>
     </div>
 
