@@ -8,12 +8,37 @@ const admin = require("firebase-admin");
 const path = require("path");
 
 // --- 1. INISIALISASI FIREBASE ---
-// Pastikan file service-account.json ada di folder root
-const serviceAccount = require("./service-account.json");
+// --- 1. INISIALISASI FIREBASE ---
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+let serviceAccount;
+
+// Cek apakah ada Environment Variable dari Railway?
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    // Jika ada, parse JSON string-nya
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } catch (e) {
+    console.error("Gagal parsing FIREBASE_SERVICE_ACCOUNT:", e);
+  }
+} else {
+  // Jika tidak ada (sedang di local), cari file-nya
+  try {
+    serviceAccount = require("./service-account.json");
+  } catch (e) {
+    console.error(
+      "File service-account.json tidak ditemukan dan Env Var kosong.",
+    );
+  }
+}
+
+// Pastikan serviceAccount ada isinya sebelum init
+if (serviceAccount) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+} else {
+  console.error("CRITICAL ERROR: Firebase Config Missing!");
+}
 
 const db = admin.firestore();
 const app = express();
