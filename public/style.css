@@ -1,10 +1,42 @@
+/* =========================================
+   1. FONT IMPORTS (OLD & NEW COMBINED)
+   ========================================= */
+/* Old Fonts: Plus Jakarta Sans, Rajdhani */
+/* New Fonts: Syncopate, Orbitron added to the list */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Plus+Jakarta+Sans:wght@300;400;600;700&family=Rajdhani:wght@500;700&family=Syncopate:wght@400;700&display=swap");
+
+/* =========================================
+   2. ROOT VARIABLES (MERGED)
+   ========================================= */
 :root {
+  /* --- OLD VARIABLES (DO NOT REMOVE) --- */
+  --bg-dark: #0a0e17;
+  --glass: rgba(255, 255, 255, 0.05);
+  --glass-border-old: rgba(
+    255,
+    255,
+    255,
+    0.1
+  ); /* Renamed slightly to avoid total clash, but kept functional */
+  --accent-old: #00f3ff;
+  --text-main: #ffffff;
+  --text-muted: #8892b0;
+  --danger: #ff4757;
+  --success: #2ed573;
+  --warning: #ffa502;
+
+  /* --- NEW VARIABLES (CYBERPUNK) --- */
   --primary: #00f3ff;
   --secondary: #ff0055;
-  --accent: #ffee00;
+  --accent: #ffee00; /* New accent color */
   --bg-void: #020203;
-  --glass: rgba(15, 20, 30, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-new: rgba(15, 20, 30, 0.7);
+  --glass-border: rgba(
+    255,
+    255,
+    255,
+    0.08
+  ); /* This will be the main border var now */
   --font-head: "Syncopate", sans-serif;
   --font-body: "Rajdhani", sans-serif;
   --font-mono: "Orbitron", sans-serif;
@@ -12,6 +44,9 @@
   --dock-h: 80px;
 }
 
+/* =========================================
+   3. GLOBAL RESET & BASE (HYBRID)
+   ========================================= */
 * {
   margin: 0;
   padding: 0;
@@ -19,14 +54,431 @@
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
+
 body {
+  /* Fallback to Old Style first */
+  background: var(--bg-dark);
+  color: var(--text-main);
+  font-family: "Plus Jakarta Sans", sans-serif; /* Default Old Font */
+  min-height: 100vh;
+
+  /* Apply New Style Overrides (Cascading) */
   background: var(--bg-void);
   color: #fff;
-  font-family: var(--font-body);
-  overflow: hidden;
+  font-family: var(--font-body); /* Switches to Rajdhani */
+  overflow-x: hidden;
+  /* Note: New CSS requested fixed height/overflow hidden. 
+     If this breaks scrolling on old pages, remove the next 3 lines */
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
 }
+
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+/* =========================================
+   4. OLD STYLES (PRESERVED)
+   ========================================= */
+
+/* UTILS */
+.hidden {
+  display: none !important;
+}
+.text-accent {
+  color: var(--accent-old);
+}
+.text-danger {
+  color: var(--danger);
+}
+.text-muted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* NAVBAR (OLD) */
+.glass-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 100;
+  background: rgba(10, 14, 23, 0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 15px 0;
+}
+.container {
+  width: 90%;
+  max-width: 1400px; /* Updated to match new max-width */
+  margin: 0 auto;
+}
+.d-flex {
+  display: flex;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.align-center {
+  align-items: center;
+}
+
+.brand-text {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 1px;
+}
+.brand-text span {
+  color: var(--accent-old);
+}
+
+/* AUTH UI */
+.btn-clean {
+  background: white;
+  color: black;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  transition: 0.3s;
+}
+.btn-clean:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--glass);
+  padding: 5px 15px 5px 5px;
+  border-radius: 50px;
+  border: 1px solid var(--glass-border);
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-old);
+}
+.u-details {
+  text-align: right;
+  line-height: 1.2;
+  margin-right: 5px;
+}
+.u-details span {
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: block;
+}
+.coin-badge {
+  font-family: "Rajdhani";
+  font-size: 0.85rem;
+  color: var(--warning);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* HERO (OLD) */
+.hero-section {
+  text-align: center;
+  padding: 100px 0 40px;
+}
+.hero-title {
+  font-family: "Rajdhani";
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.hero-title span {
+  text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+}
+
+/* GAME GRID (OLD) */
+.grid-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+  padding-bottom: 80px;
+}
+.glass-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 15px;
+  padding: 15px;
+  text-align: center;
+  transition: 0.3s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.glass-panel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-5px);
+  border-color: var(--accent-old);
+}
+.game-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  object-fit: cover;
+}
+.badge-online {
+  font-size: 0.7rem;
+  color: var(--success);
+  display: block;
+}
+.badge-online::before {
+  content: "● ";
+}
+
+/* ORDER PAGE (OLD) */
+.btn-back {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 20px;
+  padding-top: 80px;
+}
+.page-title {
+  font-family: "Rajdhani";
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 10px;
+}
+
+.section-box {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.step-num {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 30px;
+  height: 30px;
+  background: var(--accent-old);
+  color: black;
+  border-radius: 50%;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-clean {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+}
+.input-clean:focus {
+  border-color: var(--accent-old);
+}
+.input-group {
+  display: flex;
+  gap: 10px;
+}
+.input-clean.sm {
+  width: 80px;
+}
+
+/* NOTE: .item-card is redefined in New CSS below, creating an upgrade effect */
+.grid-items {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.item-price {
+  color: var(--accent-old);
+  font-weight: bold;
+  font-family: "Rajdhani";
+  font-size: 1.1rem;
+}
+.item-bonus {
+  font-size: 0.7rem;
+  color: var(--warning);
+  margin-top: 5px;
+}
+
+/* MODAL (OLD) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+.modal-glass {
+  background: #151922;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+.modal-head {
+  padding: 15px;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-head button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.coin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 15px;
+}
+.coin-opt {
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  text-align: center;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.coin-opt:hover {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.pay-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.pay-item:hover {
+  border-color: white;
+  background: rgba(255, 255, 255, 0.08);
+}
+.pay-icon {
+  width: 40px;
+  border-radius: 5px;
+  background: white;
+  padding: 2px;
+}
+.pay-info {
+  flex: 1;
+}
+.pay-price {
+  font-family: "Rajdhani";
+  font-weight: bold;
+  color: var(--accent-old);
+}
+
+/* BOTTOM DOCK OLD (Mobile) */
+/* Kept for legacy support, but new Dock styles are below */
+.mobile-only {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mobile-only {
+    display: flex;
+  }
+  .bottom-dock {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 30, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 10px 30px;
+    border-radius: 50px;
+    border: 1px solid var(--glass-border);
+    display: flex;
+    gap: 30px;
+    z-index: 99;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  .bottom-dock div {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .bottom-dock div.active {
+    color: var(--accent-old);
+  }
+
+  .fixed-action {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #151922;
+    padding: 15px;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 90;
+  }
+  .btn-primary {
+    background: var(--accent-old);
+    color: black;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+}
+
+/* =========================================================================
+   =========================================================================
+   ===           NEW CYBERPUNK THEME / OVERRIDES BELOW                   ===
+   ===           (Added from New style.css)                              ===
+   =========================================================================
+   ========================================================================= */
 
 /* --- VFX LAYERS --- */
 #webgl-canvas {
@@ -154,7 +606,7 @@ body.hover .cursor-ring {
   animation: blink 0.5s infinite;
 }
 
-/* --- HEADER --- */
+/* --- HEADER (CYBER STYLE) --- */
 .cyber-header {
   position: fixed;
   top: 0;
@@ -249,9 +701,6 @@ body.hover .cursor-ring {
   z-index: 10;
 }
 .container {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
   padding: 0 max(20px, env(safe-area-inset-right));
   padding-left: max(20px, env(safe-area-inset-left));
 }
@@ -347,7 +796,7 @@ body.hover .cursor-ring {
   animation: progress 5s linear forwards;
 }
 
-/* --- GRID SYSTEM --- */
+/* --- GRID SYSTEM & TITLES --- */
 .section-title {
   font-family: var(--font-head);
   font-size: 24px;
@@ -359,23 +808,16 @@ body.hover .cursor-ring {
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
+  gap: 15px;
   padding-bottom: 50px;
   perspective: 1000px;
 }
-/* --- GRID SYSTEM --- */
-.grid {
-  display: grid;
-  gap: 15px;
-  padding-bottom: 50px;
-}
 
-/* --- GANTI STYLE TILT-CARD LAMA DENGAN INI --- */
-
+/* --- TILT CARD (REPLACES OLD CARD STYLE) --- */
 .tilt-card {
   position: relative;
   width: 100%;
-  height: 320px; /* Tinggi kartu diperbesar agar seperti poster */
+  height: 320px;
   background-color: #1a1a1a;
   border-radius: 15px;
   border: 1px solid rgba(0, 243, 255, 0.2);
@@ -384,25 +826,17 @@ body.hover .cursor-ring {
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
-
-  /* Agar gambar background cover full */
   background-size: cover;
   background-position: center;
-
-  /* Flex untuk menaruh teks di bawah */
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
 }
-
-/* Efek Hover: Kartu naik dan glow */
 .tilt-card:hover {
   transform: translateY(-10px) scale(1.02);
   box-shadow: 0 10px 30px rgba(0, 243, 255, 0.3);
   border-color: #00f3ff;
 }
-
-/* Overlay Hitam di bawah agar teks terbaca */
 .card-overlay {
   background: linear-gradient(
     to top,
@@ -412,15 +846,12 @@ body.hover .cursor-ring {
   );
   padding: 20px;
   width: 100%;
-  transform: translateY(10px); /* Sedikit turun */
+  transform: translateY(10px);
   transition: 0.3s;
 }
-
 .tilt-card:hover .card-overlay {
-  transform: translateY(0); /* Naik saat hover */
+  transform: translateY(0);
 }
-
-/* Logo Kecil di atas teks (Opsional) */
 .mini-logo {
   width: 5vh;
   border-radius: 8px;
@@ -428,21 +859,19 @@ body.hover .cursor-ring {
   border: 1px solid #fff;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
-
 .card-info h3 {
   margin: 0;
   font-size: 1.2rem;
   color: #fff;
   text-transform: uppercase;
-  font-family: var(--font-hud);
+  font-family: var(--font-head);
   letter-spacing: 1px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
-
 .card-info p {
   margin: 5px 0 0;
   font-size: 0.8rem;
-  color: #00f3ff; /* Warna Neon */
+  color: #00f3ff;
   font-weight: bold;
 }
 .status-dot {
@@ -455,7 +884,7 @@ body.hover .cursor-ring {
   margin-right: 5px;
 }
 
-/* --- ORDER PAGE --- */
+/* --- ORDER PAGE STYLES --- */
 .order-stage {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -528,65 +957,6 @@ body.hover .cursor-ring {
 .input-neon:focus {
   border-color: var(--primary);
   box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
-}
-
-.item-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-  margin-bottom: 30px;
-}
-.item-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid #333;
-  padding: 15px;
-  text-align: center;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: 0.2s;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 120px;
-}
-.item-card:hover {
-  border-color: #777;
-  background: rgba(255, 255, 255, 0.05);
-}
-.item-card.active {
-  border-color: var(--primary);
-  background: rgba(0, 243, 255, 0.05);
-  box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.1);
-}
-.item-card.active::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: var(--primary);
-}
-.i-icon {
-  width: 35px;
-  height: 35px;
-  object-fit: contain;
-  margin-bottom: 8px;
-}
-.i-name {
-  font-size: 11px;
-  font-weight: bold;
-  line-height: 1.2;
-  margin-bottom: 5px;
-  color: #ddd;
-}
-.i-price {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--accent);
 }
 
 .btn-glitch {
@@ -709,9 +1079,7 @@ body.hover .cursor-ring {
   justify-content: center;
   align-items: center;
 }
-.hidden {
-  display: none !important;
-}
+/* Reusing .hidden from old CSS */
 .terminal-window {
   width: 800px;
   max-width: 90%;
@@ -824,17 +1192,14 @@ body.hover .cursor-ring {
 }
 
 /* =========================================
-    === RESPONSIVE MUTATION (MOBILE) ===
-    ========================================= */
+   === RESPONSIVE MUTATION (MOBILE) ===
+   ========================================= */
 .desktop-only {
   display: flex !important;
 }
-.mobile-only {
-  display: none !important;
-}
+/* .mobile-only handled in old CSS, but we can reinforce it */
 
 @media (max-width: 768px) {
-  /* HIDE DESKTOP ELEMENTS */
   .desktop-only {
     display: none !important;
   }
@@ -914,7 +1279,7 @@ body.hover .cursor-ring {
     height: 200px;
     border-radius: 12px;
     transform: none !important;
-  } /* Disable Tilt on Mobile */
+  }
   .card-info {
     padding: 12px;
     transform: none !important;
@@ -936,7 +1301,7 @@ body.hover .cursor-ring {
   }
   .game-poster-wrap {
     display: none;
-  } /* Hide Poster on Mobile */
+  }
 
   .cyber-form {
     padding: 20px;
@@ -1039,7 +1404,7 @@ body.hover .cursor-ring {
   #mp-price {
     font-size: 16px;
     font-weight: bold;
-    font-family: var(--font-hud);
+    font-family: var(--font-head);
   }
   .mp-btn {
     background: var(--primary);
@@ -1052,22 +1417,22 @@ body.hover .cursor-ring {
     font-size: 14px;
   }
 }
-/* --- GAME ORDER PAGE STYLES --- */
 
+/* --- GAME ORDER PAGE STYLES --- */
 /* 1. Banner Atas */
 .game-hero {
   background-size: cover;
   background-position: center top;
-  height: 400px; /* Desktop tinggi */
+  height: 400px;
   width: 100%;
   position: relative;
   mask-image: linear-gradient(to bottom, black 50%, transparent);
   -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent);
 }
 
-/* 2. Container Header (Poster + Judul) */
+/* 2. Container Header */
 .game-header-wrap {
-  margin-top: -180px; /* Menarik konten ke atas banner */
+  margin-top: -180px;
   position: relative;
   z-index: 5;
   display: flex;
@@ -1078,7 +1443,7 @@ body.hover .cursor-ring {
 
 /* 3. Poster Game */
 .game-poster-img {
-  width: 220px; /* Ukuran Desktop Fixed */
+  width: 220px;
   height: auto;
   aspect-ratio: 2/3;
   border-radius: 16px;
@@ -1093,9 +1458,7 @@ body.hover .cursor-ring {
   margin: 0;
   line-height: 1;
   text-transform: uppercase;
-  font-family: var(
-    --font-hud
-  ); /* Pastikan font ini ada, atau ganti sans-serif */
+  font-family: var(--font-head);
 }
 
 .game-title p {
@@ -1107,50 +1470,42 @@ body.hover .cursor-ring {
   gap: 10px;
 }
 
-/* --- MOBILE RESPONSIVE (Layar < 768px) --- */
+/* --- MOBILE RESPONSIVE GAME PAGE (< 768px) --- */
 @media (max-width: 768px) {
   .game-hero {
-    height: 250px; /* Banner lebih pendek di HP */
+    height: 250px;
   }
-
   .game-header-wrap {
     margin-top: -100px;
-    flex-direction: row; /* Tetap sebaris tapi lebih padat */
+    flex-direction: row;
     align-items: flex-end;
     gap: 15px;
     padding-left: 10px;
     padding-right: 10px;
   }
-
   .game-poster-img {
-    width: 110px; /* Poster mengecil di HP */
+    width: 110px;
     border-radius: 12px;
-    border-width: 2px !important; /* Paksa border lebih tipis */
+    border-width: 2px !important;
   }
-
   .game-title h1 {
-    font-size: 1.8rem; /* Judul mengecil */
+    font-size: 1.8rem;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
   }
-
   .game-title p {
     font-size: 0.8rem;
   }
-
-  /* Form input lebih rapat di HP */
   .cyber-form {
     padding: 20px 15px;
   }
 }
 
 /* --- FIXED BOTTOM BUTTON FOR MOBILE --- */
-
 .footer-action {
   margin-top: 40px;
-  text-align: right; /* Desktop: Kanan */
+  text-align: right;
 }
 
-/* Tombol Default Desktop */
 .btn-pay-now {
   width: 300px;
   padding: 15px 30px;
@@ -1172,52 +1527,43 @@ body.hover .cursor-ring {
   transition: 0.3s;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
-
 .btn-pay-now:hover {
   transform: translateX(-5px);
   box-shadow: 0 0 20px #00f3ff;
   color: white;
 }
 
-/* Tampilan Mobile: Tombol Menempel di Bawah */
 @media (max-width: 768px) {
   .footer-action {
     position: relative;
     bottom: 0;
     left: 0;
     width: 100%;
-    background: rgba(10, 10, 20, 0.95); /* Latar gelap transparan */
+    background: rgba(10, 10, 20, 0.95);
     backdrop-filter: blur(10px);
     padding: 15px;
     border-top: 1px solid rgba(0, 243, 255, 0.3);
-    z-index: 1000; /* Pastikan di atas elemen lain */
+    z-index: 1000;
     display: flex;
     justify-content: center;
     box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
   }
-
   .btn-pay-now {
-    width: 100% !important; /* Full lebar di HP */
+    width: 100% !important;
     font-size: 1.1rem;
   }
-
-  /* Tambahan padding agar konten terbawah tidak tertutup tombol */
   .cyber-form {
     padding-bottom: 100px !important;
   }
 }
 
 /* =========================================
-   NEW ITEM CARD DESIGN (Cyber & Premium)
+   NEW ITEM CARD DESIGN (Overrides Old .item-card)
    ========================================= */
 
-/* Grid Layout yang lebih rapi */
 .item-grid {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(140px, 1fr)
-  ); /* Responsive Grid */
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 15px;
   margin-bottom: 30px;
 }
@@ -1225,7 +1571,7 @@ body.hover .cursor-ring {
 /* --- 1. BASE CARD STYLE (Regular Items) --- */
 .item-card {
   position: relative;
-  background: rgba(20, 20, 35, 0.6); /* Dark Glass */
+  background: rgba(20, 20, 35, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 15px;
@@ -1239,7 +1585,6 @@ body.hover .cursor-ring {
   text-align: center;
 }
 
-/* Pola Grid di Background (Pattern) */
 .item-card::before {
   content: "";
   position: absolute;
@@ -1251,12 +1596,11 @@ body.hover .cursor-ring {
     rgba(255, 255, 255, 0.1) 1px,
     transparent 1px
   );
-  background-size: 10px 10px; /* Pola Titik-titik */
+  background-size: 10px 10px;
   opacity: 0.3;
   z-index: 0;
 }
 
-/* Hover Effect Regular */
 .item-card:hover {
   transform: translateY(-5px);
   border-color: #00f3ff;
@@ -1277,10 +1621,8 @@ body.hover .cursor-ring {
 /* --- 2. PREMIUM CARD STYLE (Membership) --- */
 .item-card.card-premium {
   background: linear-gradient(135deg, #2b2000, #1a1a1a);
-  border: 1px solid #ffd700; /* Gold Border */
+  border: 1px solid #ffd700;
 }
-
-/* Efek Kilau (Shine Animation) untuk Premium */
 .item-card.card-premium::after {
   content: "";
   position: absolute;
@@ -1304,17 +1646,16 @@ body.hover .cursor-ring {
   }
   20% {
     left: 200%;
-  } /* Cepat lewat */
+  }
   100% {
     left: 200%;
-  } /* Jeda lama */
+  }
 }
 
 .item-card.card-premium:hover {
   box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
   border-color: #ffed4a;
 }
-
 .item-card.card-premium.active {
   background: linear-gradient(135deg, #423200, #2b2000);
   box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
@@ -1323,10 +1664,9 @@ body.hover .cursor-ring {
 /* --- 3. CONTENT STYLING --- */
 .i-content {
   position: relative;
-  z-index: 2; /* Agar di atas pattern */
+  z-index: 2;
   width: 100%;
 }
-
 .i-icon {
   width: 45px;
   height: 45px;
@@ -1335,7 +1675,6 @@ body.hover .cursor-ring {
   transition: transform 0.3s ease;
   filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
 }
-
 .i-name {
   font-size: 0.85rem;
   color: #e0e0e0;
@@ -1343,12 +1682,10 @@ body.hover .cursor-ring {
   line-height: 1.3;
   font-weight: 500;
 }
-
 .card-premium .i-name {
-  color: #ffd700; /* Gold Text */
+  color: #ffd700;
   font-weight: bold;
 }
-
 .i-price {
   font-size: 1rem;
   font-weight: 800;
@@ -1359,10 +1696,9 @@ body.hover .cursor-ring {
   display: inline-block;
 }
 
-/* Responsive adjustment */
 @media (max-width: 768px) {
   .item-grid {
-    grid-template-columns: repeat(3, 1fr); /* 3 Kolom di HP */
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
   }
   .item-card {
@@ -1374,7 +1710,7 @@ body.hover .cursor-ring {
   }
   .i-name {
     font-size: 0.7rem;
-    height: 30px; /* Limit height text */
+    height: 30px;
     overflow: hidden;
   }
   .i-price {
@@ -1383,8 +1719,6 @@ body.hover .cursor-ring {
 }
 
 /* --- HOT DEALS / PROMO STYLES --- */
-
-/* Badge HOT di pojok kartu */
 .hot-badge {
   position: absolute;
   top: 0;
@@ -1399,8 +1733,6 @@ body.hover .cursor-ring {
   z-index: 10;
   animation: pulse-red 2s infinite;
 }
-
-/* Card khusus Promo (Efek Api) */
 .item-card.card-promo {
   border: 1px solid #ff4d00;
   background: linear-gradient(
@@ -1409,14 +1741,11 @@ body.hover .cursor-ring {
     rgba(20, 20, 35, 0.9)
   );
 }
-
 .item-card.card-promo:hover {
   box-shadow: 0 0 20px rgba(255, 69, 0, 0.6);
   border-color: #ff8c00;
   transform: translateY(-5px) scale(1.02);
 }
-
-/* Label Section Hot Deals */
 .cat-label.hot-label {
   color: #ff4d00;
   text-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
@@ -1448,12 +1777,11 @@ body.hover .cursor-ring {
   height: 100%;
   background: rgba(0, 0, 0, 0.9);
   z-index: 2000;
-  display: none; /* Hidden by default */
+  display: none;
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(5px);
 }
-
 .payment-content {
   background: #1a1a1a;
   width: 90%;
@@ -1466,18 +1794,6 @@ body.hover .cursor-ring {
   overflow: hidden;
   animation: slideUp 0.3s ease;
 }
-
-@keyframes slideUp {
-  from {
-    transform: translateY(50px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
 .pm-header {
   padding: 15px 20px;
   border-bottom: 1px solid #333;
@@ -1486,12 +1802,10 @@ body.hover .cursor-ring {
   align-items: center;
   background: #111;
 }
-
 .pm-body {
   padding: 20px;
   overflow-y: auto;
 }
-
 .pm-group-title {
   font-size: 0.9rem;
   color: #888;
@@ -1499,7 +1813,6 @@ body.hover .cursor-ring {
   font-weight: bold;
   text-transform: uppercase;
 }
-
 .pm-item {
   display: flex;
   align-items: center;
@@ -1512,22 +1825,18 @@ body.hover .cursor-ring {
   border: 1px solid transparent;
   transition: 0.2s;
 }
-
 .pm-item:hover {
   background: #333;
   border-color: #00f3ff;
 }
-
 .pm-item img {
   height: 25px;
   object-fit: contain;
 }
-
 .pm-item-info {
   flex: 1;
   margin-left: 15px;
 }
-
 .pm-name {
   font-weight: bold;
   color: #fff;
