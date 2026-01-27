@@ -2,7 +2,7 @@
 const API_URL = "/api";
 
 const ASSETS = {
-  "Mobile Legends": {
+  "MOBILE LEGENDS": {
     logo: "assets/lance2.png",
     banner: "assets/ml-banner.png",
   },
