@@ -13,9 +13,51 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
     <link rel="stylesheet" href="style.css" />
+    <style>
+      /* Add some specific styles for the login button and user info */
+      .auth-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn-google {
+        background: #fff;
+        color: #333;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-family: "Rajdhani", sans-serif;
+      }
+      .user-info {
+        display: none; /* Hidden by default */
+        align-items: center;
+        gap: 10px;
+        color: #fff;
+      }
+      .user-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        border: 2px solid #00f3ff;
+      }
+      .coin-balance {
+        color: #ffd700;
+        font-weight: bold;
+        font-size: 0.9rem;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="script.js"></script>
     <canvas id="webgl-canvas"></canvas>
     <div class="fx-scanlines"></div>
@@ -24,18 +66,6 @@
 
     <div class="cursor-dot"></div>
     <div class="cursor-ring"></div>
-
-    <div id="boot-layer">
-      <div class="boot-content">
-        <div class="boot-logo">HAWAI <span class="accent">OMEGA</span></div>
-        <div class="boot-bar-track">
-          <div class="boot-bar" id="boot-bar"></div>
-        </div>
-        <div class="boot-status" id="boot-status">
-          INITIALIZING NEURAL NET...
-        </div>
-      </div>
-    </div>
 
     <div id="app-interface">
       <header class="cyber-header">
@@ -47,14 +77,30 @@
               <span class="b-ver">SYS.10</span>
             </div>
           </div>
-          <div class="desktop-nav desktop-only">
-            <div class="nav-item">
-              SERVER: <span class="text-neon">ONLINE</span>
-            </div>
-            <div class="nav-item">
-              PING: <span class="text-green">12ms</span>
+
+          <div class="auth-container">
+            <button id="btnLogin" class="btn-google" onclick="Auth.signIn()">
+              <i class="fab fa-google"></i> Login
+            </button>
+
+            <div id="userInfo" class="user-info">
+              <div class="text-end">
+                <div id="userName" style="font-size: 0.8rem; font-weight: bold">
+                  User
+                </div>
+                <div class="coin-balance">🪙 <span id="userCoins">0</span></div>
+              </div>
+              <img id="userImg" src="" class="user-avatar" />
+              <button
+                onclick="Auth.signOut()"
+                class="btn btn-sm btn-outline-danger"
+                style="padding: 2px 6px; font-size: 0.7rem"
+              >
+                <i class="fas fa-sign-out-alt"></i>
+              </button>
             </div>
           </div>
+
           <div class="mobile-refresh mobile-only" onclick="location.reload()">
             <i class="fas fa-bolt"></i>
           </div>
@@ -121,9 +167,6 @@
         <button class="sp-btn" onclick="Terminal.process()">PAY NOW</button>
       </div>
     </div>
-
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>

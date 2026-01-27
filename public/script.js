@@ -2,6 +2,93 @@
 if (typeof API_URL === "undefined") {
   var API_URL = "/api";
 }
+
+// --- AUTH SYSTEM (NEW) ---
+const Auth = {
+  user: null,
+
+  init: () => {
+    // Konfigurasi Firebase Client (WAJIB DIGANTI DENGAN CONFIG KAMU SENDIRI)
+    // Ambil dari Firebase Console -> Project Settings -> General -> Your Apps -> SDK Setup/Configuration
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID",
+    };
+
+    // Initialize only if not already initialized
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    // Listen for auth state changes
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        // User is signed in
+        try {
+          const idToken = await user.getIdToken();
+          // Verify with backend and get custom data (coins)
+          const res = await fetch(`${API_URL}/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            Auth.user = data.user; // Contains hawai_coins
+            Auth.updateUI(true);
+          }
+        } catch (e) {
+          console.error("Auth Backend Error:", e);
+        }
+      } else {
+        // User is signed out
+        Auth.user = null;
+        Auth.updateUI(false);
+      }
+    });
+  },
+
+  signIn: () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase
+      .auth()
+      .signInWithPopup(provider)
+      .catch((error) => {
+        console.error("Login Failed", error);
+        alert("Login Gagal: " + error.message);
+      });
+  },
+
+  signOut: () => {
+    firebase.auth().signOut();
+  },
+
+  updateUI: (isLoggedIn) => {
+    const btn = document.getElementById("btnLogin");
+    const info = document.getElementById("userInfo");
+
+    if (isLoggedIn && Auth.user) {
+      if (btn) btn.style.display = "none";
+      if (info) {
+        info.style.display = "flex";
+        document.getElementById("userName").innerText =
+          Auth.user.name.split(" ")[0]; // First name
+        document.getElementById("userCoins").innerText =
+          Auth.user.hawai_coins.toLocaleString();
+        document.getElementById("userImg").src = Auth.user.picture;
+      }
+    } else {
+      if (btn) btn.style.display = "flex";
+      if (info) info.style.display = "none";
+    }
+  },
+};
+
 // --- PRESET ASSETS ---
 const PRESET_ASSETS = {
   "MOBILE LEGENDS": {
@@ -129,7 +216,10 @@ const App = {
   },
 
   init: async () => {
-    // Cursor
+    // 1. Init Auth
+    Auth.init();
+
+    // 2. Cursor Effect
     if (window.innerWidth > 768) {
       document.addEventListener("mousemove", (e) => {
         gsap.to(".cursor-dot", { x: e.clientX, y: e.clientY, duration: 0 });
@@ -139,32 +229,18 @@ const App = {
           duration: 0.15,
         });
       });
-      await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
     }
 
-    // Boot Loader
-    let pct = 0;
-    const int = setInterval(() => {
-      pct += Math.floor(Math.random() * 5) + 3;
-      if (pct > 100) pct = 100;
-      const bar = document.getElementById("boot-bar");
-      if (bar) bar.style.width = pct + "%";
-      if (pct === 100) {
-        clearInterval(int);
-        setTimeout(() => {
-          gsap.to("#boot-layer", {
-            opacity: 0,
-            duration: 1,
-            onComplete: () => {
-              document.getElementById("boot-layer").style.display = "none";
-              if (typeof World !== "undefined") World.init();
-              App.fetchData();
-            },
-          });
-        }, 500);
-      }
-    }, 30);
+    // 3. Load Data Parallel
+    await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
 
+    // 4. Hapus Boot Loader & Init World
+    const bootLayer = document.getElementById("boot-layer");
+    if (bootLayer) bootLayer.style.display = "none"; // Hapus loading screen
+
+    if (typeof World !== "undefined") World.init();
+
+    App.router("home");
     document.addEventListener("click", () => Sound.click());
   },
 
@@ -224,18 +300,12 @@ const App = {
 
   router: (page, param = null) => {
     const vp = document.getElementById("viewport");
-    gsap.to(vp, {
-      opacity: 0,
-      y: 30,
-      duration: 0.3,
-      onComplete: () => {
-        vp.innerHTML = "";
-        window.scrollTo(0, 0);
-        if (page === "home") App.renderHome(vp);
-        else if (page === "order") App.renderOrderPage(vp, param);
-        gsap.to(vp, { opacity: 1, y: 0, duration: 0.5 });
-      },
-    });
+    if (!vp) return;
+    // Transisi cepat tanpa animasi boot
+    vp.innerHTML = "";
+    window.scrollTo(0, 0);
+    if (page === "home") App.renderHome(vp);
+    else if (page === "order") App.renderOrderPage(vp, param);
   },
 
   renderHome: (container) => {
@@ -271,10 +341,9 @@ const App = {
     App.startSlider();
   },
 
-  // --- REVISI UTAMA: BAGIAN TOMBOL ---
   renderOrderPage: (container, brandName) => {
     const items = App.state.rawProducts
-      .filter((p) => p.brand === brandName && p.is_active !== false) // Hanya tampilkan yang aktif
+      .filter((p) => p.brand === brandName && p.is_active !== false)
       .sort((a, b) => a.price_sell - b.price_sell);
 
     const gameData = App.state.gamesList.find((g) => g.id === brandName) || {
@@ -288,14 +357,8 @@ const App = {
       ? `<input type="number" id="zone" class="input-neon" placeholder="Zone (4 Angka)" oninput="App.checkNickname()">`
       : `<input type="hidden" id="zone" value="">`;
 
-    // --- FILTER KATEGORI ---
-    // 1. Ambil Promo Item
     const promoItems = items.filter((p) => p.is_promo === true);
-
-    // 2. Sisa item (Non-Promo)
     const normalItems = items.filter((p) => !p.is_promo);
-
-    // 3. Pisahkan Member & Diamond dari Normal Items
     const mem = normalItems.filter(
       (p) =>
         p.name.toLowerCase().includes("member") ||
@@ -326,64 +389,58 @@ const App = {
 
                     <div class="form-section">
                         <span class="sec-title">02 // PILIH PRODUK</span>
-                        
                         ${
                           promoItems.length > 0
-                            ? `
-                        <div class="cat-label hot-label"><i class="fas fa-fire"></i> HOT PROMO</div>
+                            ? `<div class="cat-label hot-label"><i class="fas fa-fire"></i> HOT PROMO</div>
                         <div class="item-grid mb-4">
                             ${promoItems.map((p) => App.renderItemCard(p)).join("")}
                         </div>`
                             : ""
                         }
-
                         ${
                           mem.length > 0
-                            ? `
-                        <div class="cat-label mt-3"><i class="fas fa-crown text-warning"></i> MEMBERSHIP</div>
+                            ? `<div class="cat-label mt-3"><i class="fas fa-crown text-warning"></i> MEMBERSHIP</div>
                         <div class="item-grid">
                             ${mem.map((p) => App.renderItemCard(p)).join("")}
                         </div>`
                             : ""
                         }
-                        
                         <div class="cat-label mt-4"><i class="fas fa-gem" style="color:${gameData.theme}"></i> TOP UP</div>
                         <div class="item-grid">
                             ${dia.map((p) => App.renderItemCard(p)).join("")}
                         </div>
                     </div>
-
-                 <div id="paymentModal" class="payment-modal">
-                <div class="payment-content">
-                    <div class="pm-header">
-                        <h5 class="m-0 text-white">PILIH METODE PEMBAYARAN</h5>
-                        <button onclick="Terminal.closeModal()" style="background:none;border:none;color:#fff;font-size:1.5rem;">&times;</button>
-                    </div>
-                    <div class="pm-body" id="paymentList">
+                    
+                    <div id="paymentModal" class="payment-modal">
+                        <div class="payment-content">
+                            <div class="pm-header">
+                                <h5 class="m-0 text-white">PILIH METODE PEMBAYARAN</h5>
+                                <button onclick="Terminal.closeModal()" style="background:none;border:none;color:#fff;font-size:1.5rem;">&times;</button>
+                            </div>
+                            <div class="pm-body" id="paymentList"></div>
                         </div>
-                </div>
-            </div>
-
-            <div id="invoiceModal" class="payment-modal">
-                <div class="payment-content">
-                    <div class="pm-header">
-                        <h5 class="m-0 text-white">TAGIHAN PEMBAYARAN</h5>
-                        <button onclick="location.reload()" style="background:none;border:none;color:#fff;">&times;</button>
                     </div>
-                    <div class="pm-body" id="invoiceContent"></div>
-                </div>
-            </div>
 
-            <div class="footer-action">
-                <button class="btn-pay-now" onclick="Terminal.openPaymentSelect()">
-                    BELI SEKARANG <i class="fas fa-wallet ml-2"></i>
-                </button>
-            </div>
-            `;
+                    <div id="invoiceModal" class="payment-modal">
+                        <div class="payment-content">
+                            <div class="pm-header">
+                                <h5 class="m-0 text-white">TAGIHAN PEMBAYARAN</h5>
+                                <button onclick="location.reload()" style="background:none;border:none;color:#fff;">&times;</button>
+                            </div>
+                            <div class="pm-body" id="invoiceContent"></div>
+                        </div>
+                    </div>
+
+                    <div class="footer-action">
+                        <button class="btn-pay-now" onclick="Terminal.openPaymentSelect()">
+                            BELI SEKARANG <i class="fas fa-wallet ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>`;
   },
 
   renderItemCard: (p) => {
-    // Logic Class (Promo vs Member vs Regular)
     let cardClass = "item-card";
     let badgeHtml = "";
 
@@ -397,20 +454,14 @@ const App = {
       cardClass += " card-premium";
     }
 
-    // --- PERBAIKAN LOGIKA GAMBAR ---
     let imgDisplay;
-
-    // Cek apakah ada gambar custom
     if (p.image && !p.image.includes("default")) {
       if (p.image.startsWith("http") || p.image.startsWith("data:")) {
-        // Jika link HTTP (Imgur/Cloud) ATAU Base64 (Upload Sendiri), pakai langsung
         imgDisplay = p.image;
       } else {
-        // Jika file lokal di folder assets
         imgDisplay = `${API_URL.replace("/api", "")}/${p.image}`;
       }
     } else {
-      // Icon Fallback jika tidak ada gambar
       imgDisplay = DEFAULT_ASSETS.icons.diamond;
       if (p.name.toLowerCase().includes("member"))
         imgDisplay = DEFAULT_ASSETS.icons.member;
@@ -426,59 +477,40 @@ const App = {
         </div>`;
   },
 
-  // --- FITUR CEK NICKNAME ---
   checkNickname: async () => {
     const uid = document.getElementById("uid").value;
     const zoneInput = document.getElementById("zone");
     const zone = zoneInput ? zoneInput.value : "";
     const res = document.getElementById("nick-result");
-
-    // Ambil nama game yang sedang aktif
     const gameTitleEl = document.querySelector(".game-title h1");
     const gameTitle = gameTitleEl ? gameTitleEl.innerText : "";
 
-    // Validasi: Jangan request kalau ID kependekan (menghemat request server)
     if (uid.length < 4) {
       res.innerHTML = "";
       return;
     }
-
-    // Khusus Mobile Legends, jangan cek kalau Zone belum diisi
     const isML = gameTitle.toLowerCase().includes("mobile");
-    if (isML && zone.length < 3) {
-      return;
-    }
+    if (isML && zone.length < 3) return;
 
-    // Tampilkan status Loading
     res.style.display = "block";
     res.innerHTML = `<span style="color:#00f3ff; font-size: 0.9rem;"><i class="fas fa-circle-notch fa-spin"></i> Mencari ID...</span>`;
 
     try {
-      // Request ke Backend kita sendiri
       const response = await fetch(`${API_URL}/check-nickname`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          game: gameTitle,
-          id: uid,
-          zone: zone,
-        }),
+        body: JSON.stringify({ game: gameTitle, id: uid, zone: zone }),
       });
-
       const data = await response.json();
-
       if (data.success) {
-        // Jika SUKSES (Nama ketemu)
         res.innerHTML = `
                     <div style="margin-top:8px; padding:5px 10px; background:rgba(0,255,0,0.2); border:1px solid #00ff00; border-radius:6px; display:inline-flex; align-items:center; gap:5px;">
                         <i class="fas fa-check-circle" style="color:#00ff00;"></i> 
                         <span style="color:#fff; font-weight:bold; font-size:0.9rem;">${data.name}</span>
-                    </div>
-                `;
+                    </div>`;
         Sound.success();
-        App.state.nickname = data.name; // Simpan nama untuk transaksi
+        App.state.nickname = data.name;
       } else {
-        // Jika GAGAL (ID Salah)
         res.innerHTML = `<span style="color:#ff4444; font-size:0.9rem; margin-top:5px; display:block;"><i class="fas fa-times-circle"></i> ID Tidak Ditemukan</span>`;
       }
     } catch (e) {
@@ -558,7 +590,7 @@ const App = {
   },
 };
 
-// --- LOGIC TRANSAKSI BARU ---
+// --- LOGIC TRANSAKSI ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels } = App.state;
@@ -570,28 +602,35 @@ const Terminal = {
     const listDiv = document.getElementById("paymentList");
     listDiv.innerHTML = "";
 
-    // JIKA CHANNEL KOSONG -> TAMPILKAN PESAN ERROR
     if (!paymentChannels || paymentChannels.length === 0) {
-      listDiv.innerHTML = `
-            <div class="alert alert-danger text-center">
-                Metode Pembayaran Tidak Tersedia.<br>
-                <small>Admin: Cek Config Tripay (Mode Sandbox/Production) di Admin Panel.</small>
-            </div>`;
+      listDiv.innerHTML = `<div class="alert alert-danger text-center">Metode Pembayaran Tidak Tersedia.</div>`;
     } else {
-      // Render Channel
       paymentChannels.forEach((ch) => {
-        // Hitung Total (Estimasi)
         let fee = ch.total_fee?.flat || 0;
         let total = selectedItem.price + fee;
+        let balanceCheck = "";
+
+        // UI KHUSUS UNTUK HAWAI COIN
+        if (ch.code === "HAWAI_COIN") {
+          const userBalance = Auth.user ? Auth.user.hawai_coins : 0;
+          if (!Auth.user) {
+            balanceCheck = `<small class="text-danger d-block">Login required</small>`;
+          } else if (userBalance < total) {
+            balanceCheck = `<small class="text-danger d-block">Saldo kurang (Sisa: ${userBalance})</small>`;
+          } else {
+            balanceCheck = `<small class="text-success d-block">Saldo cukup (Sisa: ${userBalance})</small>`;
+          }
+        }
 
         listDiv.innerHTML += `
-                <div class="d-flex align-items-center gap-3 p-3 border rounded bg-secondary text-white" 
+                <div class="d-flex align-items-center gap-3 p-3 border rounded bg-secondary text-white mb-2" 
                      style="cursor:pointer;" 
                      onclick="Terminal.processTransaction('${ch.code}')">
-                    <img src="${ch.icon_url}" style="width:50px; bg-white rounded;">
+                    <img src="${ch.icon_url}" style="width:50px; background:white; border-radius:5px;">
                     <div class="flex-grow-1">
                         <div class="fw-bold">${ch.name}</div>
                         <small class="text-warning">Total: Rp ${total.toLocaleString()}</small>
+                        ${balanceCheck}
                     </div>
                     <i class="fas fa-chevron-right"></i>
                 </div>`;
@@ -612,6 +651,12 @@ const Terminal = {
       ? document.getElementById("zone").value
       : "";
 
+    // VALIDASI KHUSUS HAWAI COIN
+    if (method === "HAWAI_COIN" && !Auth.user) {
+      alert("Silakan Login terlebih dahulu untuk menggunakan HAWAI Coin.");
+      return;
+    }
+
     const btn =
       document.querySelector(".btn-pay-now") ||
       document.querySelector("button.btn-primary");
@@ -625,17 +670,18 @@ const Terminal = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sku: selectedItem.sku,
+          sku: selectedItem.code,
           amount: selectedItem.price,
           customer_no: uid + (zone ? ` (${zone})` : ""),
           method: method,
           game: "Game",
+          user_uid: Auth.user ? Auth.user.uid : null, // Kirim UID untuk potong coin
         }),
       });
       const json = await res.json();
 
       if (json.success) {
-        window.location.href = json.data.checkout_url; // Redirect ke Tripay
+        window.location.href = json.data.checkout_url;
       } else {
         throw new Error(json.message || "Gagal Transaksi");
       }
@@ -646,6 +692,7 @@ const Terminal = {
     }
   },
 };
+
 const Receipt = {
   show: () => {
     const d = App.state.selectedItem;
