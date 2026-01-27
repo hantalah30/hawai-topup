@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:3000";
+// Arahkan ke endpoint API relative path
+const API_URL = "/api";
 
 let db = { config: {}, products: [], assets: { sliders: [], banners: {} } };
 

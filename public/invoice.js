@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:3000/api";
+// Arahkan ke endpoint API relative path
+const API_URL = "/api";
 
 const ASSETS = {
   "Mobile Legends": {

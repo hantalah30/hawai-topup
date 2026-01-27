@@ -1,35 +1,39 @@
+// api/index.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const axios = require("axios");
 const admin = require("firebase-admin");
-const multer = require("multer"); // Tambahkan ini agar tidak error "Cannot find module"
+const multer = require("multer");
 
 const app = express();
 
-// --- KONFIGURASI MULTER (Untuk upload sementara) ---
-// Catatan: Di Vercel, file yang diupload ke 'uploads/' akan hilang setelah beberapa saat.
-// Gunakan memoryStorage agar tidak error permission di serverless
+// --- KONFIGURASI MULTER (Memory Storage untuk Serverless) ---
 const upload = multer({ storage: multer.memoryStorage() });
 
 // --- KONFIGURASI FIREBASE ---
-// Cek apakah private key ada di environment variable
-if (process.env.FIREBASE_PRIVATE_KEY) {
-  if (!admin.apps.length) {
-    try {
+if (!admin.apps.length) {
+  try {
+    const serviceAccount = {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // FIX UTAMA: Mengubah karakter \n string menjadi baris baru asli
+      privateKey: process.env.FIREBASE_PRIVATE_KEY
+        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+        : undefined,
+    };
+
+    if (serviceAccount.privateKey) {
       admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          // FIX PENTING: Mengubah karakter \n menjadi baris baru yang asli
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-        }),
+        credential: admin.credential.cert(serviceAccount),
       });
-      console.log("Firebase initialized successfully");
-    } catch (error) {
-      console.error("Firebase initialization failed:", error);
+      console.log("Firebase Connected");
+    } else {
+      console.error("Firebase Private Key is missing!");
     }
+  } catch (error) {
+    console.error("Firebase Init Error:", error);
   }
 }
 
@@ -39,7 +43,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- KONFIGURASI API KEY ---
+// --- API VARIABLES ---
 const DIGIFLAZZ_USER = process.env.DIGIFLAZZ_USER;
 const DIGIFLAZZ_KEY = process.env.DIGIFLAZZ_KEY;
 const TRIPAY_API_KEY = process.env.TRIPAY_API_KEY;
@@ -49,16 +53,16 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // --- ROUTES ---
 
-// 1. Cek Status Server
+// 1. Cek Status
 app.get("/api/status", (req, res) => {
   res.json({
-    status: "Hawai Server is Running!",
-    firebase: db ? "Connected" : "Not Connected",
+    status: "Server Running",
+    firebase: db ? "Connected" : "Disconnected",
     env: IS_PRODUCTION ? "PROD" : "DEV",
   });
 });
 
-// 2. Endpoint Produk (Digiflazz)
+// 2. Ambil Produk Digiflazz
 app.post("/api/pricelist", async (req, res) => {
   try {
     const cmd = req.body.cmd || "prepaid";
@@ -83,7 +87,7 @@ app.post("/api/pricelist", async (req, res) => {
   }
 });
 
-// 3. Endpoint Transaksi (Tripay)
+// 3. Buat Transaksi Tripay
 app.post("/api/transaction", async (req, res) => {
   try {
     const { method, product_code, phone, amount, sku_name } = req.body;
@@ -95,23 +99,18 @@ app.post("/api/transaction", async (req, res) => {
       .digest("hex");
 
     const payload = {
-      method: method,
+      method,
       merchant_ref: merchantRef,
-      amount: amount,
-      customer_name: "Customer Hawai",
-      customer_email: "customer@email.com",
+      amount,
+      customer_name: "Hawai User",
+      customer_email: "user@hawai.com",
       customer_phone: phone,
       order_items: [
-        {
-          sku: product_code,
-          name: sku_name,
-          price: amount,
-          quantity: 1,
-        },
+        { sku: product_code, name: sku_name, price: amount, quantity: 1 },
       ],
-      return_url: "https://hawai-topup.vercel.app/invoice.html",
+      return_url: "https://hawai-topup.vercel.app/invoice.html", // Ganti dengan domain Vercel kamu
       expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
-      signature: signature,
+      signature,
     };
 
     const tripayUrl = IS_PRODUCTION
@@ -122,7 +121,7 @@ app.post("/api/transaction", async (req, res) => {
       headers: { Authorization: `Bearer ${TRIPAY_API_KEY}` },
     });
 
-    // Simpan ke Firestore jika koneksi berhasil
+    // Simpan ke Firestore
     if (db) {
       await db.collection("transactions").doc(merchantRef).set({
         ref: merchantRef,
@@ -137,10 +136,7 @@ app.post("/api/transaction", async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error(
-      "Tripay Error:",
-      error.response ? error.response.data : error.message,
-    );
+    console.error("Tripay Error:", error.response?.data || error.message);
     res.status(500).json({ error: "Gagal membuat transaksi" });
   }
 });
@@ -163,15 +159,11 @@ app.post("/api/callback", async (req, res) => {
     const { merchant_ref, status } = req.body;
 
     if (db) {
-      await db
-        .collection("transactions")
-        .doc(merchant_ref)
-        .update({ status: status });
+      await db.collection("transactions").doc(merchant_ref).update({ status });
 
-      // Logika Auto Topup Digiflazz (Hanya kerangka, aktifkan jika saldo cukup)
       if (status === "PAID") {
-        console.log(`Transaksi ${merchant_ref} SUKSES. Siap tembak Digiflazz.`);
-        // Tambahkan logika axios ke digiflazz/transaction di sini
+        console.log(`Pembayaran ${merchant_ref} Sukses! Proses Digiflazz...`);
+        // Tambahkan logika Topup Digiflazz otomatis di sini
       }
     }
 
@@ -182,5 +174,5 @@ app.post("/api/callback", async (req, res) => {
   }
 });
 
-// Export untuk Vercel
+// PENTING: Export app agar Vercel bisa menjalankannya
 module.exports = app;
