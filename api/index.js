@@ -160,7 +160,7 @@ app.post("/api/check-nickname", async (req, res) => {
 
 app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
-  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
+  const mode = "api-sandbox";
   try {
     if (!config.tripay.api_key) throw new Error("Tripay API Key Missing");
     const response = await axios.get(
