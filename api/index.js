@@ -1,11 +1,3 @@
-const PORT = process.env.PORT || 3000;
-
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`Server running locally on port ${PORT}`);
-  });
-}
-
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -13,21 +5,23 @@ const crypto = require("crypto");
 const axios = require("axios");
 const multer = require("multer");
 const admin = require("firebase-admin");
-const path = require("path");
 
+// --- 1. INISIALISASI EXPRESS (WAJIB PERTAMA) ---
 const app = express();
 
-// --- 1. INISIALISASI FIREBASE (FIX UNTUK VERCEL) ---
-// JANGAN PAKAI require('./service-account.json') DI SINI!
+// --- 2. INISIALISASI FIREBASE ---
 if (!admin.apps.length) {
   try {
-    // Mengambil private key dari Environment Variable Vercel
-    // Kita harus mengganti karakter \n (baris baru) agar terbaca benar
+    // Ambil private key dari env var dan perbaiki format newlinenya
     const privateKey = process.env.FIREBASE_PRIVATE_KEY
       ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
       : undefined;
 
-    if (process.env.FIREBASE_PROJECT_ID && privateKey) {
+    if (
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      privateKey
+    ) {
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
@@ -35,9 +29,9 @@ if (!admin.apps.length) {
           privateKey: privateKey,
         }),
       });
-      console.log("Firebase Connected via Env Vars");
+      console.log("Firebase initialized successfully.");
     } else {
-      console.warn("WARNING: Firebase Config missing in Env Vars");
+      console.warn("WARNING: Firebase Config missing (Check Vercel Env Vars).");
     }
   } catch (error) {
     console.error("Firebase Init Error:", error);
@@ -46,20 +40,21 @@ if (!admin.apps.length) {
 
 const db = admin.apps.length ? admin.firestore() : null;
 
-// --- MIDDLEWARE ---
+// --- 3. MIDDLEWARE ---
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Upload Handler (Memory Storage)
+// Upload Handler (Memory Storage untuk Serverless)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- HELPER FUNCTIONS ---
+// --- 4. HELPER FUNCTIONS ---
 async function getConfig() {
-  if (!db) return {}; // Cegah crash jika DB belum connect
+  if (!db) return {};
   try {
     const doc = await db.collection("settings").doc("general").get();
     if (!doc.exists) {
+      // Default fallback jika database kosong
       return {
         tripay: {
           merchant_code: process.env.TRIPAY_MERCHANT,
@@ -80,17 +75,34 @@ async function getConfig() {
   }
 }
 
-// --- PUBLIC API ENDPOINTS ---
+// --- 5. ROUTES / API ENDPOINTS ---
 
+// Cek Status Server & Database
+app.get("/api/status", (req, res) => {
+  res.json({
+    status: "Online",
+    database: db ? "Connected" : "Disconnected",
+    env: process.env.NODE_ENV || "development",
+  });
+});
+
+// Ambil Data Awal (Produk & Banner)
 app.get("/api/init-data", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "Database not connected" });
+  if (!db)
+    return res
+      .status(500)
+      .json({ error: "Database not connected. Check server logs." });
+
   try {
+    // Ambil Produk Aktif
     const productsSnap = await db
       .collection("products")
       .where("is_active", "==", true)
       .get();
+
     const products = productsSnap.docs.map((doc) => doc.data());
 
+    // Ambil Assets (Slider & Banner)
     const assetsDoc = await db.collection("settings").doc("assets").get();
     const assets = assetsDoc.exists
       ? assetsDoc.data()
@@ -107,41 +119,44 @@ app.get("/api/init-data", async (req, res) => {
   }
 });
 
+// Cek Nickname Game
 app.post("/api/check-nickname", async (req, res) => {
   const { game, id, zone } = req.body;
   try {
     let apiUrl = "";
-    let response;
 
-    if (game.toLowerCase().includes("mobile")) {
+    if (game && game.toLowerCase().includes("mobile")) {
       apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
-    } else if (game.toLowerCase().includes("free")) {
+    } else if (game && game.toLowerCase().includes("free")) {
       apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
+    } else {
+      // Fallback dummy success untuk game lain (agar tidak error)
+      return res.json({ success: true, name: "Player Game" });
     }
 
     if (apiUrl) {
-      response = await axios.get(apiUrl);
+      const response = await axios.get(apiUrl);
       if (response.data.success) {
         return res.json({ success: true, name: response.data.name });
       }
     }
-    return res.json({
-      success: false,
-      message: "ID Tidak Ditemukan / Game belum support",
-    });
+    return res.json({ success: false, message: "ID Tidak Ditemukan" });
   } catch (error) {
     console.error("Check Nick Error:", error.message);
-    res.status(500).json({ success: false, message: "Gagal cek ID" });
+    // Tetap return JSON valid meski error, agar frontend tidak crash
+    res.json({ success: false, message: "Gagal cek ID (API Error)" });
   }
 });
 
+// Ambil Channel Pembayaran
 app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
-  // Gunakan 'api' untuk production, 'api-sandbox' untuk testing
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
 
   try {
-    if (!config.tripay?.api_key) throw new Error("Tripay API Key missing");
+    if (!config.tripay || !config.tripay.api_key) {
+      throw new Error("Tripay API Key belum disetting di Database/Env");
+    }
 
     const response = await axios.get(
       `https://tripay.co.id/${mode}/merchant/payment-channel`,
@@ -149,13 +164,15 @@ app.get("/api/channels", async (req, res) => {
     );
     res.json(response.data);
   } catch (error) {
-    console.error("Channel Error:", error.message);
+    console.error("Channel Error:", error.response?.data || error.message);
     res.status(500).json({ success: false, data: [] });
   }
 });
 
+// Buat Transaksi
 app.post("/api/transaction", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "DB Error" });
+  if (!db) return res.status(500).json({ message: "Database Error" });
+
   const config = await getConfig();
   const { sku, amount, customer_no, method, nickname, game } = req.body;
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
@@ -167,7 +184,11 @@ app.post("/api/transaction", async (req, res) => {
       : "Topup Game";
 
     const merchantRef =
-      "INV-" + Math.floor(Math.random() * 100000) + Date.now();
+      "INV-" +
+      Math.floor(Math.random() * 10000) +
+      Date.now().toString().slice(-6);
+
+    // Generate Signature Tripay
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -181,7 +202,7 @@ app.post("/api/transaction", async (req, res) => {
       customer_email: "user@example.com",
       customer_phone: customer_no,
       order_items: [{ sku, name: productName, price: amount, quantity: 1 }],
-      return_url: "https://hawai-topup.vercel.app/invoice.html", // Pastikan ini domain kamu
+      return_url: "https://hawai-topup.vercel.app/invoice.html",
       expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
       signature,
     };
@@ -194,21 +215,25 @@ app.post("/api/transaction", async (req, res) => {
 
     const data = tripayRes.data.data;
 
-    await db.collection("transactions").doc(data.reference).set({
-      ref_id: data.reference,
-      merchant_ref: merchantRef,
-      game,
-      productName,
-      nickname,
-      user_id: customer_no,
-      amount,
-      method,
-      status: "UNPAID",
-      qr_url: data.qr_url,
-      pay_code: data.pay_code,
-      checkout_url: data.checkout_url,
-      created_at: Date.now(),
-    });
+    // Simpan ke Firestore
+    await db
+      .collection("transactions")
+      .doc(data.reference)
+      .set({
+        ref_id: data.reference,
+        merchant_ref: merchantRef,
+        game: game || "Unknown",
+        product_name: productName,
+        nickname: nickname || "-",
+        user_id: customer_no,
+        amount: amount,
+        method: method,
+        status: "UNPAID",
+        qr_url: data.qr_url,
+        pay_code: data.pay_code,
+        checkout_url: data.checkout_url,
+        created_at: Date.now(),
+      });
 
     res.json({ success: true, data: { ...data, ref_id: data.reference } });
   } catch (error) {
@@ -217,5 +242,18 @@ app.post("/api/transaction", async (req, res) => {
   }
 });
 
-// Endpoint lain biarkan, tapi pastikan 'db' dicek sebelum dipakai
+// Admin Login
+app.post("/api/admin/login", async (req, res) => {
+  const config = await getConfig();
+  const serverPass = config.admin_password || "admin";
+
+  if (req.body.password === serverPass) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, message: "Password Salah" });
+  }
+});
+
+// --- 6. EXPORT MODULE (WAJIB UNTUK VERCEL) ---
+// Jangan gunakan app.listen di dalam handler Vercel
 module.exports = app;
