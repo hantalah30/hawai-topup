@@ -9,7 +9,7 @@ const admin = require("firebase-admin");
 const app = express();
 
 // ==========================================
-// 1. SETUP FIREBASE (Menggunakan Versi Lama - Lebih Robust)
+// 1. SETUP FIREBASE
 // ==========================================
 let db = null;
 let dbError = "Menunggu Inisialisasi...";
@@ -21,9 +21,7 @@ function initFirebase() {
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
     if (!projectId || !clientEmail || !privateKey) {
-      // Silent fail allowed but logged, preventing crash
-      console.warn("⚠️ Env Vars Belum Lengkap (Cek ProjectID, Email, Key)");
-      return;
+      throw new Error("Env Vars Belum Lengkap (Cek ProjectID, Email, Key)");
     }
 
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
@@ -43,7 +41,7 @@ function initFirebase() {
 
     db = admin.firestore();
     dbError = null;
-    console.log("🔥 Firebase App Initialized & Connected");
+    console.log("🔥 Firebase App Initialized");
   } catch (error) {
     dbError = error.message;
     console.error("❌ Firebase Init Error:", error.message);
@@ -61,7 +59,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- Helper Config (Digabung: Tambah Reward Percent) ---
+// --- Helper Config ---
 async function getConfig() {
   let config = {
     tripay: {
@@ -74,7 +72,6 @@ async function getConfig() {
       api_key: process.env.DIGI_KEY || "",
     },
     admin_password: process.env.ADMIN_PASSWORD || "admin",
-    point_reward_percent: 5, // Default reward 5% (Fitur Baru)
   };
 
   if (db) {
@@ -88,8 +85,6 @@ async function getConfig() {
           config.digiflazz = { ...config.digiflazz, ...dbConfig.digiflazz };
         if (dbConfig.admin_password)
           config.admin_password = dbConfig.admin_password;
-        if (dbConfig.point_reward_percent)
-          config.point_reward_percent = dbConfig.point_reward_percent;
       }
     } catch (e) {
       console.warn("Gagal baca config DB:", e.message);
@@ -99,7 +94,7 @@ async function getConfig() {
 }
 
 // ==========================================
-// 3. AUTH ROUTES
+// 3. AUTH ROUTES (Google Login)
 // ==========================================
 
 app.post("/api/auth/google", async (req, res) => {
@@ -113,6 +108,7 @@ app.post("/api/auth/google", async (req, res) => {
     const name = decodedToken.name || "User";
     const picture = decodedToken.picture || "";
 
+    // Check or create user in Firestore
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
@@ -122,15 +118,17 @@ app.post("/api/auth/google", async (req, res) => {
         email,
         name,
         picture,
-        hawai_coins: 0, // Saldo Awal (Fitur Baru)
+        hawai_coins: 0, // Default balance
         created_at: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // Update info login, tapi jangan reset saldo
+      // Update basic info on login
       await userRef.update({ name, picture, email });
     }
 
+    // Get latest data including coins
     const userData = (await userRef.get()).data();
+
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error("Auth Error:", error);
@@ -138,7 +136,7 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
-// Get User Data (Refresh Balance)
+// Endpoint to get user data (balance refresh)
 app.get("/api/user/:uid", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database Error" });
   try {
@@ -158,6 +156,7 @@ app.get("/api/user/:uid", async (req, res) => {
 app.get("/api/status", async (req, res) => {
   let connectionTest = "Untested";
   let realError = dbError;
+
   if (db) {
     try {
       await db.collection("settings").limit(1).get();
@@ -167,6 +166,7 @@ app.get("/api/status", async (req, res) => {
       realError = e.message;
     }
   }
+
   res.json({
     status: "Online",
     firebase_init: db ? "OK" : "FAILED",
@@ -175,7 +175,6 @@ app.get("/api/status", async (req, res) => {
   });
 });
 
-// Init Data (Digabung: Kirim reward_percent)
 app.get("/api/init-data", async (req, res) => {
   if (!db) return res.json({ sliders: [], banners: {}, products: [] });
   try {
@@ -184,20 +183,12 @@ app.get("/api/init-data", async (req, res) => {
       .where("is_active", "==", true)
       .get();
     const products = productsSnap.docs.map((doc) => doc.data());
-
     let assets = { sliders: [], banners: {} };
     try {
       const doc = await db.collection("settings").doc("assets").get();
       if (doc.exists) assets = doc.data();
     } catch (e) {}
-
-    const config = await getConfig();
-    res.json({
-      sliders: assets.sliders,
-      banners: assets.banners,
-      products,
-      reward_percent: config.point_reward_percent, // Info untuk Frontend
-    });
+    res.json({ sliders: assets.sliders, banners: assets.banners, products });
   } catch (e) {
     console.error(e);
     res.json({ sliders: [], banners: {}, products: [] });
@@ -226,156 +217,122 @@ app.post("/api/check-nickname", async (req, res) => {
 app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
-
-  const coinChannel = {
-    code: "HAWAI_COIN",
-    name: "HAWAI Coin (Saldo)",
-    group: "Balance",
-    icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
-    total_fee: { flat: 0, percent: 0 },
-  };
-
   try {
-    if (!config.tripay.api_key) throw new Error("No Key");
+    // Add HAWAI Coin as a manual channel
+    const manualChannels = [
+      {
+        code: "HAWAI_COIN",
+        name: "HAWAI Coin (Saldo Akun)",
+        group: "Balance",
+        icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png", // Example Icon
+        total_fee: { flat: 0, percent: 0 },
+      },
+    ];
 
-    const response = await axios.get(
-      `https://tripay.co.id/${mode}/merchant/payment-channel`,
-      { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
-    );
-    res.json({ success: true, data: [coinChannel, ...response.data.data] });
+    let tripayChannels = [];
+    if (config.tripay.api_key) {
+      const response = await axios.get(
+        `https://tripay.co.id/${mode}/merchant/payment-channel`,
+        {
+          headers: { Authorization: `Bearer ${config.tripay.api_key}` },
+        },
+      );
+      tripayChannels = response.data.data || [];
+    }
+
+    res.json({ success: true, data: [...manualChannels, ...tripayChannels] });
   } catch (error) {
     console.error("Channel Error:", error.message);
-    res.json({ success: true, data: [coinChannel] });
-  }
-});
-
-// --- FITUR BARU: Endpoint Khusus Topup Coin (Deposit) ---
-app.post("/api/topup-coin", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "DB Error" });
-  const config = await getConfig();
-  const { amount, method, user_uid, user_name } = req.body;
-  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
-
-  if (!user_uid) return res.status(400).json({ message: "Login Required" });
-
-  try {
-    const merchantRef =
-      "DEP-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
-    const signature = crypto
-      .createHmac("sha256", config.tripay.private_key)
-      .update(config.tripay.merchant_code + merchantRef + amount)
-      .digest("hex");
-
-    const payload = {
-      method,
-      merchant_ref: merchantRef,
-      amount,
-      customer_name: user_name,
-      customer_email: "user@hawai.com",
-      customer_phone: "08123456789",
-      order_items: [
+    // Fallback to manual only if Tripay fails
+    res.json({
+      success: true,
+      data: [
         {
-          sku: "DEPOSIT_COIN",
-          name: "Topup HAWAI Coin",
-          price: amount,
-          quantity: 1,
+          code: "HAWAI_COIN",
+          name: "HAWAI Coin",
+          group: "Balance",
+          icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
+          total_fee: { flat: 0 },
         },
       ],
-      return_url: "https://hawai-topup.vercel.app/",
-      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
-      signature,
-    };
-
-    const tripayRes = await axios.post(
-      `https://tripay.co.id/${mode}/transaction/create`,
-      payload,
-      {
-        headers: { Authorization: `Bearer ${config.tripay.api_key}` },
-      },
-    );
-
-    // Simpan Transaksi Deposit
-    await db.collection("transactions").doc(tripayRes.data.data.reference).set({
-      ref_id: tripayRes.data.data.reference,
-      merchant_ref: merchantRef,
-      type: "DEPOSIT", // Penanda ini Deposit Saldo
-      user_uid: user_uid,
-      amount: amount,
-      method: method,
-      status: "UNPAID",
-      checkout_url: tripayRes.data.data.checkout_url,
-      created_at: Date.now(),
     });
-
-    res.json({ success: true, data: tripayRes.data.data });
-  } catch (e) {
-    console.error("Topup Coin Error:", e.response?.data || e.message);
-    res.status(500).json({ message: "Gagal Topup Coin" });
   }
 });
 
-// --- TRANSAKSI UTAMA (Game & Voucher) ---
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res.status(500).json({ message: "Database Error: " + dbError });
-
   const config = await getConfig();
   const { sku, amount, customer_no, method, nickname, game, user_uid } =
-    req.body;
+    req.body; // Added user_uid
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
 
   try {
     const productDoc = await db.collection("products").doc(sku).get();
     const productName = productDoc.exists
       ? productDoc.data().name
-      : "Item Game";
+      : "Topup Game";
     const merchantRef =
       "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
 
-    // --- PEMBAYARAN VIA HAWAI COIN ---
-    if (method === "HAWAI_COIN") {
-      if (!user_uid) return res.status(400).json({ message: "Harus Login!" });
+    let transactionData = {
+      ref_id: merchantRef, // Use merchantRef as ID for internal/coin trx
+      merchant_ref: merchantRef,
+      game,
+      productName,
+      nickname,
+      user_id: customer_no,
+      amount,
+      method,
+      status: "UNPAID",
+      created_at: Date.now(),
+    };
 
+    // --- HANDLE HAWAI COIN PAYMENT ---
+    if (method === "HAWAI_COIN") {
+      if (!user_uid)
+        return res
+          .status(400)
+          .json({ message: "Login required for Coin payment" });
+
+      const userRef = db.collection("users").doc(user_uid);
+
+      // Transaction to ensure atomicity (check balance & deduct)
       await db.runTransaction(async (t) => {
-        const userRef = db.collection("users").doc(user_uid);
         const userDoc = await t.get(userRef);
-        if (!userDoc.exists) throw new Error("User Missing");
+        if (!userDoc.exists) throw new Error("User not found");
 
         const userData = userDoc.data();
-        if ((userData.hawai_coins || 0) < amount)
-          throw new Error("Saldo HAWAI Coin Kurang");
+        const currentCoins = userData.hawai_coins || 0;
 
-        // Potong Saldo
-        t.update(userRef, {
-          hawai_coins: admin.firestore.FieldValue.increment(-amount),
-        });
+        if (currentCoins < amount) {
+          throw new Error("Saldo HAWAI Coin tidak cukup!");
+        }
 
-        // Simpan Transaksi Langsung PAID
-        t.set(db.collection("transactions").doc(merchantRef), {
-          ref_id: merchantRef,
-          merchant_ref: merchantRef,
-          type: "GAME_TOPUP",
-          game,
-          productName,
-          user_id: customer_no,
-          user_uid, // UID pembeli
-          amount,
-          method,
-          status: "PAID",
-          created_at: Date.now(),
-        });
+        // Deduct Coins
+        t.update(userRef, { hawai_coins: currentCoins - amount });
+
+        // Set transaction status to PAID immediately
+        transactionData.status = "PAID";
+        transactionData.paid_at = Date.now();
+
+        // Save Transaction record
+        t.set(db.collection("transactions").doc(merchantRef), transactionData);
       });
 
-      // TODO: Panggil API Digiflazz disini (atau via worker lain)
+      // Trigger Digiflazz Process (Mock call - you should implement the actual call logic here or via listener)
+      // await processDigiflazz(transactionData);
+
       return res.json({
         success: true,
         data: {
-          checkout_url: `https://hawai-topup.vercel.app/invoice.html?ref=${merchantRef}`,
+          reference: merchantRef,
+          checkout_url: `https://hawai-topup.vercel.app/invoice.html?ref=${merchantRef}`, // Direct success page
         },
       });
     }
 
-    // --- PEMBAYARAN VIA TRIPAY ---
+    // --- HANDLE TRIPAY PAYMENT ---
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -386,7 +343,7 @@ app.post("/api/transaction", async (req, res) => {
       merchant_ref: merchantRef,
       amount,
       customer_name: nickname || "Guest",
-      customer_email: "guest@email.com",
+      customer_email: "cust@email.com",
       customer_phone: customer_no,
       order_items: [{ sku, name: productName, price: amount, quantity: 1 }],
       return_url: "https://hawai-topup.vercel.app/invoice.html",
@@ -400,27 +357,21 @@ app.post("/api/transaction", async (req, res) => {
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
+    const data = tripayRes.data.data;
+
+    // Save Tripay Transaction
     await db
       .collection("transactions")
-      .doc(tripayRes.data.data.reference)
+      .doc(data.reference)
       .set({
-        ref_id: tripayRes.data.data.reference,
-        merchant_ref: merchantRef,
-        type: "GAME_TOPUP",
-        game,
-        productName,
-        user_id: customer_no,
-        user_uid: user_uid || null, // Simpan UID jika login (untuk reward nanti)
-        amount,
-        method,
-        status: "UNPAID",
-        checkout_url: tripayRes.data.data.checkout_url,
-        qr_url: tripayRes.data.data.qr_url, // Simpan QR jika ada
-        pay_code: tripayRes.data.data.pay_code, // Simpan Paycode jika ada
-        created_at: Date.now(),
+        ...transactionData,
+        ref_id: data.reference,
+        qr_url: data.qr_url,
+        pay_code: data.pay_code,
+        checkout_url: data.checkout_url,
       });
 
-    res.json({ success: true, data: tripayRes.data.data });
+    res.json({ success: true, data: { ...data, ref_id: data.reference } });
   } catch (error) {
     console.error("Trx Error:", error.response?.data || error.message);
     res
@@ -429,35 +380,9 @@ app.post("/api/transaction", async (req, res) => {
   }
 });
 
-// --- HELPER UNTUK CALLBACK TRIPAY (Perlu dipanggil di rute callback) ---
-async function handleTransactionSuccess(trxData) {
-  if (!trxData.user_uid) return;
-
-  const userRef = db.collection("users").doc(trxData.user_uid);
-
-  // CASE 1: Deposit Saldo -> Tambah Coin
-  if (trxData.type === "DEPOSIT") {
-    await userRef.update({
-      hawai_coins: admin.firestore.FieldValue.increment(trxData.amount),
-    });
-  }
-  // CASE 2: Beli Game -> Kasih Poin Reward
-  else if (trxData.type === "GAME_TOPUP") {
-    const config = await getConfig();
-    const points = Math.floor(
-      trxData.amount * (config.point_reward_percent / 100),
-    );
-    if (points > 0) {
-      await userRef.update({
-        hawai_coins: admin.firestore.FieldValue.increment(points),
-      });
-    }
-  }
-}
-// Note: Anda perlu membuat endpoint callback Tripay yang memanggil fungsi di atas saat status = 'PAID'
-
+// ... (Admin Routes remain unchanged, include them here if needed for full file context) ...
 // ==========================================
-// 5. ADMIN ROUTES (Digabung Lengkap)
+// 4. ADMIN ROUTES (DEBUGGING MODE)
 // ==========================================
 
 app.post("/api/admin/login", async (req, res) => {
@@ -488,6 +413,7 @@ app.get("/api/admin/config", async (req, res) => {
         });
       }
     }
+
     res.json({ config, products, assets, db_connected: !!db });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -503,6 +429,7 @@ app.post("/api/admin/save-config", async (req, res) => {
       .set(req.body, { merge: true });
     res.json({ success: true });
   } catch (e) {
+    console.error("Save Error:", e.message);
     res.status(500).json({ error: "Gagal Simpan ke DB: " + e.message });
   }
 });
@@ -529,36 +456,7 @@ app.post("/api/admin/save-assets", async (req, res) => {
   }
 });
 
-// --- ADMIN FITUR BARU: Manajemen User ---
-app.get("/api/admin/users", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
-  try {
-    const snap = await db
-      .collection("users")
-      .orderBy("created_at", "desc")
-      .get();
-    const users = snap.docs.map((d) => d.data());
-    res.json(users);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post("/api/admin/update-balance", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
-  const { uid, newBalance } = req.body;
-  try {
-    await db
-      .collection("users")
-      .doc(uid)
-      .update({ hawai_coins: parseInt(newBalance) });
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- ADMIN: SYNC DIGIFLAZZ (Robust Version) ---
+// SYNC DIGIFLAZZ (FIX FILTER ERROR)
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db) return res.status(500).json({ error: "Database Error: " + dbError });
 
@@ -582,21 +480,27 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       },
     );
 
+    // VALIDASI RESPON DIGIFLAZZ SEBELUM PROSES
     if (!response.data || !Array.isArray(response.data.data)) {
+      // Jika bukan array, berarti Error Message dari Digiflazz
       const errMsg = JSON.stringify(response.data);
       console.error("Digiflazz Error Respon:", errMsg);
-      throw new Error("Respon Digiflazz Gagal: " + errMsg);
+      throw new Error(
+        "Respon Digiflazz Gagal (Cek IP Whitelist/Saldo): " + errMsg,
+      );
     }
 
-    const digiProducts = response.data.data;
+    const digiProducts = response.data.data; // Ini PASTI Array sekarang
     const gameProducts = digiProducts.filter(
       (item) => item.category === "Games",
     );
 
+    // Batching diperkecil jadi 100 agar aman dari timeout/limit
     const chunkSize = 100;
     for (let i = 0; i < gameProducts.length; i += chunkSize) {
       const batch = db.batch();
       const chunk = gameProducts.slice(i, i + chunkSize);
+
       chunk.forEach((item) => {
         const sku = item.buyer_sku_code;
         const newData = {
@@ -614,6 +518,7 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       });
       await batch.commit();
     }
+
     res.json({
       success: true,
       message: `Sukses Sync ${gameProducts.length} Produk!`,

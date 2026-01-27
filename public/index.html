@@ -3,109 +3,164 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hawai Store - Topup & Games</title>
-
+    <title>Hawai Topup</title>
     <link
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&family=Rajdhani:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Syncopate:wght@400;700&display=swap"
       rel="stylesheet"
     />
-
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-
     <link rel="stylesheet" href="style.css" />
+    <style>
+      /* Add some specific styles for the login button and user info */
+      .auth-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn-google {
+        background: #fff;
+        color: #333;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-family: "Rajdhani", sans-serif;
+      }
+      .user-info {
+        display: none; /* Hidden by default */
+        align-items: center;
+        gap: 10px;
+        color: #fff;
+      }
+      .user-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        border: 2px solid #00f3ff;
+      }
+      .coin-balance {
+        color: #ffd700;
+        font-weight: bold;
+        font-size: 0.9rem;
+      }
+    </style>
   </head>
   <body>
+    <div id="app"></div>
+
     <canvas id="webgl-canvas"></canvas>
+    <div class="fx-scanlines"></div>
+    <div class="fx-noise"></div>
+    <div class="fx-vignette"></div>
+
+    <div class="cursor-dot"></div>
+    <div class="cursor-ring"></div>
 
     <div id="app-interface">
-      <nav class="glass-nav">
-        <div class="container d-flex justify-between align-center">
+      <header class="cyber-header">
+        <div class="header-inner">
           <div class="brand" onclick="App.router('home')">
             <div class="brand-logo">H</div>
-            <div class="brand-text">HAWAI<span>STORE</span></div>
+            <div class="brand-txt">
+              <span class="b-title">HAWAI</span>
+              <span class="b-ver">SYS.10</span>
+            </div>
           </div>
 
-          <div class="auth-section">
-            <button id="btnLogin" class="btn-clean" onclick="Auth.signIn()">
+          <div class="auth-container">
+            <button id="btnLogin" class="btn-google" onclick="Auth.signIn()">
               <i class="fab fa-google"></i> Login
             </button>
 
-            <div id="userInfo" class="user-pill hidden">
-              <div class="u-details">
-                <span id="userName">User</span>
-                <div class="coin-badge" onclick="App.openTopupModal()">
-                  <i class="fas fa-coins text-warning"></i>
-                  <span id="userCoins">0</span>
-                  <i class="fas fa-plus-circle text-accent"></i>
+            <div id="userInfo" class="user-info">
+              <div class="text-end">
+                <div id="userName" style="font-size: 0.8rem; font-weight: bold">
+                  User
                 </div>
+                <div class="coin-balance">🪙 <span id="userCoins">0</span></div>
               </div>
-              <img id="userImg" src="" class="avatar" alt="Profile" />
-              <button onclick="Auth.signOut()" class="btn-icon" title="Logout">
+              <img id="userImg" src="" class="user-avatar" />
+              <button
+                onclick="Auth.signOut()"
+                class="btn btn-sm btn-outline-danger"
+                style="padding: 2px 6px; font-size: 0.7rem"
+              >
                 <i class="fas fa-sign-out-alt"></i>
               </button>
             </div>
           </div>
+
+          <div class="mobile-refresh mobile-only" onclick="location.reload()">
+            <i class="fas fa-bolt"></i>
+          </div>
         </div>
-      </nav>
+      </header>
 
       <main id="viewport"></main>
 
-      <div class="bottom-dock mobile-only">
-        <div onclick="App.router('home')" class="active">
-          <i class="fas fa-home"></i>
-        </div>
-        <div onclick="App.openTopupModal()"><i class="fas fa-wallet"></i></div>
-        <div onclick="location.reload()"><i class="fas fa-sync-alt"></i></div>
-      </div>
-
-      <div id="coinModal" class="modal-overlay hidden">
-        <div class="modal-glass">
-          <div class="modal-head">
-            <h3>Top Up HAWAI Coin</h3>
-            <button onclick="App.closeModal('coinModal')">&times;</button>
+      <nav class="dock-wrapper">
+        <div class="dock">
+          <div
+            class="dock-btn active"
+            data-page="home"
+            onclick="App.router('home')"
+          >
+            <i class="fas fa-th-large"></i>
+            <span class="dock-lbl">HOME</span>
           </div>
-          <div class="modal-body">
-            <p class="text-muted text-sm">
-              Saldo coin digunakan untuk pembayaran instan tanpa ribet.
-            </p>
+          <div
+            class="dock-btn"
+            data-page="history"
+            onclick="App.router('history')"
+          >
+            <i class="fas fa-history"></i>
+            <span class="dock-lbl">LOGS</span>
+          </div>
+          <div class="dock-sep desktop-only"></div>
+          <div class="dock-btn desktop-only" onclick="location.reload()">
+            <i class="fas fa-power-off text-red"></i>
+            <span class="dock-lbl">EXIT</span>
+          </div>
+        </div>
+      </nav>
 
-            <div class="coin-grid">
-              <div class="coin-opt" onclick="App.selectCoin(10000)">10.000</div>
-              <div class="coin-opt" onclick="App.selectCoin(25000)">25.000</div>
-              <div class="coin-opt" onclick="App.selectCoin(50000)">50.000</div>
-              <div class="coin-opt" onclick="App.selectCoin(100000)">
-                100.000
-              </div>
+      <div id="modal-terminal" class="modal hidden">
+        <div class="terminal-window">
+          <div class="term-head">
+            <div class="traffic-lights">
+              <span class="red"></span><span class="yellow"></span
+              ><span class="green"></span>
             </div>
-
-            <input
-              type="number"
-              id="customCoin"
-              class="input-clean mt-3"
-              placeholder="Nominal Lain (Min 10.000)"
-            />
-
-            <button
-              class="btn-primary full mt-3"
-              onclick="App.processTopupCoin()"
-            >
-              <i class="fas fa-lock"></i> BAYAR SEKARANG
-            </button>
+            <div class="term-title">SECURE_GATEWAY.exe</div>
           </div>
+          <div class="term-body" id="term-log"></div>
         </div>
       </div>
 
-      <div id="paymentModal" class="modal-overlay hidden">
-        <div class="modal-glass">
-          <div class="modal-head">
-            <h3>Metode Pembayaran</h3>
-            <button onclick="App.closeModal('paymentModal')">&times;</button>
-          </div>
-          <div id="paymentList" class="modal-body scrollable"></div>
+      <div id="modal-receipt" class="modal hidden">
+        <div class="receipt-card">
+          <div class="receipt-icon"><i class="fas fa-check"></i></div>
+          <h2>PAYMENT SUCCESS</h2>
+          <div id="receipt-data" class="receipt-content"></div>
+          <button class="btn-glitch full" onclick="Receipt.close()">
+            DISMISS
+          </button>
         </div>
+      </div>
+
+      <div id="sticky-pay" class="sticky-pay hidden mobile-only">
+        <div class="sp-info">
+          <span id="sp-item">Select Item</span>
+          <span id="sp-price" class="text-neon">Rp 0</span>
+        </div>
+        <button class="sp-btn" onclick="Terminal.process()">PAY NOW</button>
       </div>
     </div>
 
@@ -114,7 +169,11 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <script src="firebase-config.js"></script>
+
     <script src="script.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>

@@ -1,17 +1,127 @@
-// ==========================================
-// 1. CONFIG & UTILS
-// ==========================================
-if (typeof API_URL === "undefined") var API_URL = "/api";
+// MENJADI (Gunakan window agar aman jika dipanggil ganda):
+if (typeof API_URL === "undefined") {
+  var API_URL = "/api";
+}
 
-const CONFIG = {
-  rewardPercent: 5, // Default, akan diupdate dari server
+// --- AUTH SYSTEM (UPDATED) ---
+const Auth = {
+  user: null,
+
+  init: () => {
+    // HAPUS KONFIGURASI DI SINI.
+    // Kita asumsikan firebase.initializeApp() sudah jalan di file firebase-config.js
+
+    // Cek apakah Firebase sudah jalan
+    if (!firebase.apps.length) {
+      console.error("Firebase belum di-init! Cek file firebase-config.js");
+      return;
+    }
+
+    // Listen for auth state changes
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (user) {
+        // User is signed in
+        try {
+          const idToken = await user.getIdToken();
+          // Verify with backend and get custom data (coins)
+          const res = await fetch(`${API_URL}/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            Auth.user = data.user; // Contains hawai_coins
+            Auth.updateUI(true);
+          }
+        } catch (e) {
+          console.error("Auth Backend Error:", e);
+        }
+      } else {
+        // User is signed out
+        Auth.user = null;
+        Auth.updateUI(false);
+      }
+    });
+  },
+
+  signIn: () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase
+      .auth()
+      .signInWithPopup(provider)
+      .catch((error) => {
+        console.error("Login Failed", error);
+        alert("Login Gagal: " + error.message);
+      });
+  },
+
+  signOut: () => {
+    firebase.auth().signOut();
+  },
+
+  updateUI: (isLoggedIn) => {
+    const btn = document.getElementById("btnLogin");
+    const info = document.getElementById("userInfo");
+
+    if (isLoggedIn && Auth.user) {
+      if (btn) btn.style.display = "none";
+      if (info) {
+        info.style.display = "flex";
+        document.getElementById("userName").innerText =
+          Auth.user.name.split(" ")[0]; // First name
+        document.getElementById("userCoins").innerText = (
+          Auth.user.hawai_coins || 0
+        ).toLocaleString();
+        document.getElementById("userImg").src = Auth.user.picture;
+      }
+    } else {
+      if (btn) btn.style.display = "flex";
+      if (info) info.style.display = "none";
+    }
+  },
 };
 
-// --- AUDIO SYSTEM (Dari Script Lama) ---
+// --- PRESET ASSETS ---
+const PRESET_ASSETS = {
+  "MOBILE LEGENDS": {
+    logo: "assets/lance2.png",
+    banner: "assets/ml-banner.png",
+    theme: "#00f3ff",
+  },
+  "Free Fire": {
+    logo: "assets/ff.jpg",
+    banner: "assets/ff-banner.jpg",
+    theme: "#ff9900",
+  },
+  "PUBG Mobile": {
+    logo: "https://cdn-icons-png.flaticon.com/512/3408/3408506.png",
+    banner: "https://wallpaperaccess.com/full/1239676.jpg",
+    theme: "#f2a900",
+  },
+  Valorant: {
+    logo: "https://img.icons8.com/color/480/valorant.png",
+    banner: "https://images4.alphacoders.com/114/1149479.jpg",
+    theme: "#ff4655",
+  },
+};
+
+const DEFAULT_ASSETS = {
+  banner: "https://images.alphacoders.com/133/1336040.png",
+  logo: "https://placehold.co/150/1a1a1a/FFFFFF/png?text=GAME",
+  color: "#ffffff",
+  icons: {
+    member: "https://cdn-icons-png.flaticon.com/512/5727/5727270.png",
+    diamond: "https://cdn-icons-png.flaticon.com/512/4442/4442898.png",
+  },
+};
+
+// --- AUDIO SYSTEM ---
 const Sound = {
   ctx: new (window.AudioContext || window.webkitAudioContext)(),
   play: (f, t, d, v = 0.05) => {
-    if (window.innerWidth < 768) return; // Hemat baterai di HP
+    if (window.innerWidth < 768) return;
     if (Sound.ctx.state === "suspended") Sound.ctx.resume();
     const o = Sound.ctx.createOscillator();
     const g = Sound.ctx.createGain();
@@ -26,13 +136,14 @@ const Sound = {
   },
   hover: () => Sound.play(300, "triangle", 0.05, 0.02),
   click: () => Sound.play(800, "sine", 0.1, 0.05),
+  type: () => Sound.play(600, "square", 0.03, 0.03),
   success: () => {
     Sound.play(600, "square", 0.1);
     setTimeout(() => Sound.play(1200, "square", 0.4), 100);
   },
 };
 
-// --- TEXT SCRAMBLE EFFECT (Dari Script Lama) ---
+// --- TEXT SCRAMBLER ---
 class TextScramble {
   constructor(el) {
     this.el = el;
@@ -47,12 +158,9 @@ class TextScramble {
     for (let i = 0; i < length; i++) {
       const from = oldText[i] || "";
       const to = newText[i] || "";
-      this.queue.push({
-        from,
-        to,
-        start: Math.floor(Math.random() * 40),
-        end: Math.floor(Math.random() * 40) + 40,
-      });
+      const start = Math.floor(Math.random() * 40);
+      const end = start + Math.floor(Math.random() * 40);
+      this.queue.push({ from, to, start, end });
     }
     cancelAnimationFrame(this.frameRequest);
     this.frame = 0;
@@ -69,7 +177,7 @@ class TextScramble {
         output += to;
       } else if (this.frame >= start) {
         if (!char || Math.random() < 0.28) {
-          char = this.chars[Math.floor(Math.random() * this.chars.length)];
+          char = this.randomChar();
           this.queue[i].char = char;
         }
         output += `<span class="dud">${char}</span>`;
@@ -84,253 +192,302 @@ class TextScramble {
       this.frame++;
     }
   }
+  randomChar() {
+    return this.chars[Math.floor(Math.random() * this.chars.length)];
+  }
 }
 
-// ==========================================
-// 2. AUTH SYSTEM
-// ==========================================
-const Auth = {
-  user: null,
-  init: () => {
-    if (!firebase.apps.length) return;
-    firebase.auth().onAuthStateChanged(async (u) => {
-      if (u) {
-        try {
-          const token = await u.getIdToken();
-          const res = await fetch(`${API_URL}/auth/google`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: token }),
-          });
-          const data = await res.json();
-          if (data.success) Auth.user = data.user;
-          Auth.updateUI(true);
-        } catch (e) {
-          console.error("Auth Sync Error", e);
-        }
-      } else {
-        Auth.user = null;
-        Auth.updateUI(false);
-      }
-    });
-  },
-  signIn: () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    firebase
-      .auth()
-      .signInWithPopup(provider)
-      .catch((e) => alert(e.message));
-  },
-  signOut: () => firebase.auth().signOut(),
-  updateUI: (isLogin) => {
-    const btn = document.getElementById("btnLogin");
-    const info = document.getElementById("userInfo");
-    if (isLogin && Auth.user) {
-      btn.classList.add("hidden");
-      info.classList.remove("hidden");
-      document.getElementById("userName").innerText =
-        Auth.user.name.split(" ")[0];
-      document.getElementById("userCoins").innerText = (
-        Auth.user.hawai_coins || 0
-      ).toLocaleString();
-      document.getElementById("userImg").src = Auth.user.picture;
-    } else {
-      btn.classList.remove("hidden");
-      info.classList.add("hidden");
-    }
-  },
-};
-
-// ==========================================
-// 3. MAIN APP LOGIC
-// ==========================================
+// --- APP ENGINE ---
 const App = {
   state: {
-    products: [],
-    games: [],
-    channels: [],
-    selectedItem: null,
+    rawProducts: [],
+    gamesList: [],
+    paymentChannels: [],
     serverBanners: {},
+    serverSliders: [],
+    selectedItem: null,
+    refId: null,
   },
 
   init: async () => {
+    // 1. Init Auth
     Auth.init();
-    Visuals.init(); // Menggunakan Visual Grid Cyberpunk yang lama
 
-    // Listener Global Suara
-    document.addEventListener("click", () => Sound.click());
+    // 2. Cursor Effect
+    if (window.innerWidth > 768) {
+      document.addEventListener("mousemove", (e) => {
+        gsap.to(".cursor-dot", { x: e.clientX, y: e.clientY, duration: 0 });
+        gsap.to(".cursor-ring", {
+          x: e.clientX - 20,
+          y: e.clientY - 20,
+          duration: 0.15,
+        });
+      });
+    }
 
-    await Promise.all([App.fetchData(), App.fetchChannels()]);
+    // 3. Load Data Parallel
+    await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
+
+    // 4. Hapus Boot Loader & Init World
+    const bootLayer = document.getElementById("boot-layer");
+    if (bootLayer) bootLayer.style.display = "none";
+
+    if (typeof World !== "undefined") World.init();
+
     App.router("home");
+    document.addEventListener("click", () => Sound.click());
   },
 
   fetchData: async () => {
-    const res = await fetch(`${API_URL}/init-data`);
-    const data = await res.json();
-    App.state.products = data.products || [];
-    App.state.serverBanners = data.banners || {};
-    App.state.serverSliders = data.sliders || []; // Dipakai untuk Hero Slider
-    if (data.reward_percent) CONFIG.rewardPercent = data.reward_percent;
+    try {
+      const res = await fetch(`${API_URL}/init-data`);
+      const data = await res.json();
 
-    const brands = [...new Set(App.state.products.map((p) => p.brand))];
-    App.state.games = brands.map((b) => ({
-      id: b,
-      name: b,
-      img:
-        App.state.products.find((p) => p.brand === b)?.image ||
-        "assets/default.png",
-      banner: App.state.serverBanners[b] || "assets/banner-def.png",
-    }));
+      App.state.rawProducts = data.products || [];
+      App.state.serverSliders = data.sliders || [];
+      App.state.serverBanners = data.banners || {};
+
+      // Grouping Logic
+      const uniqueBrands = [
+        ...new Set(App.state.rawProducts.map((p) => p.brand)),
+      ];
+
+      App.state.gamesList = uniqueBrands
+        .map((brandName) => {
+          if (!brandName) return null;
+
+          const preset = PRESET_ASSETS[brandName] || {};
+          const adminBanner = App.state.serverBanners[brandName];
+          // Cari gambar sample
+          const sampleProduct = App.state.rawProducts.find(
+            (p) => p.brand === brandName && !p.image.includes("default"),
+          );
+          const serverImg = sampleProduct ? sampleProduct.image : null;
+
+          return {
+            id: brandName,
+            name: brandName,
+            img: preset.logo || serverImg || DEFAULT_ASSETS.logo,
+            banner: adminBanner || preset.banner || DEFAULT_ASSETS.banner,
+            theme: preset.theme || DEFAULT_ASSETS.color,
+          };
+        })
+        .filter((g) => g !== null);
+
+      App.router("home");
+    } catch (e) {
+      console.error("Fetch Error:", e);
+    }
   },
 
-  fetchChannels: async () => {
+  fetchPaymentChannels: async () => {
     try {
       const res = await fetch(`${API_URL}/channels`);
       const json = await res.json();
-      App.state.channels = json.data || [];
-    } catch (e) {}
+      if (json.success && json.data) {
+        App.state.paymentChannels = json.data;
+      }
+    } catch (e) {
+      console.error("Gagal load channel pembayaran");
+    }
   },
 
-  router: (page, param) => {
+  router: (page, param = null) => {
     const vp = document.getElementById("viewport");
+    if (!vp) return;
+
     vp.innerHTML = "";
     window.scrollTo(0, 0);
-
-    // Animasi transisi sederhana (GSAP)
-    if (typeof gsap !== "undefined")
-      gsap.fromTo(
-        vp,
-        { opacity: 0, y: 10 },
-        { opacity: 1, y: 0, duration: 0.4 },
-      );
-
     if (page === "home") App.renderHome(vp);
-    else if (page === "order") App.renderOrder(vp, param);
+    else if (page === "order") App.renderOrderPage(vp, param);
   },
 
-  // --- RENDER HOME (Hybrid: Struktur Baru + Efek Lama) ---
-  renderHome: (c) => {
-    let sliderHtml = "";
-    // Jika ada slider dari server, pakai itu. Jika tidak, pakai default
-    const sliders = App.state.serverSliders.length
-      ? App.state.serverSliders
-      : ["assets/banner-def.png"];
+  renderHome: (container) => {
+    if (App.sliderInterval) clearInterval(App.sliderInterval);
 
-    // Hero Section dengan Text Scramble
     let html = `
-        <div class="hero-section" style="background-image: url('${sliders[0]}')">
-            <h1 class="hero-title glitch-text">HAWAI <span class="text-accent">STORE</span></h1>
-            <p>Next Gen Gaming Topup Center</p>
-        </div>
-        <div class="container grid-games">`;
+            <div class="hero-slider" id="home-slider"><div class="slider-timer"></div></div>
+            <div class="container">
+                <h2 class="section-title">POPULAR GAMES</h2>
+                <div class="grid">`;
 
-    App.state.games.forEach((g) => {
-      let img =
-        g.img.startsWith("http") || g.img.startsWith("data")
-          ? g.img
-          : `${API_URL.replace("/api", "")}/${g.img}`;
-
-      // Tambahkan onmouseenter="App.tilt(this)" untuk efek 3D lama
+    App.state.gamesList.forEach((g) => {
       html += `
-            <div class="game-card glass-panel" onclick="App.router('order', '${g.id}')" onmouseenter="App.tilt(this)">
-                <img src="${img}" class="game-icon">
-                <div class="game-info">
-                    <h4>${g.name}</h4>
-                    <span class="badge-online">Online</span>
-                </div>
-            </div>`;
+                <div class="tilt-card" onclick="App.router('order', '${g.id}')" onmouseenter="App.tilt(this)" style="background-image: url('${g.banner}');">
+                    <div class="card-overlay">
+                        <div class="d-flex align-items-center gap-2">
+                            <img src="${g.img}" class="mini-logo" onerror="this.style.display='none'">
+                            <div class="card-info">
+                                <h3>${g.name}</h3>
+                                <p>● SERVER ONLINE</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
     });
-    html += `</div>`;
-    c.innerHTML = html;
 
-    // Init Text Scramble
-    const title = c.querySelector(".glitch-text");
-    if (title) new TextScramble(title).setText("HAWAI OMEGA");
+    if (App.state.gamesList.length === 0) {
+      html += `<div style="text-align:center; padding:50px; color:#fff;">LOADING GAMES...</div>`;
+    }
+
+    html += `</div></div>`;
+    container.innerHTML = html;
+    App.startSlider();
   },
 
-  // --- RENDER ORDER (Hybrid: Fitur Baru + Cek Nickname Lama) ---
-  renderOrder: (c, brand) => {
-    const items = App.state.products
-      .filter((p) => p.brand === brand && p.is_active !== false)
+  renderOrderPage: (container, brandName) => {
+    const items = App.state.rawProducts
+      .filter((p) => p.brand === brandName && p.is_active !== false)
       .sort((a, b) => a.price_sell - b.price_sell);
 
-    const gameData = App.state.games.find((g) => g.id === brand);
-    const bannerUrl = gameData ? gameData.banner : "";
-    const isML = brand.toLowerCase().includes("mobile");
+    const gameData = App.state.gamesList.find((g) => g.id === brandName) || {
+      banner: DEFAULT_ASSETS.banner,
+      img: DEFAULT_ASSETS.logo,
+      theme: "#fff",
+    };
 
-    // Input Zone hanya muncul jika Mobile Legends (Fitur Lama)
+    const isML = brandName.toLowerCase().includes("mobile");
     const zoneInput = isML
-      ? `<input id="zone" type="number" class="input-clean sm" placeholder="Zone" oninput="App.checkNickname('${brand}')">`
-      : `<input id="zone" type="hidden" value="">`;
+      ? `<input type="number" id="zone" class="input-neon" placeholder="Zone (4 Angka)" oninput="App.checkNickname()">`
+      : `<input type="hidden" id="zone" value="">`;
 
-    c.innerHTML = `
-        <div class="order-header" style="background-image: url('${bannerUrl}');">
-            <div class="overlay-grad"></div>
-            <div class="container relative z-10 pt-5">
-                 <button onclick="App.router('home')" class="btn-back"><i class="fas fa-arrow-left"></i> Kembali</button>
-                 <h2 class="page-title mt-2">${brand}</h2>
-            </div>
-        </div>
+    const promoItems = items.filter((p) => p.is_promo === true);
+    const normalItems = items.filter((p) => !p.is_promo);
+    const mem = normalItems.filter(
+      (p) =>
+        p.name.toLowerCase().includes("member") ||
+        p.name.toLowerCase().includes("pass"),
+    );
+    const dia = normalItems.filter((p) => !mem.includes(p));
 
-        <div class="container -mt-4 fade-in">
-            <div class="section-box">
-                <div class="step-num">1</div>
-                <div class="form-group">
-                    <label>Masukkan User ID</label>
-                    <div class="input-group">
-                        <input id="uid" type="number" class="input-clean" placeholder="ID Player" onchange="App.checkNickname('${brand}')">
-                        ${zoneInput}
+    container.innerHTML = `
+            <div class="game-hero" style="background-image: url('${gameData.banner}'), url('${DEFAULT_ASSETS.banner}');"></div>
+            <div class="container">
+                <div class="game-header-wrap">
+                    <img src="${gameData.img}" class="game-poster-img" style="border: 4px solid ${gameData.theme}; box-shadow: 0 0 30px ${gameData.theme}40;">
+                    <div class="game-title">
+                        <h1 style="color:#fff; text-shadow: 0 0 20px ${gameData.theme};">${brandName}</h1>
+                        <p style="color:#ddd;">Instant Delivery System</p>
                     </div>
-                    <div id="nick-result" class="mt-2 text-sm text-accent font-bold"></div>
                 </div>
-            </div>
 
-            <div class="section-box">
-                <div class="step-num">2</div>
-                <label>Pilih Nominal</label>
-                <div class="grid-items">
-                    ${items
-                      .map((p) => {
-                        // Hitung Reward (Fitur Baru)
-                        const point = Math.floor(
-                          p.price_sell * (CONFIG.rewardPercent / 100),
-                        );
-                        return `
-                        <div class="item-card" onclick="App.selectItem(this, '${p.sku}', ${p.price_sell}, '${p.name}', ${point})">
-                            <div class="item-name">${p.name}</div>
-                            <div class="item-price">Rp ${p.price_sell.toLocaleString()}</div>
-                            <div class="item-bonus">
-                                <i class="fas fa-gift"></i> +${point} Coins
+                <div class="cyber-form">
+                    <div class="form-section">
+                        <span class="sec-title">01 // ACCOUNT DATA</span>
+                        <div class="input-row">
+                            <input type="number" id="uid" class="input-neon" placeholder="User ID" onchange="App.checkNickname()">
+                            ${zoneInput}
+                        </div>
+                        <div id="nick-result" class="nick-res"></div>
+                    </div>
+
+                    <div class="form-section">
+                        <span class="sec-title">02 // PILIH PRODUK</span>
+                        ${
+                          promoItems.length > 0
+                            ? `<div class="cat-label hot-label"><i class="fas fa-fire"></i> HOT PROMO</div>
+                        <div class="item-grid mb-4">
+                            ${promoItems.map((p) => App.renderItemCard(p)).join("")}
+                        </div>`
+                            : ""
+                        }
+                        ${
+                          mem.length > 0
+                            ? `<div class="cat-label mt-3"><i class="fas fa-crown text-warning"></i> MEMBERSHIP</div>
+                        <div class="item-grid">
+                            ${mem.map((p) => App.renderItemCard(p)).join("")}
+                        </div>`
+                            : ""
+                        }
+                        <div class="cat-label mt-4"><i class="fas fa-gem" style="color:${gameData.theme}"></i> TOP UP</div>
+                        <div class="item-grid">
+                            ${dia.map((p) => App.renderItemCard(p)).join("")}
+                        </div>
+                    </div>
+                    
+                    <div id="paymentModal" class="payment-modal">
+                        <div class="payment-content">
+                            <div class="pm-header">
+                                <h5 class="m-0 text-white">PILIH METODE PEMBAYARAN</h5>
+                                <button onclick="Terminal.closeModal()" style="background:none;border:none;color:#fff;font-size:1.5rem;">&times;</button>
                             </div>
-                        </div>`;
-                      })
-                      .join("")}
-                </div>
-            </div>
+                            <div class="pm-body" id="paymentList"></div>
+                        </div>
+                    </div>
 
-            <div class="fixed-action">
-                <div class="total-price">
-                    <small>Total Bayar</small>
-                    <span id="displayTotal">Rp 0</span>
+                    <div id="invoiceModal" class="payment-modal">
+                        <div class="payment-content">
+                            <div class="pm-header">
+                                <h5 class="m-0 text-white">TAGIHAN PEMBAYARAN</h5>
+                                <button onclick="location.reload()" style="background:none;border:none;color:#fff;">&times;</button>
+                            </div>
+                            <div class="pm-body" id="invoiceContent"></div>
+                        </div>
+                    </div>
+
+                    <div class="footer-action">
+                        <button class="btn-pay-now" onclick="Terminal.openPaymentSelect()">
+                            BELI SEKARANG <i class="fas fa-wallet ml-2"></i>
+                        </button>
+                    </div>
                 </div>
-                <button class="btn-primary" onclick="App.openPayment('GAME')">BELI SEKARANG</button>
+            </div>`;
+  },
+
+  renderItemCard: (p) => {
+    let cardClass = "item-card";
+    let badgeHtml = "";
+
+    if (p.is_promo) {
+      cardClass += " card-promo";
+      badgeHtml = `<div class="hot-badge">HOT 🔥</div>`;
+    } else if (
+      p.name.toLowerCase().includes("member") ||
+      p.name.toLowerCase().includes("pass")
+    ) {
+      cardClass += " card-premium";
+    }
+
+    let imgDisplay;
+    if (p.image && !p.image.includes("default")) {
+      if (p.image.startsWith("http") || p.image.startsWith("data:")) {
+        imgDisplay = p.image;
+      } else {
+        imgDisplay = `${API_URL.replace("/api", "")}/${p.image}`;
+      }
+    } else {
+      imgDisplay = DEFAULT_ASSETS.icons.diamond;
+      if (p.name.toLowerCase().includes("member"))
+        imgDisplay = DEFAULT_ASSETS.icons.member;
+    }
+
+    return `
+        <div class="${cardClass}" onclick="App.selectItem(this, '${p.sku}', ${p.price_sell}, '${p.name}')">
+            ${badgeHtml} <div class="i-content">
+                <img src="${imgDisplay}" class="i-icon" loading="lazy">
+                <div class="i-name">${p.name}</div>
+                <div class="i-price">Rp ${p.price_sell.toLocaleString()}</div>
             </div>
         </div>`;
   },
 
-  // --- CEK NICKNAME (Fitur Penting Script Lama) ---
-  checkNickname: async (gameTitle) => {
+  checkNickname: async () => {
     const uid = document.getElementById("uid").value;
-    const zone = document.getElementById("zone").value;
-    const resEl = document.getElementById("nick-result");
+    const zoneInput = document.getElementById("zone");
+    const zone = zoneInput ? zoneInput.value : "";
+    const res = document.getElementById("nick-result");
+    const gameTitleEl = document.querySelector(".game-title h1");
+    const gameTitle = gameTitleEl ? gameTitleEl.innerText : "";
 
     if (uid.length < 4) {
-      resEl.innerHTML = "";
+      res.innerHTML = "";
       return;
     }
-    if (gameTitle.toLowerCase().includes("mobile") && zone.length < 3) return;
+    const isML = gameTitle.toLowerCase().includes("mobile");
+    if (isML && zone.length < 3) return;
 
-    resEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Mengecek ID...`;
+    res.style.display = "block";
+    res.innerHTML = `<span style="color:#00f3ff; font-size: 0.9rem;"><i class="fas fa-circle-notch fa-spin"></i> Mencari ID...</span>`;
 
     try {
       const response = await fetch(`${API_URL}/check-nickname`, {
@@ -340,143 +497,33 @@ const App = {
       });
       const data = await response.json();
       if (data.success) {
-        resEl.innerHTML = `<i class="fas fa-check-circle text-success"></i> ${data.name}`;
+        res.innerHTML = `
+                    <div style="margin-top:8px; padding:5px 10px; background:rgba(0,255,0,0.2); border:1px solid #00ff00; border-radius:6px; display:inline-flex; align-items:center; gap:5px;">
+                        <i class="fas fa-check-circle" style="color:#00ff00;"></i> 
+                        <span style="color:#fff; font-weight:bold; font-size:0.9rem;">${data.name}</span>
+                    </div>`;
         Sound.success();
+        App.state.nickname = data.name;
       } else {
-        resEl.innerHTML = `<span class="text-danger">ID Tidak Ditemukan</span>`;
+        res.innerHTML = `<span style="color:#ff4444; font-size:0.9rem; margin-top:5px; display:block;"><i class="fas fa-times-circle"></i> ID Tidak Ditemukan</span>`;
       }
     } catch (e) {
-      resEl.innerHTML = `<span class="text-danger">Gagal Cek ID</span>`;
+      console.error(e);
+      res.innerHTML = `<span style="color:red">Gagal koneksi</span>`;
     }
   },
 
-  selectItem: (el, sku, price, name, point) => {
+  selectItem: (el, code, price, name) => {
     document
       .querySelectorAll(".item-card")
-      .forEach((e) => e.classList.remove("active"));
+      .forEach((i) => i.classList.remove("active"));
     el.classList.add("active");
-    App.state.selectedItem = { sku, price, name, point };
-    document.getElementById("displayTotal").innerText =
-      `Rp ${price.toLocaleString()}`;
+    App.state.selectedItem = { code, price, name };
     Sound.click();
   },
 
-  // --- MODAL & PAYMENT LOGIC (Script Baru) ---
-  openTopupModal: () => {
-    if (!Auth.user) return alert("Silakan Login Dulu!");
-    document.getElementById("coinModal").classList.remove("hidden");
-    Sound.click();
-  },
-
-  selectCoin: (amount) => {
-    document.getElementById("customCoin").value = amount;
-    Sound.click();
-  },
-
-  processTopupCoin: () => {
-    const amount = document.getElementById("customCoin").value;
-    if (amount < 10000) return alert("Minimal Rp 10.000");
-    App.state.selectedItem = {
-      sku: "DEPOSIT",
-      price: parseInt(amount),
-      name: "Topup Coin",
-    };
-    App.closeModal("coinModal");
-    App.openPayment("COIN");
-  },
-
-  openPayment: (type) => {
-    const { selectedItem } = App.state;
-    if (!selectedItem) return alert("Pilih Item Dulu");
-    if (type === "GAME" && !document.getElementById("uid").value)
-      return alert("Isi ID Dulu");
-
-    const list = document.getElementById("paymentList");
-    list.innerHTML = "";
-
-    App.state.channels.forEach((ch) => {
-      // Sembunyikan opsi Coin jika sedang Topup Coin
-      if (type === "COIN" && ch.code === "HAWAI_COIN") return;
-
-      let balanceInfo = "";
-      let opacity = "1";
-      let clickAction = `onclick="App.execPay('${ch.code}', '${type}')"`;
-
-      // Logic Cek Saldo Coin
-      if (ch.code === "HAWAI_COIN") {
-        const bal = Auth.user ? Auth.user.hawai_coins : 0;
-        if (!Auth.user) {
-          balanceInfo = `<small class="text-danger">Login diperlukan</small>`;
-          opacity = "0.5";
-          clickAction = `onclick="alert('Harus login!')"`;
-        } else if (bal < selectedItem.price) {
-          balanceInfo = `<small class="text-danger">Saldo Kurang (${bal})</small>`;
-          opacity = "0.5";
-          clickAction = `onclick="alert('Saldo Kurang!')"`;
-        } else {
-          balanceInfo = `<small class="text-accent">Sisa Saldo: ${bal.toLocaleString()}</small>`;
-        }
-      }
-
-      list.innerHTML += `
-            <div class="pay-item" style="opacity:${opacity}" ${clickAction}>
-                <img src="${ch.icon_url}" class="pay-icon">
-                <div class="pay-info">
-                    <b>${ch.name}</b>
-                    ${balanceInfo}
-                </div>
-                <div class="pay-price">Rp ${selectedItem.price.toLocaleString()}</div>
-            </div>`;
-    });
-
-    document.getElementById("paymentModal").classList.remove("hidden");
-    Sound.click();
-  },
-
-  execPay: async (method, type) => {
-    const { selectedItem } = App.state;
-    let payload = {
-      sku: selectedItem.sku,
-      amount: selectedItem.price,
-      method: method,
-      user_uid: Auth.user ? Auth.user.uid : null,
-      user_name: Auth.user ? Auth.user.name : "Guest",
-    };
-
-    let endpoint = "/transaction";
-
-    if (type === "GAME") {
-      const uid = document.getElementById("uid").value;
-      const zone = document.getElementById("zone").value;
-      payload.customer_no = uid + zone;
-      payload.game = "Game";
-    } else {
-      endpoint = "/topup-coin";
-    }
-
-    try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (json.success) {
-        window.location.href = json.data.checkout_url;
-      } else {
-        throw new Error(json.message);
-      }
-    } catch (e) {
-      alert("Gagal: " + e.message);
-    }
-  },
-
-  closeModal: (id) => document.getElementById(id).classList.add("hidden"),
-
-  // --- TILT EFFECT (Dari Script Lama - Untuk Card) ---
   tilt: (card) => {
     if (window.innerWidth < 768) return;
-    Sound.hover();
     card.addEventListener("mousemove", (e) => {
       const rect = card.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -488,20 +535,178 @@ const App = {
     card.addEventListener("mouseleave", () => {
       card.style.transform = `perspective(1000px) rotateX(0) rotateY(0) scale(1)`;
     });
+    Sound.hover();
+  },
+
+  startSlider: () => {
+    const sliders =
+      App.state.serverSliders.length > 0
+        ? App.state.serverSliders
+        : ["assets/slider1.png"];
+    const wrapper = document.getElementById("home-slider");
+    if (!wrapper) return;
+    wrapper.innerHTML = '<div class="slider-timer"></div>';
+    let curr = 0;
+    const render = (idx) => {
+      const imgUrl = sliders[idx];
+      const div = document.createElement("div");
+      div.className = "slide active";
+      div.innerHTML = `
+                <div class="slide-bg" style="background-image: url('${imgUrl}'), url('${DEFAULT_ASSETS.banner}')"></div>
+                <div class="slide-ui">
+                    <div class="cyber-pane">
+                        <h1 class="glitch-title">HAWAI STORE</h1>
+                        <div class="slide-sub">GAME TOPUP CENTER</div>
+                    </div>
+                </div>`;
+      const old = wrapper.querySelector(".slide");
+      if (old) {
+        old.classList.remove("active");
+        setTimeout(() => old.remove(), 1000);
+      }
+      wrapper.appendChild(div);
+      if (window.innerWidth > 768) {
+        const t = div.querySelector(".glitch-title");
+        if (t) new TextScramble(t).setText("HAWAI OMEGA");
+      }
+    };
+    render(0);
+    App.sliderInterval = setInterval(() => {
+      curr = (curr + 1) % sliders.length;
+      render(curr);
+      const bar = document.querySelector(".slider-timer");
+      if (bar) {
+        bar.style.animation = "none";
+        void bar.offsetWidth;
+        bar.style.animation = "progress 5s linear forwards";
+      }
+    }, 5000);
   },
 };
 
-// ==========================================
-// 4. VISUALS (GRID CYBERPUNK - Script Lama)
-// ==========================================
-// Kita pakai yang lama karena lebih keren dari partikel baru
-const Visuals = {
+// --- LOGIC TRANSAKSI ---
+const Terminal = {
+  openPaymentSelect: () => {
+    const { selectedItem, paymentChannels } = App.state;
+    const uid = document.getElementById("uid").value;
+
+    if (!uid) return alert("Masukkan User ID dulu!");
+    if (!selectedItem) return alert("Pilih Item dulu!");
+
+    const listDiv = document.getElementById("paymentList");
+    listDiv.innerHTML = "";
+
+    if (!paymentChannels || paymentChannels.length === 0) {
+      listDiv.innerHTML = `<div class="alert alert-danger text-center">Metode Pembayaran Tidak Tersedia.</div>`;
+    } else {
+      paymentChannels.forEach((ch) => {
+        let fee = ch.total_fee?.flat || 0;
+        let total = selectedItem.price + fee;
+        let balanceCheck = "";
+
+        // UI KHUSUS UNTUK HAWAI COIN
+        if (ch.code === "HAWAI_COIN") {
+          const userBalance = Auth.user ? Auth.user.hawai_coins : 0;
+          if (!Auth.user) {
+            balanceCheck = `<small class="text-danger d-block">Login required</small>`;
+          } else if (userBalance < total) {
+            balanceCheck = `<small class="text-danger d-block">Saldo kurang (Sisa: ${userBalance})</small>`;
+          } else {
+            balanceCheck = `<small class="text-success d-block">Saldo cukup (Sisa: ${userBalance})</small>`;
+          }
+        }
+
+        listDiv.innerHTML += `
+                <div class="d-flex align-items-center gap-3 p-3 border rounded bg-secondary text-white mb-2" 
+                     style="cursor:pointer;" 
+                     onclick="Terminal.processTransaction('${ch.code}')">
+                    <img src="${ch.icon_url}" style="width:50px; background:white; border-radius:5px;">
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">${ch.name}</div>
+                        <small class="text-warning">Total: Rp ${total.toLocaleString()}</small>
+                        ${balanceCheck}
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </div>`;
+      });
+    }
+
+    document.getElementById("paymentModal").style.display = "flex";
+  },
+
+  closeModal: () => {
+    document.getElementById("paymentModal").style.display = "none";
+  },
+
+  processTransaction: async (method) => {
+    const { selectedItem } = App.state;
+    const uid = document.getElementById("uid").value;
+    const zone = document.getElementById("zone")
+      ? document.getElementById("zone").value
+      : "";
+
+    // VALIDASI KHUSUS HAWAI COIN
+    if (method === "HAWAI_COIN" && !Auth.user) {
+      alert("Silakan Login terlebih dahulu untuk menggunakan HAWAI Coin.");
+      return;
+    }
+
+    const btn =
+      document.querySelector(".btn-pay-now") ||
+      document.querySelector("button.btn-primary");
+    const oldText = btn.innerHTML;
+    btn.innerHTML = "Memproses...";
+    btn.disabled = true;
+    Terminal.closeModal();
+
+    try {
+      const res = await fetch(`${API_URL}/transaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: selectedItem.code,
+          amount: selectedItem.price,
+          customer_no: uid + (zone ? ` (${zone})` : ""),
+          method: method,
+          game: "Game",
+          user_uid: Auth.user ? Auth.user.uid : null, // Kirim UID untuk potong coin
+        }),
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        window.location.href = json.data.checkout_url;
+      } else {
+        throw new Error(json.message || "Gagal Transaksi");
+      }
+    } catch (e) {
+      alert("Error: " + e.message);
+      btn.innerHTML = oldText;
+      btn.disabled = false;
+    }
+  },
+};
+
+const Receipt = {
+  show: () => {
+    const d = App.state.selectedItem;
+    const u = document.getElementById("uid").value;
+    document.getElementById("modal-receipt").classList.remove("hidden");
+    document.getElementById("receipt-data").innerHTML =
+      `<div class="rc-row"><span>ITEM</span><span>${d.name}</span></div><div class="rc-row"><span>ID</span><span>${u}</span></div><div class="rc-row fw-bold"><span>TOTAL</span><span>Rp ${d.price.toLocaleString()}</span></div>`;
+  },
+  close: () => {
+    document.getElementById("modal-receipt").classList.add("hidden");
+    App.router("home");
+  },
+};
+
+const World = {
   init: () => {
     const cvs = document.getElementById("webgl-canvas");
     if (!cvs) return;
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020203, 0.025); // Fog hitam
-
+    scene.fog = new THREE.FogExp2(0x020203, 0.025);
     const camera = new THREE.PerspectiveCamera(
       70,
       window.innerWidth / window.innerHeight,
@@ -509,11 +714,8 @@ const Visuals = {
       1000,
     );
     camera.position.set(0, 3, 10);
-
     const renderer = new THREE.WebGLRenderer({ canvas: cvs, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-
-    // Grid Effect
     const gridGeo = new THREE.PlaneGeometry(200, 200, 60, 60);
     const gridMat = new THREE.MeshBasicMaterial({
       color: 0x00f3ff,
@@ -524,8 +726,6 @@ const Visuals = {
     const grid = new THREE.Mesh(gridGeo, gridMat);
     grid.rotation.x = -Math.PI / 2;
     scene.add(grid);
-
-    // Stars Effect
     const starGeo = new THREE.BufferGeometry();
     const count = window.innerWidth < 768 ? 300 : 1000;
     const pos = new Float32Array(count * 3);
@@ -536,15 +736,13 @@ const Visuals = {
       new THREE.PointsMaterial({ color: 0xff0055, size: 0.1 }),
     );
     scene.add(stars);
-
     function animate() {
       requestAnimationFrame(animate);
-      grid.position.z = (Date.now() * 0.005) % 3; // Grid bergerak maju
+      grid.position.z = (Date.now() * 0.005) % 3;
       stars.rotation.y += 0.0005;
       renderer.render(scene, camera);
     }
     animate();
-
     window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
