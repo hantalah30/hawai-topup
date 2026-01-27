@@ -1,5 +1,7 @@
-const API_URL = "/api";
-
+// MENJADI (Gunakan window agar aman jika dipanggil ganda):
+if (typeof API_URL === "undefined") {
+  var API_URL = "/api";
+}
 // --- PRESET ASSETS ---
 const PRESET_ASSETS = {
   "MOBILE LEGENDS": {
