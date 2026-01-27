@@ -1,7 +1,7 @@
 // Arahkan ke endpoint API relative path
 const API_URL = "/api";
 
-// Definisi Aset Game (Sama dengan script.js agar konsisten)
+// Definisi Aset Game
 const ASSETS = {
   "MOBILE LEGENDS": {
     logo: "assets/lance2.png",
@@ -20,7 +20,8 @@ const ASSETS = {
     banner: "https://images4.alphacoders.com/114/1149479.jpg",
   },
   DEFAULT: {
-    logo: "assets/default.png",
+    // [FIX] Menggunakan URL Placeholder online agar tidak 404
+    logo: "https://placehold.co/150/1a1a1a/00f3ff/png?text=GAME",
     banner: "https://images.alphacoders.com/133/1336040.png",
   },
 };
@@ -31,10 +32,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(window.location.search);
   const ref = params.get("ref");
 
-  // Jika tidak ada ref, kembalikan ke home
   if (!ref) {
-    alert("Referensi transaksi tidak ditemukan.");
-    return (window.location.href = "index.html");
+    // Alert dihapus agar tidak mengganggu, langsung redirect atau tampilkan pesan HTML
+    document.body.innerHTML =
+      "<h2 style='color:white;text-align:center;margin-top:50px;'>Error: No Reference ID</h2>";
+    return;
   }
 
   loadData(ref);
@@ -53,7 +55,6 @@ async function loadData(ref) {
 
     renderAll(json.data);
 
-    // Sembunyikan loader setelah data berhasil dimuat
     const loader = document.getElementById("loader");
     if (loader) loader.style.display = "none";
 
@@ -61,7 +62,6 @@ async function loadData(ref) {
     if (progFill) setTimeout(() => (progFill.style.width = "50%"), 500);
   } catch (e) {
     console.error("Load Data Error:", e);
-    // Tampilkan pesan error di layar jika fatal
     document.body.innerHTML = `<div style="color:white;text-align:center;margin-top:50px;">
         <h2>Gagal Memuat Transaksi</h2>
         <p>${e.message}</p>
@@ -75,7 +75,6 @@ function renderAll(data) {
   let key = "DEFAULT";
   const gameName = data.game || "";
 
-  // Cari aset yang cocok secara case-insensitive
   Object.keys(ASSETS).forEach((k) => {
     if (k !== "DEFAULT" && gameName.toLowerCase().includes(k.toLowerCase())) {
       key = k;
@@ -90,9 +89,10 @@ function renderAll(data) {
   const gameLogo = document.getElementById("gameLogo");
   if (gameLogo) {
     gameLogo.src = asset.logo;
-    // Fallback jika gambar error
-    gameLogo.onerror = () => {
-      gameLogo.src = ASSETS.DEFAULT.logo;
+    // [FIX] Fallback handler yang aman agar tidak looping
+    gameLogo.onerror = function () {
+      this.onerror = null;
+      this.src = ASSETS.DEFAULT.logo;
     };
   }
 
@@ -103,7 +103,6 @@ function renderAll(data) {
   if (refIdSmall) refIdSmall.innerText = data.ref_id;
 
   // 2. Data Text Detail
-  // [FIX] Prioritaskan productName, lalu item, lalu sku
   const productName =
     data.productName || data.item || data.sku || "Unknown Item";
 
@@ -118,7 +117,7 @@ function renderAll(data) {
 
   // 4. Status Check & Rendering Area Pembayaran
   if (data.status === "PAID" || data.status === "SUCCESS") {
-    showSuccess(true); // Tampilkan sukses (mode instant, tanpa confetti berulang)
+    showSuccess(true);
   } else if (data.status === "EXPIRED" || data.status === "FAILED") {
     showExpired();
   } else {
@@ -190,7 +189,7 @@ function renderPay(data) {
             </a>
         `;
   } else if (data.checkout_url) {
-    // Fallback jika tidak ada QR/VA tapi ada link checkout
+    // Fallback
     area.innerHTML = `
           <div class="mb-3">Silakan selesaikan pembayaran melalui link di bawah:</div>
           <a href="${data.checkout_url}" target="_blank" class="btn btn-primary rounded-pill w-100 py-3 fw-bold">
@@ -220,7 +219,6 @@ function showSuccess(isInstant = false) {
     const sfx = document.getElementById("sfx-success");
     if (sfx) sfx.play().catch((e) => console.log("Audio play blocked"));
 
-    // Efek Confetti (Pastikan library canvas-confetti sudah diload di HTML)
     if (typeof confetti !== "undefined") {
       confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
     }
@@ -245,13 +243,12 @@ function showExpired() {
 }
 
 function startTimer(created) {
-  // Jika created timestamp dari firestore object, convert dulu
   let startTime = created;
   if (created && created._seconds) {
     startTime = created._seconds * 1000;
   }
 
-  const end = startTime + 24 * 3600 * 1000; // Expired 24 jam
+  const end = startTime + 24 * 3600 * 1000;
 
   timerInt = setInterval(() => {
     const diff = end - Date.now();
@@ -309,7 +306,7 @@ async function checkStatus(ref) {
       }
     }
   } catch (e) {
-    // Silent error for polling
+    // Silent error
   }
 }
 
