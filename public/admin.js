@@ -145,11 +145,17 @@ function renderProductTable(data) {
 
   data.forEach((p) => {
     const realIndex = db.products.findIndex((item) => item.sku === p.sku);
+
+    // --- PERBAIKAN LOGIKA GAMBAR ADMIN ---
     let imgUrl = "assets/default.png";
     if (p.image && !p.image.includes("default")) {
-      imgUrl = p.image.startsWith("http")
-        ? p.image
-        : `${API_BASE_URL}/${p.image}`;
+      if (p.image.startsWith("http") || p.image.startsWith("data:")) {
+        // Support Link Luar & Base64
+        imgUrl = p.image;
+      } else {
+        // Support File Lokal
+        imgUrl = `${API_BASE_URL}/${p.image}`;
+      }
     }
 
     const modal = parseInt(p.price_modal) || 0;
@@ -160,29 +166,33 @@ function renderProductTable(data) {
       : "text-secondary opacity-25";
 
     tbody.innerHTML += `
-      <tr class="${p.is_active ? "" : "table-light text-muted"}">
-        <td class="text-center"><input type="checkbox" class="form-check-input prod-select" value="${realIndex}"></td>
-        <td>
-            <img src="${imgUrl}" class="preview-img" onclick="triggerUpload(${realIndex})">
-            <input type="file" id="file-${realIndex}" class="d-none" onchange="uploadProdImg(this, ${realIndex})">
-        </td>
-        <td>
-            <div class="fw-bold text-truncate" style="max-width: 250px;">${p.name}</div>
-            <small class="sku-text">${p.sku} | ${p.brand}</small>
-        </td>
-        <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})">
-            <i class="fas fa-fire ${promoClass} fs-5"></i>
-        </td>
-        <td>
-            <input type="number" class="form-control form-control-sm" style="width:80px" value="${markup}" onchange="updateMarkup(${realIndex}, this.value)">
-        </td>
-        <td class="fw-bold text-success" id="sell-${realIndex}">Rp ${jual.toLocaleString()}</td>
-        <td>
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" ${p.is_active ? "checked" : ""} onchange="toggleActive(${realIndex}, this.checked)">
-            </div>
-        </td>
-      </tr>`;
+            <tr class="${p.is_active ? "" : "table-light text-muted"}">
+                <td class="text-center">
+                    <input type="checkbox" class="form-check-input prod-select" value="${realIndex}">
+                </td>
+                <td>
+                    <img src="${imgUrl}" class="preview-img" onclick="triggerUpload(${realIndex})" title="Klik untuk ganti gambar">
+                    <input type="file" id="file-${realIndex}" class="d-none" onchange="uploadProdImg(this, ${realIndex})">
+                </td>
+                <td>
+                    <div class="fw-bold text-truncate" style="max-width: 250px;">${p.name}</div>
+                    <small class="sku-text">${p.sku} | ${p.brand}</small>
+                </td>
+                <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})">
+                    <i class="fas fa-fire ${promoClass} fs-5"></i>
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" style="width:80px" 
+                        value="${markup}" onchange="updateMarkup(${realIndex}, this.value)">
+                </td>
+                <td class="fw-bold text-success" id="sell-${realIndex}">Rp ${jual.toLocaleString()}</td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" ${p.is_active ? "checked" : ""} onchange="toggleActive(${realIndex}, this.checked)">
+                    </div>
+                </td>
+            </tr>
+        `;
   });
 }
 

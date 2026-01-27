@@ -387,27 +387,30 @@ const App = {
     let cardClass = "item-card";
     let badgeHtml = "";
 
-    // Jika Promo
     if (p.is_promo) {
-      cardClass += " card-promo"; // Style border merah
+      cardClass += " card-promo";
       badgeHtml = `<div class="hot-badge">HOT 🔥</div>`;
-    }
-    // Jika Membership (dan bukan promo)
-    else if (
+    } else if (
       p.name.toLowerCase().includes("member") ||
       p.name.toLowerCase().includes("pass")
     ) {
-      cardClass += " card-premium"; // Style emas
+      cardClass += " card-premium";
     }
 
-    // Logic Gambar
+    // --- PERBAIKAN LOGIKA GAMBAR ---
     let imgDisplay;
+
+    // Cek apakah ada gambar custom
     if (p.image && !p.image.includes("default")) {
-      imgDisplay = p.image.startsWith("http")
-        ? p.image
-        : `${API_URL.replace("/api", "")}/${p.image}`;
+      if (p.image.startsWith("http") || p.image.startsWith("data:")) {
+        // Jika link HTTP (Imgur/Cloud) ATAU Base64 (Upload Sendiri), pakai langsung
+        imgDisplay = p.image;
+      } else {
+        // Jika file lokal di folder assets
+        imgDisplay = `${API_URL.replace("/api", "")}/${p.image}`;
+      }
     } else {
-      // Icon Fallback
+      // Icon Fallback jika tidak ada gambar
       imgDisplay = DEFAULT_ASSETS.icons.diamond;
       if (p.name.toLowerCase().includes("member"))
         imgDisplay = DEFAULT_ASSETS.icons.member;
@@ -416,7 +419,7 @@ const App = {
     return `
         <div class="${cardClass}" onclick="App.selectItem(this, '${p.sku}', ${p.price_sell}, '${p.name}')">
             ${badgeHtml} <div class="i-content">
-                <img src="${imgDisplay}" class="i-icon">
+                <img src="${imgDisplay}" class="i-icon" loading="lazy">
                 <div class="i-name">${p.name}</div>
                 <div class="i-price">Rp ${p.price_sell.toLocaleString()}</div>
             </div>
