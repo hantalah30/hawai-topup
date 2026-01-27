@@ -8,29 +8,42 @@ const admin = require("firebase-admin");
 
 const app = express();
 
-// --- 1. SETUP FIREBASE ---
+// ==========================================
+// 1. SETUP FIREBASE (ANTI CRASH)
+// ==========================================
 if (!admin.apps.length) {
   try {
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
     if (privateKey) {
+      // Bersihkan tanda kutip ganda jika ada (biasa terjadi saat copy-paste di Vercel)
       if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
         privateKey = JSON.parse(privateKey);
       }
+      // Pastikan newline terbaca dengan benar
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
 
-    if (process.env.FIREBASE_PROJECT_ID && privateKey) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+    // Cek kelengkapan variabel SEBELUM inisialisasi
+    if (projectId && privateKey && clientEmail) {
       admin.initializeApp({
         credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          projectId: projectId,
+          clientEmail: clientEmail,
           privateKey: privateKey,
         }),
       });
       console.log("🔥 Firebase Connected!");
+    } else {
+      console.warn("⚠️ Gagal Connect Firebase: Variable Env Belum Lengkap.");
+      console.warn(
+        `Cek: ProjectID=${!!projectId}, Email=${!!clientEmail}, Key=${!!privateKey}`,
+      );
     }
   } catch (error) {
-    console.error("Firebase Error:", error);
+    console.error("❌ Firebase Init Error:", error.message);
   }
 }
 
@@ -44,6 +57,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // --- 3. HELPER CONFIG ---
 async function getConfig() {
+  // Default Config dari Env Vars (Fallback jika DB mati)
   let config = {
     tripay: {
       merchant_code: process.env.TRIPAY_MERCHANT_CODE || "",
@@ -57,6 +71,7 @@ async function getConfig() {
     admin_password: process.env.ADMIN_PASSWORD || "admin",
   };
 
+  // Jika DB Hidup, timpa dengan data dari database
   if (db) {
     try {
       const doc = await db.collection("settings").doc("general").get();
@@ -69,35 +84,50 @@ async function getConfig() {
         if (dbConfig.admin_password)
           config.admin_password = dbConfig.admin_password;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log("⚠️ Gagal baca DB settings.");
+    }
   }
   return config;
 }
 
-// --- PUBLIC ROUTES ---
+// ==========================================
+// ROUTES PUBLIC
+// ==========================================
+
 app.get("/api/status", async (req, res) => {
   const config = await getConfig();
   res.json({
     status: "Online",
-    firebase: db ? "Connected" : "Disconnected",
-    digiflazz_configured: !!config.digiflazz.username,
+    firebase: db ? "Connected" : "Disconnected (Cek Env Vercel)",
+    tripay_configured: !!config.tripay.api_key,
   });
 });
 
 app.get("/api/init-data", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
+  // Jangan return 500 jika DB mati, return array kosong biar web tetap jalan
+  if (!db) {
+    console.error("DB Error: Init Data Failed");
+    return res.json({ sliders: [], banners: {}, products: [] });
+  }
   try {
     const productsSnap = await db
       .collection("products")
       .where("is_active", "==", true)
       .get();
     const products = productsSnap.docs.map((doc) => doc.data());
+
     let assets = { sliders: [], banners: {} };
     try {
       const assetsDoc = await db.collection("settings").doc("assets").get();
       if (assetsDoc.exists) assets = assetsDoc.data();
     } catch (e) {}
-    res.json({ sliders: assets.sliders, banners: assets.banners, products });
+
+    res.json({
+      sliders: assets.sliders || [],
+      banners: assets.banners || {},
+      products,
+    });
   } catch (e) {
     res.status(500).json({ error: "Server Error" });
   }
@@ -107,6 +137,7 @@ app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
   try {
+    if (!config.tripay.api_key) throw new Error("Tripay API Key Missing");
     const response = await axios.get(
       `https://tripay.co.id/${mode}/merchant/payment-channel`,
       {
@@ -134,12 +165,15 @@ app.post("/api/check-nickname", async (req, res) => {
       return res.json({ success: true, name: response.data.name });
     return res.json({ success: false, message: "ID Tidak Ditemukan" });
   } catch (e) {
-    res.json({ success: false, message: "Error Cek ID" });
+    res.json({ success: false, message: "Gagal Cek ID" });
   }
 });
 
 app.post("/api/transaction", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "DB Error" });
+  if (!db)
+    return res
+      .status(500)
+      .json({ message: "Database Error: Cannot Save Transaction" });
   const config = await getConfig();
   const { sku, amount, customer_no, method, nickname, game } = req.body;
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
@@ -151,6 +185,7 @@ app.post("/api/transaction", async (req, res) => {
       : "Topup Game";
     const merchantRef =
       "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
+
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -172,10 +207,9 @@ app.post("/api/transaction", async (req, res) => {
     const tripayRes = await axios.post(
       `https://tripay.co.id/${mode}/transaction/create`,
       payload,
-      {
-        headers: { Authorization: `Bearer ${config.tripay.api_key}` },
-      },
+      { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
+
     const data = tripayRes.data.data;
 
     await db.collection("transactions").doc(data.reference).set({
@@ -193,42 +227,61 @@ app.post("/api/transaction", async (req, res) => {
       checkout_url: data.checkout_url,
       created_at: Date.now(),
     });
+
     res.json({ success: true, data: { ...data, ref_id: data.reference } });
-  } catch (e) {
+  } catch (error) {
+    console.error("Trx Error:", error.response?.data || error.message);
     res.status(500).json({ success: false, message: "Gagal Transaksi" });
   }
 });
 
 // ==========================================
-// ROUTES ADMIN
+// ROUTES ADMIN (FIXED ERROR 500)
 // ==========================================
 
 app.post("/api/admin/login", async (req, res) => {
   const config = await getConfig();
-  if (req.body.password === config.admin_password) res.json({ success: true });
-  else res.status(401).json({ success: false });
+  // Gunakan password env jika DB mati
+  if (req.body.password === config.admin_password) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false });
+  }
 });
 
+// FIX UTAMA: Hapus 'if (!db) return 500' -> Biarkan load config dari Env Var
 app.get("/api/admin/config", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
   try {
     const config = await getConfig();
-    const productsSnap = await db.collection("products").get();
-    const products = productsSnap.docs.map((doc) => doc.data());
 
+    let products = [];
     let assets = { sliders: [], banners: {} };
-    try {
-      const doc = await db.collection("settings").doc("assets").get();
-      if (doc.exists) assets = doc.data();
-    } catch (e) {}
-    res.json({ config, products, assets });
+
+    // Hanya coba ambil dari DB jika DB terhubung
+    if (db) {
+      try {
+        const productsSnap = await db.collection("products").get();
+        products = productsSnap.docs.map((doc) => doc.data());
+
+        const assetsDoc = await db.collection("settings").doc("assets").get();
+        if (assetsDoc.exists) assets = assetsDoc.data();
+      } catch (err) {
+        console.warn("Gagal load data dari DB, menggunakan data kosong.");
+      }
+    }
+
+    res.json({ config, products, assets, db_connected: !!db });
   } catch (e) {
-    res.status(500).json({ error: "Fetch Error" });
+    console.error("Fetch Admin Error:", e);
+    res.status(500).json({ error: "Gagal load data" });
   }
 });
 
 app.post("/api/admin/save-config", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
+  if (!db)
+    return res
+      .status(500)
+      .json({ error: "Database Disconnected (Cek Env Vars)" });
   try {
     await db
       .collection("settings")
@@ -236,15 +289,15 @@ app.post("/api/admin/save-config", async (req, res) => {
       .set(req.body, { merge: true });
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: "Save Error" });
+    res.status(500).json({ error: "Gagal simpan config" });
   }
 });
 
 app.post("/api/admin/save-products", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
+  if (!db) return res.status(500).json({ error: "Database Disconnected" });
   try {
     const products = req.body;
-    // Batching for safety (max 500)
+    // Batching (Max 400 per batch agar tidak timeout)
     const chunkSize = 400;
     for (let i = 0; i < products.length; i += chunkSize) {
       const batch = db.batch();
@@ -256,32 +309,31 @@ app.post("/api/admin/save-products", async (req, res) => {
     }
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: "Save Error" });
+    res.status(500).json({ error: "Gagal simpan produk" });
   }
 });
 
 app.post("/api/admin/save-assets", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
+  if (!db) return res.status(500).json({ error: "Database Disconnected" });
   try {
     await db.collection("settings").doc("assets").set(req.body);
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: "Save Error" });
+    res.status(500).json({ error: "Gagal simpan assets" });
   }
 });
 
-// --- SYNC DIGIFLAZZ FIX (CHUNKING) ---
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "DB Error" });
+  if (!db)
+    return res
+      .status(500)
+      .json({ error: "Database Disconnected. Tidak bisa sync." });
 
   const config = await getConfig();
   const { username, api_key } = config.digiflazz;
 
-  // Cek Config
   if (!username || !api_key) {
-    return res
-      .status(400)
-      .json({ message: "Username/Key Digiflazz Kosong! Cek Config." });
+    return res.status(400).json({ message: "Username/Key Digiflazz Kosong!" });
   }
 
   try {
@@ -289,8 +341,6 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       .createHash("md5")
       .update(username + api_key + "pricelist")
       .digest("hex");
-
-    // Request ke Digiflazz
     const response = await axios.post(
       "https://api.digiflazz.com/v1/price-list",
       {
@@ -301,16 +351,14 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
     );
 
     const digiProducts = response.data.data;
-    if (!digiProducts || digiProducts.length === 0) {
-      throw new Error("Produk Digiflazz Kosong / Gagal Auth");
-    }
+    if (!digiProducts) throw new Error("Gagal mengambil data dari Digiflazz");
 
-    // Filter hanya kategori Games
+    // Filter Games
     const gameProducts = digiProducts.filter(
       (item) => item.category === "Games",
     );
 
-    // Ambil data lama untuk mapping harga & gambar
+    // Ambil data lama
     const oldDataSnap = await db.collection("products").get();
     const oldDataMap = {};
     oldDataSnap.forEach((doc) => {
@@ -318,10 +366,7 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
     });
 
     let count = 0;
-
-    // --- LOGIKA CHUNKING (PENTING AGAR TIDAK ERROR 500) ---
-    // Firebase membatasi 500 write per batch. Kita pakai 400 biar aman.
-    const chunkSize = 400;
+    const chunkSize = 400; // Batch size aman
 
     for (let i = 0; i < gameProducts.length; i += chunkSize) {
       const batch = db.batch();
@@ -330,14 +375,12 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       chunk.forEach((item) => {
         const sku = item.buyer_sku_code;
         const oldItem = oldDataMap[sku];
-
         const newData = {
           sku: sku,
           name: item.product_name,
           brand: item.brand,
           category: item.category,
           price_modal: item.price,
-          // Logic pertahankan markup lama
           markup: oldItem ? oldItem.markup || 0 : 0,
           price_sell: oldItem ? item.price + (oldItem.markup || 0) : item.price,
           image: oldItem
@@ -346,25 +389,18 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
           is_active: oldItem ? oldItem.is_active : false,
           is_promo: oldItem ? oldItem.is_promo || false : false,
         };
-
-        const ref = db.collection("products").doc(sku);
-        batch.set(ref, newData);
+        batch.set(db.collection("products").doc(sku), newData);
         count++;
       });
-
-      // Commit per 400 item
       await batch.commit();
-      console.log(`Synced batch ${i} - ${i + chunk.length}`);
     }
 
-    res.json({ success: true, message: `Sukses Sync ${count} Produk Game!` });
+    res.json({ success: true, message: `Sukses Sync ${count} Produk!` });
   } catch (error) {
-    console.error("Digi Sync Error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Gagal Sync Digiflazz",
-      detail: error.response?.data || error.message,
-    });
+    console.error("Sync Error:", error.message);
+    res
+      .status(500)
+      .json({ success: false, message: "Gagal Sync: " + error.message });
   }
 });
 

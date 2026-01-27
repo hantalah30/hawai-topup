@@ -3,11 +3,7 @@ const API_BASE_URL = "";
 
 // Default state agar tidak undefined saat awal load
 let db = {
-  config: {
-    tripay: {},
-    digiflazz: {},
-    admin_password: "admin",
-  },
+  config: { tripay: {}, digiflazz: {}, admin_password: "admin" },
   products: [],
   assets: { sliders: [], banners: {} },
 };
@@ -16,8 +12,6 @@ let db = {
 async function login() {
   const pass = document.getElementById("adminPass").value;
   const btn = document.querySelector("#loginOverlay button");
-  const originalText = btn.innerText;
-
   btn.innerText = "Loading...";
   btn.disabled = true;
 
@@ -36,9 +30,9 @@ async function login() {
       alert("Password Salah");
     }
   } catch (e) {
-    alert("Gagal Login: Cek Koneksi / Server");
+    alert("Server Error");
   } finally {
-    btn.innerText = originalText;
+    btn.innerText = "Masuk";
     btn.disabled = false;
   }
 }
@@ -50,44 +44,42 @@ function logout() {
 async function loadData() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
-
-    // Jangan throw error, handle gracefully
-    if (!res.ok) {
-      console.warn("Server belum dikonfigurasi atau DB kosong.");
-      return;
-    }
-
     const data = await res.json();
 
-    // SAFE MERGE
     if (data) {
       if (data.config) db.config = data.config;
       if (data.products) db.products = data.products;
       if (data.assets) db.assets = data.assets;
+
+      // ALERT JIKA DB MATI
+      if (data.db_connected === false) {
+        alert(
+          "⚠️ PERINGATAN: Database Firebase Tidak Terhubung!\n\nCek Environment Variables (FIREBASE_CLIENT_EMAIL, dll) di Vercel.\nAnda tidak bisa menyimpan data sampai ini diperbaiki.",
+        );
+      }
     }
 
-    // FILL FORM
-    const conf = db.config || {};
-
-    if (conf.digiflazz) {
+    // Fill Forms
+    if (db.config.digiflazz) {
       document.getElementById("digi_user").value =
-        conf.digiflazz.username || "";
-      document.getElementById("digi_api").value = conf.digiflazz.api_key || "";
+        db.config.digiflazz.username || "";
+      document.getElementById("digi_api").value =
+        db.config.digiflazz.api_key || "";
     }
-
-    if (conf.tripay) {
+    if (db.config.tripay) {
       document.getElementById("tripay_merchant").value =
-        conf.tripay.merchant_code || "";
-      document.getElementById("tripay_api").value = conf.tripay.api_key || "";
+        db.config.tripay.merchant_code || "";
+      document.getElementById("tripay_api").value =
+        db.config.tripay.api_key || "";
       document.getElementById("tripay_private").value =
-        conf.tripay.private_key || "";
+        db.config.tripay.private_key || "";
     }
 
     renderAssets();
     populateBrandFilter();
     filterProducts();
   } catch (e) {
-    console.warn("Gagal load data:", e);
+    console.error(e);
   }
 }
 
@@ -433,20 +425,17 @@ async function saveAssets(silent = false) {
 }
 
 async function saveConfig() {
-  const digiUser = document.getElementById("digi_user").value || "";
-  const digiApi = document.getElementById("digi_api").value || "";
-  const triMerch = document.getElementById("tripay_merchant").value || "";
-  const triApi = document.getElementById("tripay_api").value || "";
-  const triPriv = document.getElementById("tripay_private").value || "";
-
-  // Safe navigation for admin_password
-  const oldPass =
-    db.config && db.config.admin_password ? db.config.admin_password : "admin";
-
   const cfg = {
-    digiflazz: { username: digiUser, api_key: digiApi },
-    tripay: { merchant_code: triMerch, api_key: triApi, private_key: triPriv },
-    admin_password: oldPass,
+    digiflazz: {
+      username: document.getElementById("digi_user").value,
+      api_key: document.getElementById("digi_api").value,
+    },
+    tripay: {
+      merchant_code: document.getElementById("tripay_merchant").value,
+      api_key: document.getElementById("tripay_api").value,
+      private_key: document.getElementById("tripay_private").value,
+    },
+    admin_password: db.config.admin_password || "admin",
   };
 
   try {
@@ -455,16 +444,14 @@ async function saveConfig() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cfg),
     });
-
     const json = await res.json();
     if (json.success) {
-      alert("✅ Konfigurasi Tersimpan!");
+      alert("Tersimpan!");
       db.config = cfg;
     } else {
-      alert("Gagal menyimpan: " + (json.error || "Server Error"));
+      alert("Gagal: " + (json.error || "DB Error"));
     }
   } catch (e) {
-    console.error(e);
-    alert("Error Saving Config: " + e.message);
+    alert("Save Error");
   }
 }
