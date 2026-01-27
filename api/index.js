@@ -41,13 +41,11 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- 4. CONFIG MANAGER (FIXED) ---
+// --- 4. HELPER: GET CONFIG ---
 async function getConfig() {
-  // 1. Set Default dari Environment Variable (Paling Aman)
   let config = {
     tripay: {
-      merchant_code:
-        process.env.TRIPAY_MERCHANT_CODE || process.env.TRIPAY_MERCHANT,
+      merchant_code: process.env.TRIPAY_MERCHANT_CODE,
       api_key: process.env.TRIPAY_API_KEY,
       private_key: process.env.TRIPAY_PRIVATE_KEY,
     },
@@ -58,15 +56,16 @@ async function getConfig() {
     admin_password: process.env.ADMIN_PASSWORD || "admin",
   };
 
-  // 2. Coba timpa dengan settingan dari Database (opsional)
+  // Timpa dengan data database jika ada (agar Admin bisa edit via Web)
   if (db) {
     try {
       const doc = await db.collection("settings").doc("general").get();
       if (doc.exists) {
         const dbConfig = doc.data();
-        // Hanya timpa jika data di DB tidak kosong
-        if (dbConfig.tripay?.api_key) config.tripay = dbConfig.tripay;
-        if (dbConfig.digiflazz?.username) config.digiflazz = dbConfig.digiflazz;
+        if (dbConfig.tripay)
+          config.tripay = { ...config.tripay, ...dbConfig.tripay };
+        if (dbConfig.digiflazz)
+          config.digiflazz = { ...config.digiflazz, ...dbConfig.digiflazz };
         if (dbConfig.admin_password)
           config.admin_password = dbConfig.admin_password;
       }
@@ -77,28 +76,27 @@ async function getConfig() {
   return config;
 }
 
-// --- 5. ROUTES ---
+// --- 5. ROUTES PUBLIC (Client) ---
 
 app.get("/api/status", async (req, res) => {
   const config = await getConfig();
   res.json({
     status: "Online",
     firebase: db ? "Connected" : "Disconnected",
-    tripay_configured: !!config.tripay.api_key, // Cek apakah API Key terdeteksi
-    env_test: process.env.NODE_ENV,
+    tripay_configured: !!config.tripay.api_key,
   });
 });
 
 app.get("/api/init-data", async (req, res) => {
   if (!db) return res.status(500).json({ error: "Database offline" });
   try {
+    // Hanya ambil yang AKTIF untuk halaman depan
     const productsSnap = await db
       .collection("products")
       .where("is_active", "==", true)
       .get();
     const products = productsSnap.docs.map((doc) => doc.data());
 
-    // Default data jika kosong
     let assets = { sliders: [], banners: {} };
     try {
       const assetsDoc = await db.collection("settings").doc("assets").get();
@@ -107,21 +105,13 @@ app.get("/api/init-data", async (req, res) => {
 
     res.json({ sliders: assets.sliders, banners: assets.banners, products });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Server Error Fetching Data" });
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
 app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
-  // Gunakan 'api-sandbox' untuk testing, 'api' untuk production
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
-
-  if (!config.tripay.api_key) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Tripay API Key Missing" });
-  }
 
   try {
     const response = await axios.get(
@@ -132,28 +122,16 @@ app.get("/api/channels", async (req, res) => {
     );
     res.json(response.data);
   } catch (error) {
-    console.error(
-      "Tripay Channel Error:",
-      error.response?.data || error.message,
-    );
+    console.error("Tripay Error:", error.message);
     res.status(500).json({ success: false, data: [] });
   }
 });
 
 app.post("/api/transaction", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database Error" });
-
   const config = await getConfig();
   const { sku, amount, customer_no, method, nickname, game } = req.body;
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
-
-  // Validasi Config
-  if (!config.tripay.private_key || !config.tripay.merchant_code) {
-    console.error("Missing Tripay Config:", config.tripay);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server Misconfiguration (Tripay)" });
-  }
 
   try {
     const productDoc = await db.collection("products").doc(sku).get();
@@ -176,12 +154,10 @@ app.post("/api/transaction", async (req, res) => {
       customer_email: "customer@email.com",
       customer_phone: customer_no,
       order_items: [{ sku, name: productName, price: amount, quantity: 1 }],
-      return_url: "https://hawai-topup.vercel.app/invoice.html", // Ganti domain kamu
+      return_url: "https://hawai-topup.vercel.app/invoice.html",
       expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
       signature,
     };
-
-    console.log("Sending to Tripay...", payload.merchant_ref);
 
     const tripayRes = await axios.post(
       `https://tripay.co.id/${mode}/transaction/create`,
@@ -191,7 +167,6 @@ app.post("/api/transaction", async (req, res) => {
 
     const data = tripayRes.data.data;
 
-    // Simpan ke Firestore
     await db.collection("transactions").doc(data.reference).set({
       ref_id: data.reference,
       merchant_ref: merchantRef,
@@ -210,16 +185,14 @@ app.post("/api/transaction", async (req, res) => {
 
     res.json({ success: true, data: { ...data, ref_id: data.reference } });
   } catch (error) {
-    console.error("Transaction Failed:", error.response?.data || error.message);
-    res.status(500).json({
-      success: false,
-      message: "Gagal membuat transaksi. Cek server logs.",
-      detail: error.response?.data,
-    });
+    console.error("Trx Error:", error.response?.data || error.message);
+    res.status(500).json({ success: false, message: "Gagal Transaksi" });
   }
 });
 
-// Admin Login
+// --- 6. ROUTES ADMIN (INI YANG SEBELUMNYA HILANG) ---
+
+// Login Admin
 app.post("/api/admin/login", async (req, res) => {
   const config = await getConfig();
   if (req.body.password === config.admin_password) {
@@ -229,5 +202,71 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-// WAJIB: Module Exports
+// Ambil Data Admin (Config + Produk Lengkap + Assets)
+app.get("/api/admin/config", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    // Ambil settings dari DB
+    let dbConfig = {};
+    const configDoc = await db.collection("settings").doc("general").get();
+    if (configDoc.exists) dbConfig = configDoc.data();
+
+    // Ambil SEMUA produk (aktif & tidak aktif)
+    const productsSnap = await db.collection("products").get();
+    const products = productsSnap.docs.map((doc) => doc.data());
+
+    // Ambil Assets
+    let assets = { sliders: [], banners: {} };
+    const assetsDoc = await db.collection("settings").doc("assets").get();
+    if (assetsDoc.exists) assets = assetsDoc.data();
+
+    // Return format yang diminta admin.js
+    res.json({
+      config: dbConfig,
+      products: products,
+      assets: assets,
+    });
+  } catch (e) {
+    console.error("Admin Fetch Error:", e);
+    res.status(500).json({ error: "Gagal load data admin" });
+  }
+});
+
+// Simpan Produk (Bulk)
+app.post("/api/admin/save-products", async (req, res) => {
+  try {
+    const products = req.body;
+    const batch = db.batch();
+    products.forEach((p) => {
+      const ref = db.collection("products").doc(p.sku);
+      batch.set(ref, p);
+    });
+    await batch.commit();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Gagal simpan produk" });
+  }
+});
+
+// Simpan Config General (API Key dll)
+app.post("/api/admin/save-config", async (req, res) => {
+  try {
+    await db
+      .collection("settings")
+      .doc("general")
+      .set(req.body, { merge: true });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Gagal simpan config" });
+  }
+});
+
+// Upload Gambar (Base64)
+app.post("/api/admin/upload", upload.single("image"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file" });
+  const b64 = Buffer.from(req.file.buffer).toString("base64");
+  const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+  res.json({ filepath: dataURI });
+});
+
 module.exports = app;
