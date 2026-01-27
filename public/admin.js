@@ -1,5 +1,5 @@
 // Arahkan ke endpoint API relative path
-const API_URL = "/api";
+const API_BASE_URL = "";
 
 let db = { config: {}, products: [], assets: { sliders: [], banners: {} } };
 
