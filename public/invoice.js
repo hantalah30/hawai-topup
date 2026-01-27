@@ -1,12 +1,18 @@
 // Arahkan ke endpoint API relative path
-const API_URL = "/api";
+if (typeof API_URL === "undefined") {
+  var API_URL = "/api";
+}
 
+// Preset Aset Game (Sama seperti di script.js)
 const ASSETS = {
   "MOBILE LEGENDS": {
     logo: "assets/lance2.png",
     banner: "assets/ml-banner.png",
   },
-  "Free Fire": { logo: "assets/ff.jpg", banner: "assets/ff-banner.jpg" },
+  "Free Fire": {
+    logo: "assets/ff.jpg",
+    banner: "assets/ff-banner.jpg",
+  },
   "PUBG Mobile": {
     logo: "https://cdn-icons-png.flaticon.com/512/3408/3408506.png",
     banner: "https://wallpaperaccess.com/full/1239676.jpg",
@@ -15,219 +21,126 @@ const ASSETS = {
     logo: "https://img.icons8.com/color/480/valorant.png",
     banner: "https://images4.alphacoders.com/114/1149479.jpg",
   },
-  DEFAULT: {
-    logo: "assets/default.png",
-    banner: "https://images.alphacoders.com/133/1336040.png",
-  },
 };
 
-let checkInt, timerInt;
+const DEFAULT_BANNER = "https://images.alphacoders.com/133/1336040.png";
 
-document.addEventListener("DOMContentLoaded", () => {
+// Fungsi Utama
+async function initInvoice() {
   const params = new URLSearchParams(window.location.search);
-  const ref = params.get("ref");
-  if (!ref) return (window.location.href = "index.html");
+  const refId = params.get("ref");
 
-  loadData(ref);
-  checkInt = setInterval(() => checkStatus(ref), 3000);
+  if (!refId) {
+    document.body.innerHTML =
+      "<h2 style='color:white;text-align:center;margin-top:50px;'>No Reference ID</h2>";
+    return;
+  }
 
-  initParticles();
-  setupTiltEffect();
-});
+  // Set No Invoice di UI
+  document.getElementById("inv-no").innerText = "#" + refId;
 
-async function loadData(ref) {
   try {
-    const res = await fetch(`${API_URL}/transaction/${ref}`);
+    const res = await fetch(`${API_URL}/transaction/${refId}`);
     const json = await res.json();
+
     if (!json.success) throw new Error(json.message);
 
-    renderAll(json.data);
-    document.getElementById("loader").style.display = "none";
-    setTimeout(
-      () => (document.getElementById("progFill").style.width = "50%"),
-      500,
-    );
-  } catch (e) {
-    alert("Error: " + e.message);
+    const data = json.data;
+    renderInvoice(data);
+  } catch (error) {
+    console.error(error);
+    alert("Gagal memuat transaksi: " + error.message);
   }
 }
 
-function renderAll(data) {
-  // 1. Visual
-  let key = "DEFAULT";
-  Object.keys(ASSETS).forEach((k) => {
-    if ((data.game || "").toLowerCase().includes(k.toLowerCase())) key = k;
-  });
-  const asset = ASSETS[key];
-  document.getElementById("bgImg").style.backgroundImage =
-    `url('${asset.banner}')`;
-  document.getElementById("gameLogo").src = asset.logo;
-  document.getElementById("gameTitle").innerText = data.game;
-  document.getElementById("refIdSmall").innerText = data.ref_id;
+function renderInvoice(data) {
+  // 1. Set Status
+  const statusEl = document.getElementById("status-badge");
+  statusEl.innerText = data.status;
 
-  // 2. Data Text
-  document.getElementById("dItem").innerText = data.product_name;
-  document.getElementById("dUid").innerText = data.user_id;
-  document.getElementById("dMethod").innerText = data.method;
-  document.getElementById("dTotal").innerText =
-    "Rp " + parseInt(data.amount).toLocaleString();
-
-  // 3. ANIMASI NICKNAME
-  // Jalankan efek decoding text pada nickname
-  const finalNick = data.nickname || "User Game";
-  animateNickname("dNick", finalNick);
-
-  // 4. Status Check
   if (data.status === "PAID") {
-    showSuccess(true);
+    statusEl.className = "badge-status status-success";
+    document.getElementById("qr-container").style.display = "none";
+    document.getElementById("pay-guide").innerHTML = `
+        <div style="text-align:center; padding:20px; border:1px solid #0f0; border-radius:10px; background:rgba(0,255,0,0.1);">
+            <h3 style="color:#0f0;">PEMBAYARAN BERHASIL</h3>
+            <p>Terima kasih! Item Anda sedang diproses sistem.</p>
+        </div>
+    `;
   } else if (data.status === "EXPIRED") {
-    showExpired();
+    statusEl.className = "badge-status status-failed";
+    document.getElementById("qr-container").style.display = "none";
   } else {
-    renderPay(data);
+    statusEl.className = "badge-status status-pending";
+  }
+
+  // 2. Set Detail Produk (Item Name Fix)
+  // Backend mengirim 'productName', tapi invoice.js mungkin mencari 'item'
+  const itemName = data.productName || data.item || data.sku;
+  document.getElementById("item-name").innerText = itemName;
+
+  document.getElementById("user-id").innerText = data.user_id || "-";
+  document.getElementById("nick").innerText = data.nickname || "-";
+  document.getElementById("amount").innerText =
+    "Rp " + (data.amount || 0).toLocaleString();
+  document.getElementById("method").innerText = data.method;
+
+  // 3. Set Gambar Banner & Logo (Case Insensitive Fix)
+  const gameKey = Object.keys(ASSETS).find(
+    (key) => key.toLowerCase() === (data.game || "").toLowerCase(),
+  );
+  const gameAssets = ASSETS[gameKey] || {};
+
+  document.getElementById("game-banner").src =
+    gameAssets.banner || DEFAULT_BANNER;
+
+  // Jika ada elemen logo
+  const logoEl = document.getElementById("game-logo");
+  if (logoEl) logoEl.src = gameAssets.logo || "";
+
+  // 4. QR Code & Pay Code
+  if (data.qr_url && data.status === "UNPAID") {
+    const qrImg = document.getElementById("qr-img");
+    if (qrImg) qrImg.src = data.qr_url;
+  }
+
+  // Virtual Account / Pay Code
+  if (data.pay_code && data.status === "UNPAID") {
+    const vaEl = document.getElementById("va-code");
+    if (vaEl) {
+      vaEl.innerText = data.pay_code;
+      vaEl.parentElement.style.display = "block"; // Tampilkan container VA
+    }
+  }
+
+  // 5. Expired Timer (Optional)
+  if (data.status === "UNPAID") {
     startTimer(data.created_at);
   }
 }
 
-// --- FITUR BARU: ANIMASI DECODING TEXT ---
-function animateNickname(elementId, finalText) {
-  const el = document.getElementById(elementId);
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
-  let iterations = 0;
+function startTimer(createdAt) {
+  const expireTime = createdAt + 24 * 60 * 60 * 1000; // 24 Jam
+  const timerEl = document.getElementById("expiry-timer");
 
-  const interval = setInterval(() => {
-    el.innerText = finalText
-      .split("")
-      .map((letter, index) => {
-        if (index < iterations) return finalText[index];
-        return chars[Math.floor(Math.random() * chars.length)];
-      })
-      .join("");
+  if (!timerEl) return;
 
-    if (iterations >= finalText.length) clearInterval(interval);
-    iterations += 1 / 3; // Kecepatan decoding
-  }, 30);
-}
+  setInterval(() => {
+    const now = Date.now();
+    const diff = expireTime - now;
 
-function renderPay(data) {
-  const area = document.getElementById("paymentArea");
-  if (data.qr_url) {
-    area.innerHTML = `
-            <div class="small text-muted mb-2 fw-bold text-uppercase">Scan QRIS</div>
-            <div class="qr-wrapper"><div class="qr-laser"></div><img src="${data.qr_url}" width="180"></div>
-            <div class="mt-2 text-muted small">Support: DANA, OVO, Shopee, LinkAja</div>
-        `;
-  } else if (data.pay_code) {
-    area.innerHTML = `
-            <div class="small text-muted mb-1 fw-bold text-uppercase">Nomor Virtual Account</div>
-            <div class="va-display" onclick="copy('${data.pay_code}')">
-                ${data.pay_code} <i class="far fa-copy text-primary ms-2 fs-5"></i>
-                <span class="copy-tooltip">Salin!</span>
-            </div>
-            <div class="alert alert-info py-1 px-2 d-inline-block small mb-2 border-0">
-                <i class="fas fa-info-circle"></i> Cek otomatis
-            </div>
-            <br>
-            <a href="${data.checkout_url}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3">Petunjuk</a>
-        `;
-  }
-}
+    if (diff <= 0) {
+      timerEl.innerText = "EXPIRED";
+      return;
+    }
 
-function showSuccess(isInstant = false) {
-  clearInterval(checkInt);
-  clearInterval(timerInt);
-  document.getElementById("progFill").style.width = "100%";
-  document.getElementById("stepPay").classList.add("completed");
-  document.getElementById("stepPay").classList.remove("active");
-  document.getElementById("stepDone").classList.add("completed", "active");
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-  if (!isInstant) {
-    document.getElementById("sfx-success").play();
-    confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
-  }
-  document.getElementById("successOverlay").style.display = "flex";
-}
-
-function showExpired() {
-  clearInterval(checkInt);
-  document.getElementById("paymentArea").style.opacity = "0.5";
-  document.getElementById("paymentArea").innerHTML =
-    `<h3 class="text-danger fw-bold py-4">WAKTU HABIS</h3>`;
-  document.getElementById("countdown").innerText = "EXPIRED";
-}
-
-function startTimer(created) {
-  const end = created + 24 * 3600 * 1000;
-  timerInt = setInterval(() => {
-    const diff = end - Date.now();
-    if (diff <= 0) return showExpired();
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    document.getElementById("countdown").innerText =
-      `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    timerEl.innerText = `${hours}h ${minutes}m ${seconds}s`;
   }, 1000);
 }
 
-function copy(txt) {
-  navigator.clipboard.writeText(txt);
-  document.getElementById("sfx-click").play();
-  const el = document.querySelector(".copy-tooltip");
-  el.innerText = "Tersalin!";
-  el.style.opacity = 1;
-  setTimeout(() => {
-    el.style.opacity = 0;
-    el.innerText = "Salin!";
-  }, 1500);
-}
-
-async function checkStatus(ref) {
-  try {
-    const res = await fetch(`${API_URL}/transaction/${ref}`);
-    const json = await res.json();
-    if (json.success && json.data.status === "PAID") showSuccess();
-  } catch (e) {}
-}
-
-function setupTiltEffect() {
-  if (window.innerWidth < 768) return;
-  const card = document.getElementById("visualSide");
-  const logo = document.getElementById("logoWrap");
-  card.addEventListener("mousemove", (e) => {
-    const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
-    const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
-    logo.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
-    document.getElementById("bgImg").style.transform = "scale(1.2)";
-  });
-  card.addEventListener("mouseleave", () => {
-    logo.style.transform = `rotateY(0deg) rotateX(0deg)`;
-    document.getElementById("bgImg").style.transform = "scale(1.1)";
-  });
-}
-
-function initParticles() {
-  const canvas = document.getElementById("particles");
-  const ctx = canvas.getContext("2d");
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-  let particles = [];
-  for (let i = 0; i < 50; i++)
-    particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      size: Math.random() * 2,
-      speedY: Math.random() * 0.5 + 0.1,
-    });
-  function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-    particles.forEach((p) => {
-      p.y -= p.speedY;
-      if (p.y < 0) p.y = canvas.height;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    requestAnimationFrame(animate);
-  }
-  animate();
-}
+// Jalankan
+window.onload = initInvoice;
