@@ -121,6 +121,34 @@ app.get("/api/init-data", async (req, res) => {
   }
 });
 
+// Endpoint Digiflazz
+app.post("/api/digiflazz", async (req, res) => {
+  try {
+    const username = process.env.DIGIFLAZZ_USERNAME;
+    const apiKey = process.env.DIGIFLAZZ_KEY;
+
+    // Signature = md5(username + apiKey + "pricelist")
+    const sign = crypto
+      .createHash("md5")
+      .update(username + apiKey + "pricelist")
+      .digest("hex");
+
+    const response = await axios.post(
+      "https://api.digiflazz.com/v1/price-list",
+      {
+        cmd: "prepaid",
+        username: username,
+        sign: sign,
+      },
+    );
+
+    res.json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch from Digiflazz" });
+  }
+});
+
 app.post("/api/check-nickname", async (req, res) => {
   const { game, id, zone } = req.body;
   try {

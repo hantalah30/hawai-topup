@@ -22,8 +22,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+} else {
+  firebase.app(); // if already initialized
+}
 
+const db = firebase.firestore();
+console.log("Firebase berhasil terhubung!");
 // Export agar bisa dipakai di file lain
 export { db, collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc };
