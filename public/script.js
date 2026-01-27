@@ -204,7 +204,7 @@ const App = {
     selectedItem: null,
     transactionType: "GAME",
     refId: null,
-    nickname: null, // Store nickname here
+    nickname: null,
   },
 
   init: async () => {
@@ -310,12 +310,16 @@ const App = {
   },
 
   processTopupCoin: () => {
-    const amount = document.getElementById("customCoin").value;
-    if (amount < 10000) return alert("Minimal Topup Rp 10.000");
+    const amountInput = document.getElementById("customCoin");
+    const amount = parseInt(amountInput.value);
+
+    if (isNaN(amount) || amount < 10000) {
+      return alert("Minimal Topup Rp 10.000");
+    }
 
     App.state.selectedItem = {
       code: "DEPOSIT",
-      price: parseInt(amount),
+      price: amount,
       name: "Topup Coin",
     };
     App.state.transactionType = "COIN";
@@ -512,7 +516,7 @@ const App = {
                         <span style="color:#fff; font-weight:bold; font-size:0.9rem;">${data.name}</span>
                     </div>`;
         Sound.success();
-        App.state.nickname = data.name; // Simpan Nickname di State!
+        App.state.nickname = data.name;
       } else {
         res.innerHTML = `<span style="color:#ff4444; font-size:0.9rem; margin-top:5px; display:block;"><i class="fas fa-times-circle"></i> ID Tidak Ditemukan</span>`;
         App.state.nickname = null;
@@ -595,7 +599,7 @@ const App = {
   },
 };
 
-// --- LOGIC TRANSAKSI (FIXED) ---
+// --- LOGIC TRANSAKSI (FIXED REDIRECT) ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels, transactionType } = App.state;
@@ -670,19 +674,12 @@ const Terminal = {
       payload.customer_no = uid + (zone ? ` (${zone})` : "");
       payload.game = "Game";
 
-      // --- PERBAIKAN PENTING DI SINI ---
-      // Cek apakah ada nickname di state (hasil dari checkNickname)
       let finalNickname = App.state.nickname;
-
-      // Jika state kosong, coba cek elemen HTML siapa tau user cek tapi state belum update (jarang, tapi aman)
       if (!finalNickname) {
-        const nickElement = document.querySelector("#nick-result span span"); // Span didalam span hasil sukses
+        const nickElement = document.querySelector("#nick-result span span");
         if (nickElement) finalNickname = nickElement.innerText;
       }
-
-      // Default ke "-" agar Backend tidak error 500
       payload.nickname = finalNickname || "-";
-      // ---------------------------------
 
       if (method === "HAWAI_COIN" && !Auth.user) {
         alert("Silakan Login terlebih dahulu.");
@@ -711,7 +708,8 @@ const Terminal = {
       const json = await res.json();
 
       if (json.success) {
-        window.location.href = json.data.checkout_url;
+        // [FIXED] Redirect ke invoice.html internal, bukan checkout_url Tripay
+        window.location.href = `/invoice.html?ref=${json.data.reference}`;
       } else {
         throw new Error(json.message || "Gagal Transaksi");
       }
