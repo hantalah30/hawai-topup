@@ -6,7 +6,7 @@ let db = {
   config: {
     tripay: {},
     digiflazz: {},
-    admin_password: "admin", // Default password fallback
+    admin_password: "admin",
   },
   products: [],
   assets: { sliders: [], banners: {} },
@@ -16,8 +16,8 @@ let db = {
 async function login() {
   const pass = document.getElementById("adminPass").value;
   const btn = document.querySelector("#loginOverlay button");
-
   const originalText = btn.innerText;
+
   btn.innerText = "Loading...";
   btn.disabled = true;
 
@@ -36,7 +36,7 @@ async function login() {
       alert("Password Salah");
     }
   } catch (e) {
-    alert("Gagal Login: Cek Server");
+    alert("Gagal Login: Cek Koneksi Internet / Server");
   } finally {
     btn.innerText = originalText;
     btn.disabled = false;
@@ -51,11 +51,12 @@ async function loadData() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
 
-    if (!res.ok) throw new Error("Server Error");
+    // Jika server error (500), jangan crash, pakai default state
+    if (!res.ok) throw new Error("Gagal mengambil data dari server");
 
     const data = await res.json();
 
-    // UPDATE STATE DENGAN DATA BARU (Safe Merge)
+    // SAFE MERGE: Hanya update jika data valid
     if (data) {
       if (data.config) db.config = data.config;
       if (data.products) db.products = data.products;
@@ -81,12 +82,10 @@ async function loadData() {
 
     renderAssets();
     populateBrandFilter();
-
-    // Tampilkan data awal jika ada
     filterProducts();
   } catch (e) {
-    console.error("Gagal load data:", e);
-    // Jangan alert error terus menerus, cukup log saja agar admin bisa input manual
+    console.warn("Mode Offline / Server Error:", e);
+    // Tidak alert agar admin tetap bisa input manual jika perlu
   }
 }
 
@@ -112,7 +111,6 @@ function filterProducts() {
     document.getElementById("searchSku").value || ""
   ).toLowerCase();
 
-  // Jika belum pilih game dan belum cari, jangan tampilkan apa-apa (biar ringan)
   if (!brand && !search) return;
 
   const selectAll = document.getElementById("selectAll");
@@ -142,7 +140,6 @@ function renderProductTable(data) {
 
   data.forEach((p) => {
     const realIndex = db.products.findIndex((item) => item.sku === p.sku);
-
     let imgUrl = "assets/default.png";
     if (p.image && !p.image.includes("default")) {
       imgUrl = p.image.startsWith("http")
@@ -158,43 +155,37 @@ function renderProductTable(data) {
       : "text-secondary opacity-25";
 
     tbody.innerHTML += `
-            <tr class="${p.is_active ? "" : "table-light text-muted"}">
-                <td class="text-center">
-                    <input type="checkbox" class="form-check-input prod-select" value="${realIndex}">
-                </td>
-                <td>
-                    <img src="${imgUrl}" class="preview-img" onclick="triggerUpload(${realIndex})">
-                    <input type="file" id="file-${realIndex}" class="d-none" onchange="uploadProdImg(this, ${realIndex})">
-                </td>
-                <td>
-                    <div class="fw-bold text-truncate" style="max-width: 250px;">${p.name}</div>
-                    <small class="sku-text">${p.sku} | ${p.brand}</small>
-                </td>
-                
-                <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})" title="Toggle Hot Deal">
-                    <i class="fas fa-fire ${promoClass} fs-5"></i>
-                </td>
-
-                <td>
-                    <input type="number" class="form-control form-control-sm" style="width:80px" 
-                        value="${markup}" onchange="updateMarkup(${realIndex}, this.value)">
-                </td>
-                <td class="fw-bold text-success" id="sell-${realIndex}">Rp ${jual.toLocaleString()}</td>
-                <td>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" ${p.is_active ? "checked" : ""} onchange="toggleActive(${realIndex}, this.checked)">
-                    </div>
-                </td>
-            </tr>
-        `;
+      <tr class="${p.is_active ? "" : "table-light text-muted"}">
+        <td class="text-center"><input type="checkbox" class="form-check-input prod-select" value="${realIndex}"></td>
+        <td>
+            <img src="${imgUrl}" class="preview-img" onclick="triggerUpload(${realIndex})">
+            <input type="file" id="file-${realIndex}" class="d-none" onchange="uploadProdImg(this, ${realIndex})">
+        </td>
+        <td>
+            <div class="fw-bold text-truncate" style="max-width: 250px;">${p.name}</div>
+            <small class="sku-text">${p.sku} | ${p.brand}</small>
+        </td>
+        <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})">
+            <i class="fas fa-fire ${promoClass} fs-5"></i>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" style="width:80px" value="${markup}" onchange="updateMarkup(${realIndex}, this.value)">
+        </td>
+        <td class="fw-bold text-success" id="sell-${realIndex}">Rp ${jual.toLocaleString()}</td>
+        <td>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" ${p.is_active ? "checked" : ""} onchange="toggleActive(${realIndex}, this.checked)">
+            </div>
+        </td>
+      </tr>`;
   });
 }
 
 // --- ACTIONS ---
-
 function toggleSelectAll(source) {
-  const checkboxes = document.querySelectorAll(".prod-select");
-  checkboxes.forEach((cb) => (cb.checked = source.checked));
+  document
+    .querySelectorAll(".prod-select")
+    .forEach((cb) => (cb.checked = source.checked));
 }
 
 function updateMarkup(idx, val) {
@@ -230,7 +221,7 @@ async function uploadProdImg(input, idx) {
     const data = await res.json();
     if (db.products[idx]) {
       db.products[idx].image = data.filepath;
-      filterProducts(); // Refresh icon
+      filterProducts();
     }
   } catch (e) {
     alert("Gagal Upload Gambar");
@@ -290,15 +281,13 @@ async function processBulkImage(input) {
       body: formData,
     });
     const data = await res.json();
-    const newImg = data.filepath;
 
     selectedIndices.forEach((idx) => {
-      if (db.products[idx]) db.products[idx].image = newImg;
+      if (db.products[idx]) db.products[idx].image = data.filepath;
     });
-
     await saveProducts();
     filterProducts();
-    alert("✅ Gambar berhasil diupdate massal!");
+    alert("✅ Gambar berhasil diupdate!");
   } catch (e) {
     alert("Gagal update massal.");
   } finally {
@@ -310,8 +299,7 @@ async function processBulkImage(input) {
 
 // --- SERVER SYNC & SAVE ---
 async function syncDigiflazz() {
-  if (!confirm("Tarik data Digiflazz? (Harga modal akan terupdate)")) return;
-
+  if (!confirm("Tarik data Digiflazz?")) return;
   const btn = document.getElementById("btnSync");
   const oldHtml = btn.innerHTML;
   btn.innerHTML = "⏳ Syncing...";
@@ -322,9 +310,7 @@ async function syncDigiflazz() {
       method: "POST",
     });
     const data = await res.json();
-
-    if (!res.ok) throw new Error(data.message || "Gagal Sync");
-
+    if (!res.ok) throw new Error(data.message || "Server Error");
     alert(data.message);
     loadData();
   } catch (e) {
@@ -367,35 +353,20 @@ function renderAssets() {
     sDiv.innerHTML = "";
     (db.assets.sliders || []).forEach((url, i) => {
       let disp = url.startsWith("http") ? url : `${API_BASE_URL}/${url}`;
-      sDiv.innerHTML += `
-            <div class="position-relative">
-                <img src="${disp}" style="width:120px;height:70px;object-fit:cover;border-radius:5px;border:1px solid #ddd;">
-                <button onclick="delSlider(${i})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0 px-2" style="transform:translate(30%,-30%);border-radius:50%;">&times;</button>
-            </div>`;
+      sDiv.innerHTML += `<div class="position-relative"><img src="${disp}" style="width:120px;height:70px;object-fit:cover;border-radius:5px;"><button onclick="delSlider(${i})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0" style="border-radius:50%">&times;</button></div>`;
     });
   }
-
   const bDiv = document.getElementById("bannerContainer");
   if (bDiv) {
     bDiv.innerHTML = "";
     const brands = [
       ...new Set(db.products.map((p) => p.brand || "Lainnya")),
     ].sort();
-
     brands.forEach((b) => {
       const curr =
         (db.assets.banners && db.assets.banners[b]) || "assets/default.png";
       const disp = curr.startsWith("http") ? curr : `${API_BASE_URL}/${curr}`;
-      bDiv.innerHTML += `
-                <div class="d-flex justify-content-between align-items-center mb-2 border p-2 rounded bg-white">
-                    <span class="small fw-bold text-dark">${b}</span>
-                    <div class="d-flex gap-2 align-items-center">
-                        <img src="${disp}" style="width:60px;height:30px;object-fit:cover;border-radius:4px;border:1px solid #eee;">
-                        <label class="btn btn-sm btn-outline-primary py-0" style="cursor:pointer;">
-                            Upload <input type="file" class="d-none" onchange="uploadBanner('${b}', this)">
-                        </label>
-                    </div>
-                </div>`;
+      bDiv.innerHTML += `<div class="d-flex justify-content-between align-items-center mb-2 border p-2 rounded bg-white"><span class="small fw-bold text-dark">${b}</span><div class="d-flex gap-2 align-items-center"><img src="${disp}" style="width:60px;height:30px;object-fit:cover;"><label class="btn btn-sm btn-outline-primary py-0">Upload <input type="file" class="d-none" onchange="uploadBanner('${b}', this)"></label></div></div>`;
     });
   }
 }
@@ -452,28 +423,25 @@ async function saveAssets(silent = false) {
       body: JSON.stringify(db.assets),
     });
     if (!silent) alert("Asset tersimpan!");
-  } catch (e) {
-    if (!silent) alert("Gagal simpan asset");
-  }
+  } catch (e) {}
 }
 
-// --- FIX UNCAUGHT TYPE ERROR ---
+// --- FIX UNCAUGHT TYPE ERROR HERE ---
 async function saveConfig() {
-  // Ambil nilai dari DOM, kalau kosong string kosong
   const digiUser = document.getElementById("digi_user").value || "";
   const digiApi = document.getElementById("digi_api").value || "";
   const triMerch = document.getElementById("tripay_merchant").value || "";
   const triApi = document.getElementById("tripay_api").value || "";
   const triPriv = document.getElementById("tripay_private").value || "";
 
-  // Ambil password lama dengan aman
+  // Ambil password lama dengan aman (fallback ke "admin")
   const oldPass =
     db.config && db.config.admin_password ? db.config.admin_password : "admin";
 
   const cfg = {
     digiflazz: { username: digiUser, api_key: digiApi },
     tripay: { merchant_code: triMerch, api_key: triApi, private_key: triPriv },
-    admin_password: oldPass, // Sertakan password agar tidak hilang
+    admin_password: oldPass,
   };
 
   try {
@@ -486,10 +454,9 @@ async function saveConfig() {
     const json = await res.json();
     if (json.success) {
       alert("✅ Konfigurasi Tersimpan!");
-      // Update local state agar tidak perlu reload
-      db.config = cfg;
+      db.config = cfg; // Update local
     } else {
-      alert("Gagal menyimpan: " + (json.error || "Unknown Error"));
+      alert("Gagal menyimpan: " + (json.error || "Server Error"));
     }
   } catch (e) {
     console.error(e);
