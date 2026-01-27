@@ -1,8 +1,3 @@
-/* =========================================
-   1. CONFIG & VARIABLES (CYBERPUNK THEME)
-   ========================================= */
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Syncopate:wght@400;700&display=swap");
-
 :root {
   --primary: #00f3ff; /* Cyan Neon */
   --secondary: #ff0055; /* Red Neon */
@@ -11,13 +6,12 @@
   --glass: rgba(15, 20, 30, 0.7);
   --glass-border: rgba(255, 255, 255, 0.08);
 
-  /* Fonts */
   --font-head: "Syncopate", sans-serif;
   --font-body: "Rajdhani", sans-serif;
   --font-mono: "Orbitron", sans-serif;
 
-  /* Dimensions */
   --header-h: 70px;
+  --dock-h: 80px;
 }
 
 * {
@@ -37,7 +31,42 @@ body {
 }
 
 /* =========================================
-   2. VISUAL EFFECTS (BACKGROUND)
+   1. UTILITIES (TAMBAHAN DARI YANG BARU)
+   Agar layout JS baru tetap jalan
+   ========================================= */
+.hidden {
+  display: none !important;
+}
+.d-flex {
+  display: flex;
+}
+.align-center {
+  align-items: center;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.mt-3 {
+  margin-top: 1rem;
+}
+.text-center {
+  text-align: center;
+}
+.text-danger {
+  color: var(--secondary);
+}
+.text-warning {
+  color: var(--accent);
+}
+.text-success {
+  color: #0f0;
+}
+.full {
+  width: 100%;
+}
+
+/* =========================================
+   2. VFX LAYERS (LAMA - DIPERTAHANKAN)
    ========================================= */
 #webgl-canvas {
   position: fixed;
@@ -75,78 +104,9 @@ body {
   z-index: 3;
 }
 
-/* --- UTILITIES (Added from New Style) --- */
-.hidden {
-  display: none !important;
-}
-.d-flex {
-  display: flex;
-}
-.align-center {
-  align-items: center;
-}
-.justify-between {
-  justify-content: space-between;
-}
-.text-center {
-  text-align: center;
-}
-.mt-3 {
-  margin-top: 1rem;
-}
-.full {
-  width: 100%;
-}
-
-.text-neon {
-  color: var(--primary);
-  text-shadow: 0 0 10px var(--primary);
-}
-.text-danger {
-  color: var(--secondary);
-}
-.text-warning {
-  color: var(--accent);
-}
-.text-success {
-  color: #0f0;
-  text-shadow: 0 0 10px #0f0;
-}
-
 /* =========================================
-   3. UI COMPONENTS
+   3. HEADER & AUTH (DIGABUNG)
    ========================================= */
-
-/* --- CURSOR --- */
-.cursor-dot {
-  width: 6px;
-  height: 6px;
-  background: #fff;
-  position: fixed;
-  border-radius: 50%;
-  z-index: 9999;
-  pointer-events: none;
-  mix-blend-mode: difference;
-}
-.cursor-ring {
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--primary);
-  position: fixed;
-  border-radius: 50%;
-  z-index: 9998;
-  pointer-events: none;
-  transition: transform 0.1s ease-out;
-}
-body.hover .cursor-ring {
-  width: 60px;
-  height: 60px;
-  background: rgba(0, 243, 255, 0.1);
-  border-color: var(--secondary);
-  mix-blend-mode: screen;
-}
-
-/* --- HEADER --- */
 .cyber-header {
   position: fixed;
   top: 0;
@@ -212,57 +172,53 @@ body.hover .cursor-ring {
   color: #666;
 }
 
-/* --- AUTH UI (Login & Balance) --- */
+/* Styles untuk Auth Button & User Info */
 .auth-container {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
 }
-
 .btn-google {
-  background: transparent;
-  color: #fff;
-  border: 1px solid #fff;
+  background: #fff;
+  color: #333;
+  border: none;
   padding: 8px 15px;
-  border-radius: 4px;
+  border-radius: 5px;
   font-weight: bold;
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: "Rajdhani", sans-serif;
   transition: 0.3s;
 }
 .btn-google:hover {
   background: var(--primary);
-  color: #000;
-  border-color: var(--primary);
   box-shadow: 0 0 15px var(--primary);
 }
 
 .user-info {
   display: none;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: #fff;
 }
 .user-avatar {
-  width: 38px;
-  height: 38px;
+  width: 35px;
+  height: 35px;
   border-radius: 50%;
   border: 2px solid var(--primary);
 }
 
+/* [MODIFIKASI] Coin Balance agar terlihat bisa diklik (Topup) */
 .coin-balance {
   color: var(--accent);
   font-weight: bold;
-  font-family: var(--font-mono);
   font-size: 0.9rem;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 238, 0, 0.3);
-  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 10px;
   border-radius: 4px;
+  border: 1px solid rgba(255, 238, 0, 0.3);
   cursor: pointer;
   transition: 0.3s;
   display: flex;
@@ -270,13 +226,26 @@ body.hover .cursor-ring {
   gap: 5px;
 }
 .coin-balance:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(255, 238, 0, 0.2);
+  background: rgba(255, 238, 0, 0.1);
+  box-shadow: 0 0 15px rgba(255, 238, 0, 0.3);
   transform: scale(1.05);
 }
 
+.mobile-refresh {
+  font-size: 18px;
+  color: var(--primary);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* =========================================
-   4. LAYOUT & PAGES
+   4. LAYOUT & SLIDER (LAMA)
    ========================================= */
 #viewport {
   width: 100%;
@@ -295,7 +264,6 @@ body.hover .cursor-ring {
   padding-left: max(20px, env(safe-area-inset-left));
 }
 
-/* --- HOME SLIDER --- */
 .hero-slider {
   position: relative;
   height: clamp(400px, 60vh, 700px);
@@ -386,7 +354,9 @@ body.hover .cursor-ring {
   animation: progress 5s linear forwards;
 }
 
-/* --- HOME GRID --- */
+/* =========================================
+   5. HOME GRID & TILT CARDS (LAMA)
+   ========================================= */
 .section-title {
   font-family: var(--font-head);
   font-size: 24px;
@@ -463,7 +433,10 @@ body.hover .cursor-ring {
   font-weight: bold;
 }
 
-/* --- ORDER PAGE --- */
+/* =========================================
+   6. ORDER PAGE & ITEM CARDS (STRICTLY LAMA)
+   User minta bagian ini JANGAN diubah
+   ========================================= */
 .game-hero {
   background-size: cover;
   background-position: center top;
@@ -490,6 +463,7 @@ body.hover .cursor-ring {
   object-fit: cover;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.3s;
 }
 .game-title h1 {
   font-size: 3.5rem;
@@ -499,6 +473,12 @@ body.hover .cursor-ring {
   text-transform: uppercase;
   font-family: var(--font-head);
 }
+.game-title p {
+  font-size: 1.1rem;
+  opacity: 0.8;
+  margin-top: 10px;
+}
+
 .cyber-form {
   background: rgba(10, 10, 15, 0.8);
   backdrop-filter: blur(25px);
@@ -530,6 +510,8 @@ body.hover .cursor-ring {
   gap: 10px;
   margin-bottom: 20px;
 }
+
+/* Input Neon tetap sama */
 .input-neon,
 .input-clean {
   flex: 1;
@@ -549,7 +531,20 @@ body.hover .cursor-ring {
   box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
 }
 
-/* Order Grid */
+.nick-res {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(0, 255, 0, 0.05);
+  border: 1px dashed #0f0;
+  color: #0f0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Item Grid & Cards Style Lama */
 .item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -571,6 +566,21 @@ body.hover .cursor-ring {
   align-items: center;
   text-align: center;
 }
+.item-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.1) 1px,
+    transparent 1px
+  );
+  background-size: 10px 10px;
+  opacity: 0.3;
+  z-index: 0;
+}
 .item-card:hover,
 .item-card.active {
   transform: translateY(-5px);
@@ -578,10 +588,52 @@ body.hover .cursor-ring {
   box-shadow: 0 10px 20px rgba(0, 243, 255, 0.15);
   background: rgba(20, 20, 35, 0.9);
 }
+.item-card.active {
+  background: rgba(0, 243, 255, 0.1);
+}
+.i-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
+.i-icon {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+}
+.i-name {
+  font-size: 0.85rem;
+  color: #e0e0e0;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.i-price {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* Premium Card (Gold) */
 .item-card.card-premium {
   background: linear-gradient(135deg, #2b2000, #1a1a1a);
   border: 1px solid #ffd700;
 }
+.item-card.card-premium:hover {
+  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+  border-color: #ffed4a;
+}
+.item-card.card-premium .i-name {
+  color: #ffd700;
+  font-weight: bold;
+}
+
+/* Hot Promo Card */
 .hot-badge {
   position: absolute;
   top: 0;
@@ -595,8 +647,15 @@ body.hover .cursor-ring {
   z-index: 10;
   animation: pulse-red 2s infinite;
 }
+.item-card.card-promo {
+  border: 1px solid #ff4d00;
+  background: linear-gradient(
+    180deg,
+    rgba(50, 10, 0, 0.8),
+    rgba(20, 20, 35, 0.9)
+  );
+}
 .cat-label {
-  font-family: var(--font-mono);
   font-size: 1.1rem;
   color: #fff;
   margin-bottom: 15px;
@@ -604,31 +663,20 @@ body.hover .cursor-ring {
   padding-bottom: 5px;
   display: inline-block;
 }
-
-.i-icon {
-  width: 45px;
-  height: 45px;
-  object-fit: contain;
-  margin-bottom: 10px;
-}
-.i-name {
-  font-size: 0.85rem;
-  color: #e0e0e0;
-  margin-bottom: 5px;
-}
-.i-price {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: inline-block;
+.cat-label.hot-label {
+  color: #ff4d00;
+  border-color: #ff4d00;
+  text-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
 }
 
+/* Tombol Footer Action (Desktop/Mobile) */
+.footer-action {
+  margin-top: 40px;
+  text-align: right;
+}
 .btn-pay-now,
 .sp-btn {
-  width: 100%;
+  width: 300px;
   padding: 15px 30px;
   font-size: 1.2rem;
   font-weight: bold;
@@ -638,7 +686,6 @@ body.hover .cursor-ring {
   text-transform: uppercase;
   cursor: pointer;
   transition: 0.3s;
-  font-family: var(--font-mono);
   clip-path: polygon(
     10px 0,
     100% 0,
@@ -652,18 +699,15 @@ body.hover .cursor-ring {
 .sp-btn:hover {
   box-shadow: 0 0 20px #00f3ff;
   color: white;
-  transform: translateY(-3px);
-}
-.btn-pay-now:disabled {
-  filter: grayscale(1);
-  cursor: not-allowed;
+  transform: translateX(-5px);
 }
 
 /* =========================================
-   5. MODALS (Updated with Cyberpunk Style)
+   7. MODAL BARU (ADAPTASI KE CYBERPUNK)
+   Ini style tambahan agar Modal Topup & Payment
+   yang ada di HTML baru terlihat Cyberpunk
    ========================================= */
-.modal-overlay,
-.modal {
+.modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.9);
@@ -672,37 +716,30 @@ body.hover .cursor-ring {
   justify-content: center;
   align-items: center;
   backdrop-filter: blur(5px);
-  animation: fadeIn 0.3s;
+  transition: 0.3s;
+}
+.hidden {
+  display: none !important;
 }
 
-/* New Standard Glass Modal (For Topup/List) */
+/* Modal Glass Container */
 .modal-glass {
-  background: #0a0e17;
+  background: #0a0e17; /* Dark BG */
   width: 90%;
   max-width: 450px;
-  border-radius: 10px;
-  border: 1px solid var(--primary);
+  border-radius: 15px;
+  border: 1px solid var(--primary); /* Neon Border */
   box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
   display: flex;
   flex-direction: column;
+  animation: slideUp 0.3s ease;
   position: relative;
   overflow: hidden;
-  animation: slideUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
-/* Cyberpunk Corner Deco */
-.modal-glass::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: linear-gradient(90deg, var(--primary), transparent);
-}
-
+/* Modal Header */
 .modal-head {
   padding: 15px 20px;
-  border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 243, 255, 0.3);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -710,7 +747,7 @@ body.hover .cursor-ring {
 }
 .modal-head h3 {
   font-family: var(--font-head);
-  font-size: 1rem;
+  font-size: 1.1rem;
   color: #fff;
   margin: 0;
 }
@@ -720,7 +757,7 @@ body.hover .cursor-ring {
   overflow-y: auto;
 }
 
-/* Grid for Coin Options */
+/* Grid Pilihan Coin (Topup) */
 .coin-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -729,34 +766,38 @@ body.hover .cursor-ring {
 }
 .coin-opt {
   padding: 15px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.05);
   text-align: center;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
   font-family: var(--font-mono);
   color: var(--primary);
   transition: 0.3s;
+  font-size: 1.1rem;
   font-weight: bold;
 }
 .coin-opt:hover {
   border-color: var(--primary);
   background: rgba(0, 243, 255, 0.1);
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
-  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
 }
 
-/* Payment List Item */
+/* List Metode Pembayaran */
+.scrollable {
+  overflow-y: auto;
+  max-height: 50vh;
+}
 .pay-item {
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 15px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.03);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid transparent;
+  border: 1px solid #333;
   transition: 0.3s;
 }
 .pay-item:hover {
@@ -764,45 +805,23 @@ body.hover .cursor-ring {
   background: rgba(0, 243, 255, 0.05);
 }
 .pay-icon {
-  width: 50px;
+  width: 40px;
   background: #fff;
   padding: 2px;
   border-radius: 4px;
 }
-.scrollable {
-  overflow-y: auto;
-  max-height: 50vh;
-}
-
-/* Old Terminal Modal (Reserved for logs if needed) */
-.terminal-window {
-  width: 800px;
-  max-width: 90%;
-  height: 500px;
-  background: #080808;
-  border: 1px solid #333;
-  display: flex;
-  flex-direction: column;
-  font-family: "Courier New", monospace;
-  box-shadow: 0 0 100px rgba(0, 243, 255, 0.15);
-}
-.term-head {
-  background: #111;
-  padding: 10px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid #222;
-}
-.term-body {
+.pay-info {
   flex: 1;
-  padding: 20px;
-  color: var(--primary);
-  font-size: 12px;
-  overflow-y: auto;
+}
+.pay-price {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: bold;
 }
 
-/* --- DOCK & BOTTOM NAV --- */
+/* =========================================
+   8. DOCK & MOBILE
+   ========================================= */
 .dock-wrapper {
   position: fixed;
   bottom: 30px;
@@ -862,8 +881,14 @@ body.hover .cursor-ring {
   opacity: 1;
   top: -30px;
 }
+.dock-sep {
+  width: 1px;
+  height: 30px;
+  background: #444;
+  align-self: center;
+}
 
-/* Sticky Pay Mobile */
+/* Sticky Pay Mobile (Jika needed) */
 .sticky-pay {
   position: fixed;
   bottom: 80px;
@@ -885,46 +910,13 @@ body.hover .cursor-ring {
   flex-direction: column;
   font-size: 12px;
 }
-.sp-info span:first-child {
-  color: #aaa;
-}
 .sp-info span:last-child {
   font-size: 16px;
   font-weight: bold;
   color: var(--primary);
 }
-.sp-btn {
-  width: auto;
-  padding: 8px 20px;
-  font-size: 1rem;
-}
 
-/* Receipt */
-.receipt-card {
-  width: 400px;
-  max-width: 90%;
-  background: #fff;
-  color: #000;
-  padding: 40px;
-  text-align: center;
-  clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
-  animation: slideUp 0.5s;
-}
-.receipt-icon {
-  font-size: 40px;
-  color: #fff;
-  background: #0f0;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px auto;
-  box-shadow: 0 10px 30px rgba(0, 255, 0, 0.3);
-}
-
-/* --- ANIMATIONS --- */
+/* Animations */
 @keyframes blink {
   50% {
     opacity: 0;
@@ -948,14 +940,6 @@ body.hover .cursor-ring {
     opacity: 1;
   }
 }
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 @keyframes pulse-red {
   0% {
     box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
@@ -968,7 +952,7 @@ body.hover .cursor-ring {
   }
 }
 
-/* --- RESPONSIVE MEDIA QUERIES --- */
+/* Media Queries */
 .desktop-only {
   display: flex !important;
 }
@@ -987,25 +971,17 @@ body.hover .cursor-ring {
   .cursor-ring {
     display: none;
   }
-
   #viewport {
     padding-bottom: 100px;
   }
   .container {
     padding: 0 20px;
   }
-
-  /* Header Mobile */
   .cyber-header {
     padding: 0 20px;
     height: 60px;
     background: rgba(5, 5, 5, 0.95);
   }
-  .b-title {
-    font-size: 16px;
-  }
-
-  /* Hero Mobile */
   .hero-slider {
     height: 50vh;
     min-height: 350px;
@@ -1018,6 +994,7 @@ body.hover .cursor-ring {
   .game-header-wrap {
     margin-top: -100px;
     padding-left: 10px;
+    flex-wrap: wrap;
   }
   .game-poster-img {
     width: 110px;
@@ -1025,8 +1002,6 @@ body.hover .cursor-ring {
   .game-title h1 {
     font-size: 1.8rem;
   }
-
-  /* Grids Mobile */
   .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
@@ -1035,6 +1010,8 @@ body.hover .cursor-ring {
     height: 200px;
     transform: none !important;
   }
+
+  /* Mobile Order & Grid */
   .item-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
@@ -1043,8 +1020,25 @@ body.hover .cursor-ring {
     min-height: 100px;
     padding: 10px;
   }
+  .btn-pay-now {
+    width: 100%;
+    font-size: 1rem;
+  }
+  .footer-action {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(10, 10, 20, 0.95);
+    padding: 15px;
+    border-top: 1px solid var(--primary);
+    z-index: 1000;
+  }
+  .cyber-form {
+    padding-bottom: 100px;
+  }
 
-  /* Dock Mobile */
+  /* Mobile Dock Custom */
   .dock-wrapper {
     bottom: 0;
     padding: 0;
@@ -1065,6 +1059,8 @@ body.hover .cursor-ring {
     box-shadow: none !important;
     transform: none !important;
     color: #666;
+    width: auto;
+    height: auto;
   }
   .dock-btn.active {
     color: var(--primary);
@@ -1076,5 +1072,6 @@ body.hover .cursor-ring {
     color: inherit;
     padding: 0;
     margin-top: 4px;
+    pointer-events: auto;
   }
 }
