@@ -8,56 +8,77 @@ const admin = require("firebase-admin");
 
 const app = express();
 
-// ==========================================
-// 1. SETUP FIREBASE (ANTI CRASH)
-// ==========================================
-if (!admin.apps.length) {
-  try {
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-    if (privateKey) {
-      // Bersihkan tanda kutip ganda jika ada (biasa terjadi saat copy-paste di Vercel)
-      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-        privateKey = JSON.parse(privateKey);
-      }
-      // Pastikan newline terbaca dengan benar
-      privateKey = privateKey.replace(/\\n/g, "\n");
-    }
+// Variable Global untuk menyimpan status error database
+let db = null;
+let dbError = "Initializing...";
 
+// ==========================================
+// 1. SETUP FIREBASE (ROBUST & DEBUG MODE)
+// ==========================================
+function initFirebase() {
+  try {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    // Cek kelengkapan variabel SEBELUM inisialisasi
-    if (projectId && privateKey && clientEmail) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: projectId,
-          clientEmail: clientEmail,
-          privateKey: privateKey,
-        }),
-      });
-      console.log("🔥 Firebase Connected!");
-    } else {
-      console.warn("⚠️ Gagal Connect Firebase: Variable Env Belum Lengkap.");
-      console.warn(
-        `Cek: ProjectID=${!!projectId}, Email=${!!clientEmail}, Key=${!!privateKey}`,
+    // Cek kelengkapan variable
+    if (!projectId)
+      throw new Error("FIREBASE_PROJECT_ID tidak ada di Env Vars");
+    if (!clientEmail)
+      throw new Error("FIREBASE_CLIENT_EMAIL tidak ada di Env Vars");
+    if (!privateKey)
+      throw new Error("FIREBASE_PRIVATE_KEY tidak ada di Env Vars");
+
+    // Format Private Key agar diterima Vercel
+    // 1. Hapus tanda kutip jika user tidak sengaja mengikutkannya
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = JSON.parse(privateKey);
+    }
+    // 2. Ganti literal \n dengan karakter enter asli
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
+    // 3. Validasi format PEM sederhana
+    if (!privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
+      throw new Error(
+        "Format Private Key SALAH. Harus diawali -----BEGIN PRIVATE KEY-----",
       );
     }
+
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+    }
+
+    db = admin.firestore();
+    dbError = null; // Sukses!
+    console.log("🔥 Firebase Connected!");
   } catch (error) {
-    console.error("❌ Firebase Init Error:", error.message);
+    dbError = error.message;
+    console.error("❌ Firebase Error:", error.message);
+    db = null;
   }
 }
 
-const db = admin.apps.length ? admin.firestore() : null;
+// Jalankan inisialisasi
+initFirebase();
 
-// --- 2. MIDDLEWARE ---
+// ==========================================
+// 2. MIDDLEWARE
+// ==========================================
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- 3. HELPER CONFIG ---
+// ==========================================
+// 3. HELPER CONFIG
+// ==========================================
 async function getConfig() {
-  // Default Config dari Env Vars (Fallback jika DB mati)
   let config = {
     tripay: {
       merchant_code: process.env.TRIPAY_MERCHANT_CODE || "",
@@ -71,7 +92,7 @@ async function getConfig() {
     admin_password: process.env.ADMIN_PASSWORD || "admin",
   };
 
-  // Jika DB Hidup, timpa dengan data dari database
+  // Jika DB Hidup, ambil settingan terbaru
   if (db) {
     try {
       const doc = await db.collection("settings").doc("general").get();
@@ -85,31 +106,32 @@ async function getConfig() {
           config.admin_password = dbConfig.admin_password;
       }
     } catch (e) {
-      console.log("⚠️ Gagal baca DB settings.");
+      console.log("⚠️ Gagal baca DB settings (Non-Fatal).");
     }
   }
   return config;
 }
 
 // ==========================================
-// ROUTES PUBLIC
+// 4. PUBLIC ROUTES
 // ==========================================
 
+// Endpoint Status (DEBUGGING)
 app.get("/api/status", async (req, res) => {
   const config = await getConfig();
   res.json({
     status: "Online",
-    firebase: db ? "Connected" : "Disconnected (Cek Env Vercel)",
+    firebase: db ? "Connected" : "ERROR",
+    // Tampilkan pesan error detail jika DB mati
+    db_error_message: db ? null : dbError,
     tripay_configured: !!config.tripay.api_key,
   });
 });
 
 app.get("/api/init-data", async (req, res) => {
-  // Jangan return 500 jika DB mati, return array kosong biar web tetap jalan
-  if (!db) {
-    console.error("DB Error: Init Data Failed");
-    return res.json({ sliders: [], banners: {}, products: [] });
-  }
+  // Jangan return 500 agar frontend tetap tampil (fallback mode)
+  if (!db) return res.json({ sliders: [], banners: {}, products: [] });
+
   try {
     const productsSnap = await db
       .collection("products")
@@ -137,7 +159,6 @@ app.get("/api/channels", async (req, res) => {
   const config = await getConfig();
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
   try {
-    if (!config.tripay.api_key) throw new Error("Tripay API Key Missing");
     const response = await axios.get(
       `https://tripay.co.id/${mode}/merchant/payment-channel`,
       {
@@ -171,9 +192,7 @@ app.post("/api/check-nickname", async (req, res) => {
 
 app.post("/api/transaction", async (req, res) => {
   if (!db)
-    return res
-      .status(500)
-      .json({ message: "Database Error: Cannot Save Transaction" });
+    return res.status(500).json({ message: "Database Error: " + dbError });
   const config = await getConfig();
   const { sku, amount, customer_no, method, nickname, game } = req.body;
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
@@ -236,12 +255,11 @@ app.post("/api/transaction", async (req, res) => {
 });
 
 // ==========================================
-// ROUTES ADMIN (FIXED ERROR 500)
+// 5. ROUTES ADMIN (BACKOFFICE)
 // ==========================================
 
 app.post("/api/admin/login", async (req, res) => {
   const config = await getConfig();
-  // Gunakan password env jika DB mati
   if (req.body.password === config.admin_password) {
     res.json({ success: true });
   } else {
@@ -249,7 +267,6 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-// FIX UTAMA: Hapus 'if (!db) return 500' -> Biarkan load config dari Env Var
 app.get("/api/admin/config", async (req, res) => {
   try {
     const config = await getConfig();
@@ -257,7 +274,6 @@ app.get("/api/admin/config", async (req, res) => {
     let products = [];
     let assets = { sliders: [], banners: {} };
 
-    // Hanya coba ambil dari DB jika DB terhubung
     if (db) {
       try {
         const productsSnap = await db.collection("products").get();
@@ -265,23 +281,23 @@ app.get("/api/admin/config", async (req, res) => {
 
         const assetsDoc = await db.collection("settings").doc("assets").get();
         if (assetsDoc.exists) assets = assetsDoc.data();
-      } catch (err) {
-        console.warn("Gagal load data dari DB, menggunakan data kosong.");
-      }
+      } catch (err) {}
     }
 
-    res.json({ config, products, assets, db_connected: !!db });
+    res.json({
+      config,
+      products,
+      assets,
+      db_connected: !!db,
+      db_error: dbError, // Kirim error ke frontend agar admin tahu
+    });
   } catch (e) {
-    console.error("Fetch Admin Error:", e);
     res.status(500).json({ error: "Gagal load data" });
   }
 });
 
 app.post("/api/admin/save-config", async (req, res) => {
-  if (!db)
-    return res
-      .status(500)
-      .json({ error: "Database Disconnected (Cek Env Vars)" });
+  if (!db) return res.status(500).json({ error: "DB Error: " + dbError });
   try {
     await db
       .collection("settings")
@@ -294,11 +310,10 @@ app.post("/api/admin/save-config", async (req, res) => {
 });
 
 app.post("/api/admin/save-products", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "Database Disconnected" });
+  if (!db) return res.status(500).json({ error: "DB Error: " + dbError });
   try {
     const products = req.body;
-    // Batching (Max 400 per batch agar tidak timeout)
-    const chunkSize = 400;
+    const chunkSize = 400; // Batch limit safe
     for (let i = 0; i < products.length; i += chunkSize) {
       const batch = db.batch();
       const chunk = products.slice(i, i + chunkSize);
@@ -314,7 +329,7 @@ app.post("/api/admin/save-products", async (req, res) => {
 });
 
 app.post("/api/admin/save-assets", async (req, res) => {
-  if (!db) return res.status(500).json({ error: "Database Disconnected" });
+  if (!db) return res.status(500).json({ error: "DB Error: " + dbError });
   try {
     await db.collection("settings").doc("assets").set(req.body);
     res.json({ success: true });
@@ -325,15 +340,15 @@ app.post("/api/admin/save-assets", async (req, res) => {
 
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db)
-    return res
-      .status(500)
-      .json({ error: "Database Disconnected. Tidak bisa sync." });
+    return res.status(500).json({ error: "DB Disconnected: " + dbError });
 
   const config = await getConfig();
   const { username, api_key } = config.digiflazz;
 
   if (!username || !api_key) {
-    return res.status(400).json({ message: "Username/Key Digiflazz Kosong!" });
+    return res
+      .status(400)
+      .json({ message: "Username/Key Digiflazz Kosong! Cek Config." });
   }
 
   try {
@@ -351,22 +366,19 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
     );
 
     const digiProducts = response.data.data;
-    if (!digiProducts) throw new Error("Gagal mengambil data dari Digiflazz");
+    if (!digiProducts) throw new Error("Gagal mengambil data Digiflazz");
 
-    // Filter Games
     const gameProducts = digiProducts.filter(
       (item) => item.category === "Games",
     );
-
-    // Ambil data lama
     const oldDataSnap = await db.collection("products").get();
     const oldDataMap = {};
     oldDataSnap.forEach((doc) => {
       oldDataMap[doc.id] = doc.data();
     });
 
+    const chunkSize = 400;
     let count = 0;
-    const chunkSize = 400; // Batch size aman
 
     for (let i = 0; i < gameProducts.length; i += chunkSize) {
       const batch = db.batch();
@@ -397,7 +409,7 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
 
     res.json({ success: true, message: `Sukses Sync ${count} Produk!` });
   } catch (error) {
-    console.error("Sync Error:", error.message);
+    console.error("Digi Error:", error.message);
     res
       .status(500)
       .json({ success: false, message: "Gagal Sync: " + error.message });

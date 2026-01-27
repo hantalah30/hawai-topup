@@ -46,33 +46,34 @@ async function loadData() {
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
     const data = await res.json();
 
+    // ALERT ERROR DARI BACKEND
+    if (data.db_connected === false) {
+      alert(
+        "⚠️ DATABASE ERROR: " +
+          (data.db_error || "Unknown Error") +
+          "\n\nSilakan cek Environment Variables di Vercel!",
+      );
+    }
+
     if (data) {
       if (data.config) db.config = data.config;
       if (data.products) db.products = data.products;
       if (data.assets) db.assets = data.assets;
-
-      // ALERT JIKA DB MATI
-      if (data.db_connected === false) {
-        alert(
-          "⚠️ PERINGATAN: Database Firebase Tidak Terhubung!\n\nCek Environment Variables (FIREBASE_CLIENT_EMAIL, dll) di Vercel.\nAnda tidak bisa menyimpan data sampai ini diperbaiki.",
-        );
-      }
     }
 
     // Fill Forms
-    if (db.config.digiflazz) {
+    const conf = db.config || {};
+    if (conf.digiflazz) {
       document.getElementById("digi_user").value =
-        db.config.digiflazz.username || "";
-      document.getElementById("digi_api").value =
-        db.config.digiflazz.api_key || "";
+        conf.digiflazz.username || "";
+      document.getElementById("digi_api").value = conf.digiflazz.api_key || "";
     }
-    if (db.config.tripay) {
+    if (conf.tripay) {
       document.getElementById("tripay_merchant").value =
-        db.config.tripay.merchant_code || "";
-      document.getElementById("tripay_api").value =
-        db.config.tripay.api_key || "";
+        conf.tripay.merchant_code || "";
+      document.getElementById("tripay_api").value = conf.tripay.api_key || "";
       document.getElementById("tripay_private").value =
-        db.config.tripay.private_key || "";
+        conf.tripay.private_key || "";
     }
 
     renderAssets();
@@ -80,6 +81,7 @@ async function loadData() {
     filterProducts();
   } catch (e) {
     console.error(e);
+    alert("Gagal terhubung ke server backend.");
   }
 }
 
@@ -425,6 +427,7 @@ async function saveAssets(silent = false) {
 }
 
 async function saveConfig() {
+  // Ambil Data Form
   const cfg = {
     digiflazz: {
       username: document.getElementById("digi_user").value,
@@ -444,14 +447,19 @@ async function saveConfig() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cfg),
     });
+
     const json = await res.json();
+
+    // Handle Error 500 dari Backend
+    if (!res.ok) {
+      throw new Error(json.error || "Server Error");
+    }
+
     if (json.success) {
-      alert("Tersimpan!");
+      alert("✅ Tersimpan!");
       db.config = cfg;
-    } else {
-      alert("Gagal: " + (json.error || "DB Error"));
     }
   } catch (e) {
-    alert("Save Error");
+    alert("❌ GAGAL SIMPAN: " + e.message);
   }
 }
