@@ -560,56 +560,44 @@ const App = {
 
 // --- LOGIC TRANSAKSI BARU ---
 const Terminal = {
-  // 1. Buka Modal Pilihan Pembayaran
   openPaymentSelect: () => {
-    const { selectedItem, nickname } = App.state;
+    const { selectedItem, paymentChannels } = App.state;
     const uid = document.getElementById("uid").value;
 
-    if (!uid || !selectedItem)
-      return alert("Lengkapi User ID dan Pilih Item dulu!");
-    // if (!nickname) return alert("Tunggu proses cek ID selesai...");
+    if (!uid) return alert("Masukkan User ID dulu!");
+    if (!selectedItem) return alert("Pilih Item dulu!");
 
-    // Render List Channel
     const listDiv = document.getElementById("paymentList");
     listDiv.innerHTML = "";
 
-    // Grouping Channel (VA, E-Wallet, Retail)
-    const groups = {
-      "Virtual Account": App.state.paymentChannels.filter(
-        (c) => c.group === "Virtual Account",
-      ),
-      "E-Wallet": App.state.paymentChannels.filter(
-        (c) => c.group === "E-Wallet" || c.code.includes("QRIS"),
-      ),
-      "Convenience Store": App.state.paymentChannels.filter(
-        (c) => c.group === "Convenience Store",
-      ),
-    };
-
-    // Render ke HTML
-    for (const [groupName, channels] of Object.entries(groups)) {
-      if (channels.length === 0) continue;
-      listDiv.innerHTML += `<div class="pm-group-title">${groupName}</div>`;
-
-      channels.forEach((ch) => {
-        // Hitung Total (Harga Produk + Fee Tripay Flat/Percent)
-        // Note: Ini estimasi kasar, tripay akan hitung fix di server
-        let totalEst = App.state.selectedItem.price;
+    // JIKA CHANNEL KOSONG -> TAMPILKAN PESAN ERROR
+    if (!paymentChannels || paymentChannels.length === 0) {
+      listDiv.innerHTML = `
+            <div class="alert alert-danger text-center">
+                Metode Pembayaran Tidak Tersedia.<br>
+                <small>Admin: Cek Config Tripay (Mode Sandbox/Production) di Admin Panel.</small>
+            </div>`;
+    } else {
+      // Render Channel
+      paymentChannels.forEach((ch) => {
+        // Hitung Total (Estimasi)
+        let fee = ch.total_fee?.flat || 0;
+        let total = selectedItem.price + fee;
 
         listDiv.innerHTML += `
-                    <div class="pm-item" onclick="Terminal.processTransaction('${ch.code}', '${ch.name}')">
-                        <img src="${ch.icon_url}" alt="${ch.code}">
-                        <div class="pm-item-info">
-                            <div class="pm-name">${ch.name}</div>
-                            <div class="pm-fee">Proses Otomatis</div>
-                        </div>
-                        <i class="fas fa-chevron-right text-muted"></i>
+                <div class="d-flex align-items-center gap-3 p-3 border rounded bg-secondary text-white" 
+                     style="cursor:pointer;" 
+                     onclick="Terminal.processTransaction('${ch.code}')">
+                    <img src="${ch.icon_url}" style="width:50px; bg-white rounded;">
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">${ch.name}</div>
+                        <small class="text-warning">Total: Rp ${total.toLocaleString()}</small>
                     </div>
-                `;
+                    <i class="fas fa-chevron-right"></i>
+                </div>`;
       });
     }
 
-    // Tampilkan Modal
     document.getElementById("paymentModal").style.display = "flex";
   },
 
@@ -617,44 +605,42 @@ const Terminal = {
     document.getElementById("paymentModal").style.display = "none";
   },
 
-  // 2. Proses Transaksi ke Server
-  processTransaction: async (methodCode, methodName) => {
-    const { selectedItem, nickname } = App.state;
+  processTransaction: async (method) => {
+    const { selectedItem } = App.state;
     const uid = document.getElementById("uid").value;
-    // Ambil nama game dari judul
-    const gameTitle = document.querySelector(".game-title h1").innerText;
+    const zone = document.getElementById("zone")
+      ? document.getElementById("zone").value
+      : "";
 
-    // Tampilkan Loading Swal/Alert
-    Terminal.closeModal();
-    const btn = document.querySelector(".btn-pay-now");
+    const btn =
+      document.querySelector(".btn-pay-now") ||
+      document.querySelector("button.btn-primary");
     const oldText = btn.innerHTML;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> MEMPROSES...`;
+    btn.innerHTML = "Memproses...";
     btn.disabled = true;
+    Terminal.closeModal();
 
     try {
       const res = await fetch(`${API_URL}/transaction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sku: selectedItem.code,
+          sku: selectedItem.sku,
           amount: selectedItem.price,
-          customer_no: uid,
-          method: methodCode,
-          nickname: nickname, // Kirim Nickname
-          game: gameTitle, // Kirim Nama Game
+          customer_no: uid + (zone ? ` (${zone})` : ""),
+          method: method,
+          game: "Game",
         }),
       });
-
       const json = await res.json();
 
-      if (!json.success) throw new Error(json.message || "Gagal Transaksi");
-
-      // --- REDIRECT KE HALAMAN INVOICE ---
-      // Kita kirim Reference ID lewat URL
-      window.location.href = `invoice.html?ref=${json.data.ref_id}`;
+      if (json.success) {
+        window.location.href = json.data.checkout_url; // Redirect ke Tripay
+      } else {
+        throw new Error(json.message || "Gagal Transaksi");
+      }
     } catch (e) {
-      console.error(e);
-      alert("Gagal: " + e.message);
+      alert("Error: " + e.message);
       btn.innerHTML = oldText;
       btn.disabled = false;
     }
