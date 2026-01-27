@@ -9,7 +9,7 @@ const admin = require("firebase-admin");
 const app = express();
 
 // ==========================================
-// 1. SETUP FIREBASE
+// 1. SETUP FIREBASE (Menggunakan Versi Lama - Lebih Aman)
 // ==========================================
 let db = null;
 let dbError = "Menunggu Inisialisasi...";
@@ -72,6 +72,7 @@ async function getConfig() {
       api_key: process.env.DIGI_KEY || "",
     },
     admin_password: process.env.ADMIN_PASSWORD || "admin",
+    point_reward_percent: 5, // [BARU] Default reward 5%
   };
 
   if (db) {
@@ -85,6 +86,9 @@ async function getConfig() {
           config.digiflazz = { ...config.digiflazz, ...dbConfig.digiflazz };
         if (dbConfig.admin_password)
           config.admin_password = dbConfig.admin_password;
+        // [BARU] Ambil config reward dari DB
+        if (dbConfig.point_reward_percent)
+          config.point_reward_percent = dbConfig.point_reward_percent;
       }
     } catch (e) {
       console.warn("Gagal baca config DB:", e.message);
@@ -183,12 +187,22 @@ app.get("/api/init-data", async (req, res) => {
       .where("is_active", "==", true)
       .get();
     const products = productsSnap.docs.map((doc) => doc.data());
+
     let assets = { sliders: [], banners: {} };
     try {
       const doc = await db.collection("settings").doc("assets").get();
       if (doc.exists) assets = doc.data();
     } catch (e) {}
-    res.json({ sliders: assets.sliders, banners: assets.banners, products });
+
+    // [BARU] Kirim info reward percent ke frontend
+    const config = await getConfig();
+
+    res.json({
+      sliders: assets.sliders,
+      banners: assets.banners,
+      products,
+      reward_percent: config.point_reward_percent, // [BARU]
+    });
   } catch (e) {
     console.error(e);
     res.json({ sliders: [], banners: {}, products: [] });
@@ -224,7 +238,7 @@ app.get("/api/channels", async (req, res) => {
         code: "HAWAI_COIN",
         name: "HAWAI Coin (Saldo Akun)",
         group: "Balance",
-        icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png", // Example Icon
+        icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
         total_fee: { flat: 0, percent: 0 },
       },
     ];
@@ -243,7 +257,6 @@ app.get("/api/channels", async (req, res) => {
     res.json({ success: true, data: [...manualChannels, ...tripayChannels] });
   } catch (error) {
     console.error("Channel Error:", error.message);
-    // Fallback to manual only if Tripay fails
     res.json({
       success: true,
       data: [
@@ -259,12 +272,77 @@ app.get("/api/channels", async (req, res) => {
   }
 });
 
+// [BARU] Endpoint Khusus Topup Coin (Deposit)
+app.post("/api/topup-coin", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "DB Error" });
+  const config = await getConfig();
+  const { amount, method, user_uid, user_name } = req.body;
+  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
+
+  if (!user_uid) return res.status(400).json({ message: "Login Required" });
+
+  try {
+    const merchantRef =
+      "DEP-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
+    const signature = crypto
+      .createHmac("sha256", config.tripay.private_key)
+      .update(config.tripay.merchant_code + merchantRef + amount)
+      .digest("hex");
+
+    const payload = {
+      method,
+      merchant_ref: merchantRef,
+      amount,
+      customer_name: user_name,
+      customer_email: "user@hawai.com",
+      customer_phone: "08123456789",
+      order_items: [
+        {
+          sku: "DEPOSIT_COIN",
+          name: "Topup HAWAI Coin",
+          price: amount,
+          quantity: 1,
+        },
+      ],
+      return_url: "https://hawai-topup.vercel.app/",
+      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      signature,
+    };
+
+    const tripayRes = await axios.post(
+      `https://tripay.co.id/${mode}/transaction/create`,
+      payload,
+      {
+        headers: { Authorization: `Bearer ${config.tripay.api_key}` },
+      },
+    );
+
+    // Simpan Transaksi Deposit
+    await db.collection("transactions").doc(tripayRes.data.data.reference).set({
+      ref_id: tripayRes.data.data.reference,
+      merchant_ref: merchantRef,
+      type: "DEPOSIT", // Penanda ini Deposit Saldo
+      user_uid: user_uid,
+      amount: amount,
+      method: method,
+      status: "UNPAID",
+      checkout_url: tripayRes.data.data.checkout_url,
+      created_at: Date.now(),
+    });
+
+    res.json({ success: true, data: tripayRes.data.data });
+  } catch (e) {
+    console.error("Topup Coin Error:", e.response?.data || e.message);
+    res.status(500).json({ message: "Gagal Topup Coin" });
+  }
+});
+
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res.status(500).json({ message: "Database Error: " + dbError });
   const config = await getConfig();
   const { sku, amount, customer_no, method, nickname, game, user_uid } =
-    req.body; // Added user_uid
+    req.body;
   const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
 
   try {
@@ -276,12 +354,14 @@ app.post("/api/transaction", async (req, res) => {
       "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
 
     let transactionData = {
-      ref_id: merchantRef, // Use merchantRef as ID for internal/coin trx
+      ref_id: merchantRef,
       merchant_ref: merchantRef,
+      type: "GAME_TOPUP", // [BARU] Penanda Tipe Transaksi
       game,
       productName,
       nickname,
-      user_id: customer_no,
+      user_id: customer_no, // ID Game User
+      user_uid: user_uid || null, // [BARU] ID Akun Web (untuk reward)
       amount,
       method,
       status: "UNPAID",
@@ -297,7 +377,6 @@ app.post("/api/transaction", async (req, res) => {
 
       const userRef = db.collection("users").doc(user_uid);
 
-      // Transaction to ensure atomicity (check balance & deduct)
       await db.runTransaction(async (t) => {
         const userDoc = await t.get(userRef);
         if (!userDoc.exists) throw new Error("User not found");
@@ -320,14 +399,14 @@ app.post("/api/transaction", async (req, res) => {
         t.set(db.collection("transactions").doc(merchantRef), transactionData);
       });
 
-      // Trigger Digiflazz Process (Mock call - you should implement the actual call logic here or via listener)
+      // TODO: Panggil API Digiflazz disini karena sudah PAID
       // await processDigiflazz(transactionData);
 
       return res.json({
         success: true,
         data: {
           reference: merchantRef,
-          checkout_url: `https://hawai-topup.vercel.app/invoice.html?ref=${merchantRef}`, // Direct success page
+          checkout_url: `https://hawai-topup.vercel.app/invoice.html?ref=${merchantRef}`,
         },
       });
     }
@@ -380,9 +459,8 @@ app.post("/api/transaction", async (req, res) => {
   }
 });
 
-// ... (Admin Routes remain unchanged, include them here if needed for full file context) ...
 // ==========================================
-// 4. ADMIN ROUTES (DEBUGGING MODE)
+// 5. ADMIN ROUTES
 // ==========================================
 
 app.post("/api/admin/login", async (req, res) => {
@@ -456,7 +534,7 @@ app.post("/api/admin/save-assets", async (req, res) => {
   }
 });
 
-// SYNC DIGIFLAZZ (FIX FILTER ERROR)
+// SYNC DIGIFLAZZ (Logika Lama yang lebih detail)
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db) return res.status(500).json({ error: "Database Error: " + dbError });
 
@@ -482,7 +560,6 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
 
     // VALIDASI RESPON DIGIFLAZZ SEBELUM PROSES
     if (!response.data || !Array.isArray(response.data.data)) {
-      // Jika bukan array, berarti Error Message dari Digiflazz
       const errMsg = JSON.stringify(response.data);
       console.error("Digiflazz Error Respon:", errMsg);
       throw new Error(
@@ -490,7 +567,7 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       );
     }
 
-    const digiProducts = response.data.data; // Ini PASTI Array sekarang
+    const digiProducts = response.data.data;
     const gameProducts = digiProducts.filter(
       (item) => item.category === "Games",
     );
@@ -534,6 +611,35 @@ app.post("/api/admin/upload", upload.single("image"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
   const b64 = Buffer.from(req.file.buffer).toString("base64");
   res.json({ filepath: `data:${req.file.mimetype};base64,${b64}` });
+});
+
+// [BARU] --- ADMIN USER MANAGEMENT ---
+app.get("/api/admin/users", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    const snap = await db
+      .collection("users")
+      .orderBy("created_at", "desc")
+      .get();
+    const users = snap.docs.map((d) => d.data());
+    res.json(users);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/update-balance", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  const { uid, newBalance } = req.body;
+  try {
+    await db
+      .collection("users")
+      .doc(uid)
+      .update({ hawai_coins: parseInt(newBalance) });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = app;

@@ -112,6 +112,15 @@
           <button
             class="nav-link"
             data-bs-toggle="pill"
+            data-bs-target="#tab-users"
+          >
+            👥 Users & Saldo
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link"
+            data-bs-toggle="pill"
             data-bs-target="#tab-api"
           >
             🔑 Konfigurasi API
@@ -260,6 +269,36 @@
           </button>
         </div>
 
+        <div class="tab-pane fade" id="tab-users">
+          <div class="card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="m-0">Manajemen User & Saldo HAWAI Coin</h5>
+              <button
+                onclick="loadUsers()"
+                class="btn btn-sm btn-outline-primary"
+              >
+                <i class="fas fa-sync"></i> Refresh Data
+              </button>
+            </div>
+            <div
+              class="table-responsive"
+              style="max-height: 70vh; overflow-y: auto"
+            >
+              <table class="table table-hover border">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Nama</th>
+                    <th>Email</th>
+                    <th>Saldo Coin</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <div class="tab-pane fade" id="tab-api">
           <div class="card p-4" style="max-width: 500px">
             <h5>API Settings</h5>
@@ -274,6 +313,15 @@
             ><input id="tripay_api" class="form-control mb-2" />
             <label>Tripay Private Key</label
             ><input id="tripay_private" class="form-control mb-3" />
+            <hr />
+            <label>Reward Cashback (%)</label>
+            <input
+              type="number"
+              id="reward_percent"
+              class="form-control mb-3"
+              placeholder="Contoh: 5"
+            />
+
             <button onclick="saveConfig()" class="btn btn-dark">
               Simpan Config
             </button>

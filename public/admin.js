@@ -480,3 +480,22 @@ async function saveConfig() {
     alert("❌ ERROR: " + e.message);
   }
 }
+
+// Tambahkan fungsi ini di admin.js
+async function loadUsers() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/users`);
+  const users = await res.json();
+  const tbody = document.getElementById("userTableBody");
+  tbody.innerHTML = "";
+  users.forEach((u) => {
+    tbody.innerHTML += `
+        <tr>
+            <td>${u.name}</td>
+            <td>${u.email}</td>
+            <td>${(u.hawai_coins || 0).toLocaleString()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editBalance('${u.uid}')">Edit Saldo</button>
+            </td>
+        </tr>`;
+  });
+}
