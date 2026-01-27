@@ -1,12 +1,16 @@
 // Arahkan ke endpoint API relative path
 const API_URL = "/api";
 
+// Definisi Aset Game (Sama dengan script.js agar konsisten)
 const ASSETS = {
   "MOBILE LEGENDS": {
     logo: "assets/lance2.png",
     banner: "assets/ml-banner.png",
   },
-  "Free Fire": { logo: "assets/ff.jpg", banner: "assets/ff-banner.jpg" },
+  "Free Fire": {
+    logo: "assets/ff.jpg",
+    banner: "assets/ff-banner.jpg",
+  },
   "PUBG Mobile": {
     logo: "https://cdn-icons-png.flaticon.com/512/3408/3408506.png",
     banner: "https://wallpaperaccess.com/full/1239676.jpg",
@@ -26,10 +30,15 @@ let checkInt, timerInt;
 document.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(window.location.search);
   const ref = params.get("ref");
-  if (!ref) return (window.location.href = "index.html");
+
+  // Jika tidak ada ref, kembalikan ke home
+  if (!ref) {
+    alert("Referensi transaksi tidak ditemukan.");
+    return (window.location.href = "index.html");
+  }
 
   loadData(ref);
-  checkInt = setInterval(() => checkStatus(ref), 3000);
+  checkInt = setInterval(() => checkStatus(ref), 3000); // Polling status setiap 3 detik
 
   initParticles();
   setupTiltEffect();
@@ -39,48 +48,78 @@ async function loadData(ref) {
   try {
     const res = await fetch(`${API_URL}/transaction/${ref}`);
     const json = await res.json();
+
     if (!json.success) throw new Error(json.message);
 
     renderAll(json.data);
-    document.getElementById("loader").style.display = "none";
-    setTimeout(
-      () => (document.getElementById("progFill").style.width = "50%"),
-      500,
-    );
+
+    // Sembunyikan loader setelah data berhasil dimuat
+    const loader = document.getElementById("loader");
+    if (loader) loader.style.display = "none";
+
+    const progFill = document.getElementById("progFill");
+    if (progFill) setTimeout(() => (progFill.style.width = "50%"), 500);
   } catch (e) {
-    alert("Error: " + e.message);
+    console.error("Load Data Error:", e);
+    // Tampilkan pesan error di layar jika fatal
+    document.body.innerHTML = `<div style="color:white;text-align:center;margin-top:50px;">
+        <h2>Gagal Memuat Transaksi</h2>
+        <p>${e.message}</p>
+        <a href="index.html" style="color:#00f3ff;">Kembali ke Home</a>
+    </div>`;
   }
 }
 
 function renderAll(data) {
-  // 1. Visual
+  // 1. Logika Visual (Logo & Banner)
   let key = "DEFAULT";
+  const gameName = data.game || "";
+
+  // Cari aset yang cocok secara case-insensitive
   Object.keys(ASSETS).forEach((k) => {
-    if ((data.game || "").toLowerCase().includes(k.toLowerCase())) key = k;
+    if (k !== "DEFAULT" && gameName.toLowerCase().includes(k.toLowerCase())) {
+      key = k;
+    }
   });
+
   const asset = ASSETS[key];
-  document.getElementById("bgImg").style.backgroundImage =
-    `url('${asset.banner}')`;
-  document.getElementById("gameLogo").src = asset.logo;
-  document.getElementById("gameTitle").innerText = data.game;
-  document.getElementById("refIdSmall").innerText = data.ref_id;
 
-  // 2. Data Text
-  document.getElementById("dItem").innerText = data.product_name;
-  document.getElementById("dUid").innerText = data.user_id;
-  document.getElementById("dMethod").innerText = data.method;
-  document.getElementById("dTotal").innerText =
-    "Rp " + parseInt(data.amount).toLocaleString();
+  const bgImg = document.getElementById("bgImg");
+  if (bgImg) bgImg.style.backgroundImage = `url('${asset.banner}')`;
 
-  // 3. ANIMASI NICKNAME
-  // Jalankan efek decoding text pada nickname
-  const finalNick = data.nickname || "User Game";
+  const gameLogo = document.getElementById("gameLogo");
+  if (gameLogo) {
+    gameLogo.src = asset.logo;
+    // Fallback jika gambar error
+    gameLogo.onerror = () => {
+      gameLogo.src = ASSETS.DEFAULT.logo;
+    };
+  }
+
+  const gameTitle = document.getElementById("gameTitle");
+  if (gameTitle) gameTitle.innerText = gameName || "Transaction";
+
+  const refIdSmall = document.getElementById("refIdSmall");
+  if (refIdSmall) refIdSmall.innerText = data.ref_id;
+
+  // 2. Data Text Detail
+  // [FIX] Prioritaskan productName, lalu item, lalu sku
+  const productName =
+    data.productName || data.item || data.sku || "Unknown Item";
+
+  setText("dItem", productName);
+  setText("dUid", data.user_id || "-");
+  setText("dMethod", data.method || "-");
+  setText("dTotal", "Rp " + parseInt(data.amount || 0).toLocaleString());
+
+  // 3. Animasi Nickname
+  const finalNick = data.nickname || "User";
   animateNickname("dNick", finalNick);
 
-  // 4. Status Check
-  if (data.status === "PAID") {
-    showSuccess(true);
-  } else if (data.status === "EXPIRED") {
+  // 4. Status Check & Rendering Area Pembayaran
+  if (data.status === "PAID" || data.status === "SUCCESS") {
+    showSuccess(true); // Tampilkan sukses (mode instant, tanpa confetti berulang)
+  } else if (data.status === "EXPIRED" || data.status === "FAILED") {
     showExpired();
   } else {
     renderPay(data);
@@ -88,9 +127,17 @@ function renderAll(data) {
   }
 }
 
-// --- FITUR BARU: ANIMASI DECODING TEXT ---
+// Helper aman untuk set text
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = text;
+}
+
+// --- ANIMASI DECODING TEXT ---
 function animateNickname(elementId, finalText) {
   const el = document.getElementById(elementId);
+  if (!el) return;
+
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
   let iterations = 0;
 
@@ -104,111 +151,204 @@ function animateNickname(elementId, finalText) {
       .join("");
 
     if (iterations >= finalText.length) clearInterval(interval);
-    iterations += 1 / 3; // Kecepatan decoding
+    iterations += 1 / 3;
   }, 30);
 }
 
 function renderPay(data) {
   const area = document.getElementById("paymentArea");
+  if (!area) return;
+
   if (data.qr_url) {
+    // Tampilan QRIS
     area.innerHTML = `
             <div class="small text-muted mb-2 fw-bold text-uppercase">Scan QRIS</div>
-            <div class="qr-wrapper"><div class="qr-laser"></div><img src="${data.qr_url}" width="180"></div>
+            <div class="qr-wrapper">
+                <div class="qr-laser"></div>
+                <img src="${data.qr_url}" width="180" alt="QR Code" style="border-radius:10px;">
+            </div>
             <div class="mt-2 text-muted small">Support: DANA, OVO, Shopee, LinkAja</div>
+            <br>
+            <a href="${data.checkout_url}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill px-4">
+                Buka di Browser <i class="fas fa-external-link-alt ms-1"></i>
+            </a>
         `;
   } else if (data.pay_code) {
+    // Tampilan Virtual Account / Kode Bayar
     area.innerHTML = `
-            <div class="small text-muted mb-1 fw-bold text-uppercase">Nomor Virtual Account</div>
+            <div class="small text-muted mb-1 fw-bold text-uppercase">Nomor Virtual Account / Kode Bayar</div>
             <div class="va-display" onclick="copy('${data.pay_code}')">
                 ${data.pay_code} <i class="far fa-copy text-primary ms-2 fs-5"></i>
                 <span class="copy-tooltip">Salin!</span>
             </div>
-            <div class="alert alert-info py-1 px-2 d-inline-block small mb-2 border-0">
+            <div class="alert alert-info py-1 px-2 d-inline-block small mb-2 border-0" style="background: rgba(0, 243, 255, 0.1); color: #00f3ff;">
                 <i class="fas fa-info-circle"></i> Cek otomatis
             </div>
             <br>
-            <a href="${data.checkout_url}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3">Petunjuk</a>
+            <a href="${data.checkout_url}" target="_blank" class="btn btn-outline-light btn-sm rounded-pill px-3 mt-2">
+                Lihat Petunjuk Pembayaran
+            </a>
         `;
+  } else if (data.checkout_url) {
+    // Fallback jika tidak ada QR/VA tapi ada link checkout
+    area.innerHTML = `
+          <div class="mb-3">Silakan selesaikan pembayaran melalui link di bawah:</div>
+          <a href="${data.checkout_url}" target="_blank" class="btn btn-primary rounded-pill w-100 py-3 fw-bold">
+              BAYAR SEKARANG <i class="fas fa-arrow-right ms-2"></i>
+          </a>
+      `;
   }
 }
 
 function showSuccess(isInstant = false) {
-  clearInterval(checkInt);
-  clearInterval(timerInt);
-  document.getElementById("progFill").style.width = "100%";
-  document.getElementById("stepPay").classList.add("completed");
-  document.getElementById("stepPay").classList.remove("active");
-  document.getElementById("stepDone").classList.add("completed", "active");
+  if (checkInt) clearInterval(checkInt);
+  if (timerInt) clearInterval(timerInt);
+
+  const progFill = document.getElementById("progFill");
+  if (progFill) progFill.style.width = "100%";
+
+  const stepPay = document.getElementById("stepPay");
+  if (stepPay) {
+    stepPay.classList.add("completed");
+    stepPay.classList.remove("active");
+  }
+
+  const stepDone = document.getElementById("stepDone");
+  if (stepDone) stepDone.classList.add("completed", "active");
 
   if (!isInstant) {
-    document.getElementById("sfx-success").play();
-    confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
+    const sfx = document.getElementById("sfx-success");
+    if (sfx) sfx.play().catch((e) => console.log("Audio play blocked"));
+
+    // Efek Confetti (Pastikan library canvas-confetti sudah diload di HTML)
+    if (typeof confetti !== "undefined") {
+      confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
+    }
   }
-  document.getElementById("successOverlay").style.display = "flex";
+
+  const successOverlay = document.getElementById("successOverlay");
+  if (successOverlay) successOverlay.style.display = "flex";
 }
 
 function showExpired() {
-  clearInterval(checkInt);
-  document.getElementById("paymentArea").style.opacity = "0.5";
-  document.getElementById("paymentArea").innerHTML =
-    `<h3 class="text-danger fw-bold py-4">WAKTU HABIS</h3>`;
-  document.getElementById("countdown").innerText = "EXPIRED";
+  if (checkInt) clearInterval(checkInt);
+
+  const area = document.getElementById("paymentArea");
+  if (area) {
+    area.style.opacity = "0.5";
+    area.innerHTML = `<h3 class="text-danger fw-bold py-4"><i class="fas fa-times-circle"></i> WAKTU HABIS</h3>`;
+  }
+
+  const countdown = document.getElementById("countdown");
+  if (countdown) countdown.innerText = "EXPIRED";
+  if (countdown) countdown.style.color = "#ff0055";
 }
 
 function startTimer(created) {
-  const end = created + 24 * 3600 * 1000;
+  // Jika created timestamp dari firestore object, convert dulu
+  let startTime = created;
+  if (created && created._seconds) {
+    startTime = created._seconds * 1000;
+  }
+
+  const end = startTime + 24 * 3600 * 1000; // Expired 24 jam
+
   timerInt = setInterval(() => {
     const diff = end - Date.now();
-    if (diff <= 0) return showExpired();
+    if (diff <= 0) {
+      clearInterval(timerInt);
+      return showExpired();
+    }
+
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
-    document.getElementById("countdown").innerText =
-      `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+
+    const countdown = document.getElementById("countdown");
+    if (countdown) {
+      countdown.innerText = `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    }
   }, 1000);
 }
 
 function copy(txt) {
-  navigator.clipboard.writeText(txt);
-  document.getElementById("sfx-click").play();
-  const el = document.querySelector(".copy-tooltip");
-  el.innerText = "Tersalin!";
-  el.style.opacity = 1;
-  setTimeout(() => {
-    el.style.opacity = 0;
-    el.innerText = "Salin!";
-  }, 1500);
+  navigator.clipboard
+    .writeText(txt)
+    .then(() => {
+      const sfx = document.getElementById("sfx-click");
+      if (sfx) sfx.play().catch(() => {});
+
+      const el = document.querySelector(".copy-tooltip");
+      if (el) {
+        el.innerText = "Tersalin!";
+        el.style.opacity = 1;
+        setTimeout(() => {
+          el.style.opacity = 0;
+          el.innerText = "Salin!";
+        }, 1500);
+      }
+    })
+    .catch((err) => {
+      console.error("Gagal menyalin:", err);
+      alert("Gagal menyalin. Silakan copy manual.");
+    });
 }
 
 async function checkStatus(ref) {
   try {
     const res = await fetch(`${API_URL}/transaction/${ref}`);
     const json = await res.json();
-    if (json.success && json.data.status === "PAID") showSuccess();
-  } catch (e) {}
+    if (json.success) {
+      if (json.data.status === "PAID" || json.data.status === "SUCCESS") {
+        showSuccess();
+      } else if (
+        json.data.status === "EXPIRED" ||
+        json.data.status === "FAILED"
+      ) {
+        showExpired();
+      }
+    }
+  } catch (e) {
+    // Silent error for polling
+  }
 }
 
 function setupTiltEffect() {
   if (window.innerWidth < 768) return;
+
   const card = document.getElementById("visualSide");
   const logo = document.getElementById("logoWrap");
+  const bgImg = document.getElementById("bgImg");
+
+  if (!card || !logo || !bgImg) return;
+
   card.addEventListener("mousemove", (e) => {
     const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
     const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
     logo.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
-    document.getElementById("bgImg").style.transform = "scale(1.2)";
+    bgImg.style.transform = "scale(1.2)";
   });
+
   card.addEventListener("mouseleave", () => {
     logo.style.transform = `rotateY(0deg) rotateX(0deg)`;
-    document.getElementById("bgImg").style.transform = "scale(1.1)";
+    bgImg.style.transform = "scale(1.1)";
   });
 }
 
 function initParticles() {
   const canvas = document.getElementById("particles");
+  if (!canvas) return;
+
   const ctx = canvas.getContext("2d");
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
+
+  const resize = () => {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  };
+
+  window.addEventListener("resize", resize);
+  resize();
+
   let particles = [];
   for (let i = 0; i < 50; i++)
     particles.push({
@@ -217,6 +357,7 @@ function initParticles() {
       size: Math.random() * 2,
       speedY: Math.random() * 0.5 + 0.1,
     });
+
   function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
