@@ -9,7 +9,7 @@ const admin = require("firebase-admin");
 const app = express();
 
 // ==========================================
-// 1. SETUP FIREBASE (ULTIMATE FIX)
+// 1. SETUP FIREBASE
 // ==========================================
 let db = null;
 let dbError = "Menunggu Inisialisasi...";
@@ -24,7 +24,6 @@ function initFirebase() {
       throw new Error("Env Vars Belum Lengkap (Cek ProjectID, Email, Key)");
     }
 
-    // Fix Format Key Vercel (Paling sering salah di sini)
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = JSON.parse(privateKey);
     }
@@ -41,7 +40,7 @@ function initFirebase() {
     }
 
     db = admin.firestore();
-    dbError = null; // Reset error
+    dbError = null;
     console.log("🔥 Firebase App Initialized");
   } catch (error) {
     dbError = error.message;
@@ -98,32 +97,29 @@ async function getConfig() {
 // 3. PUBLIC ROUTES
 // ==========================================
 
-// DEBUGGING STATUS (CEK INI PERTAMA KALI)
 app.get("/api/status", async (req, res) => {
   let connectionTest = "Untested";
   let realError = dbError;
 
   if (db) {
     try {
-      // Coba baca data beneran untuk tes koneksi
       await db.collection("settings").limit(1).get();
       connectionTest = "SUCCESS: Read/Write OK";
     } catch (e) {
       connectionTest = "FAILED: " + e.message;
-      realError = e.message; // Tangkap error asli dari Google
+      realError = e.message;
     }
   }
 
   res.json({
     status: "Online",
     firebase_init: db ? "OK" : "FAILED",
-    firebase_connection: connectionTest, // Ini status yang jujur
+    firebase_connection: connectionTest,
     error_detail: realError,
   });
 });
 
 app.get("/api/init-data", async (req, res) => {
-  // Fail-safe: Jangan crash jika DB mati
   if (!db) return res.json({ sliders: [], banners: {}, products: [] });
   try {
     const productsSnap = await db
@@ -139,20 +135,108 @@ app.get("/api/init-data", async (req, res) => {
     res.json({ sliders: assets.sliders, banners: assets.banners, products });
   } catch (e) {
     console.error(e);
-    res.json({ sliders: [], banners: {}, products: [] }); // Return kosong jangan 500
+    res.json({ sliders: [], banners: {}, products: [] });
   }
 });
 
-// ... (Endpoint check-nickname, channels, transaction sama seperti sebelumnya) ...
-// Saya singkat agar muat, tapi pastikan endpoint transaction ada di file kamu.
 app.post("/api/check-nickname", async (req, res) => {
-  /* ... Logika Cek Nick ... */ res.json({ success: false });
+  const { game, id, zone } = req.body;
+  try {
+    let apiUrl = "";
+    if (game && game.toLowerCase().includes("mobile"))
+      apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
+    else if (game && game.toLowerCase().includes("free"))
+      apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
+    else return res.json({ success: true, name: "Gamer" });
+
+    const response = await axios.get(apiUrl);
+    if (response.data.success)
+      return res.json({ success: true, name: response.data.name });
+    return res.json({ success: false, message: "ID Tidak Ditemukan" });
+  } catch (e) {
+    res.json({ success: false, message: "Gagal Cek ID" });
+  }
 });
+
 app.get("/api/channels", async (req, res) => {
-  /* ... Logika Channel ... */ res.json({ data: [] });
+  const config = await getConfig();
+  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
+  try {
+    if (!config.tripay.api_key) throw new Error("Tripay API Key Missing");
+    const response = await axios.get(
+      `https://tripay.co.id/${mode}/merchant/payment-channel`,
+      {
+        headers: { Authorization: `Bearer ${config.tripay.api_key}` },
+      },
+    );
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ success: false, data: [] });
+  }
 });
+
 app.post("/api/transaction", async (req, res) => {
-  /* ... Logika Transaksi ... */ res.json({ success: false });
+  if (!db)
+    return res.status(500).json({ message: "Database Error: " + dbError });
+  const config = await getConfig();
+  const { sku, amount, customer_no, method, nickname, game } = req.body;
+  const mode = process.env.NODE_ENV === "production" ? "api" : "api-sandbox";
+
+  try {
+    const productDoc = await db.collection("products").doc(sku).get();
+    const productName = productDoc.exists
+      ? productDoc.data().name
+      : "Topup Game";
+    const merchantRef =
+      "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
+
+    const signature = crypto
+      .createHmac("sha256", config.tripay.private_key)
+      .update(config.tripay.merchant_code + merchantRef + amount)
+      .digest("hex");
+
+    const payload = {
+      method,
+      merchant_ref: merchantRef,
+      amount,
+      customer_name: nickname || "Guest",
+      customer_email: "cust@email.com",
+      customer_phone: customer_no,
+      order_items: [{ sku, name: productName, price: amount, quantity: 1 }],
+      return_url: "https://hawai-topup.vercel.app/invoice.html",
+      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      signature,
+    };
+
+    const tripayRes = await axios.post(
+      `https://tripay.co.id/${mode}/transaction/create`,
+      payload,
+      { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
+    );
+
+    const data = tripayRes.data.data;
+
+    await db.collection("transactions").doc(data.reference).set({
+      ref_id: data.reference,
+      merchant_ref: merchantRef,
+      game,
+      productName,
+      nickname,
+      user_id: customer_no,
+      amount,
+      method,
+      status: "UNPAID",
+      qr_url: data.qr_url,
+      pay_code: data.pay_code,
+      checkout_url: data.checkout_url,
+      created_at: Date.now(),
+    });
+
+    res.json({ success: true, data: { ...data, ref_id: data.reference } });
+  } catch (error) {
+    console.error("Trx Error:", error.response?.data || error.message);
+    res.status(500).json({ success: false, message: "Gagal Transaksi" });
+  }
 });
 
 // ==========================================
@@ -178,8 +262,6 @@ app.get("/api/admin/config", async (req, res) => {
         const aDoc = await db.collection("settings").doc("assets").get();
         if (aDoc.exists) assets = aDoc.data();
       } catch (e) {
-        console.error("DB Read Error:", e.message);
-        // Jangan throw, kirim data kosong + error info
         return res.json({
           config,
           products: [],
@@ -196,7 +278,6 @@ app.get("/api/admin/config", async (req, res) => {
   }
 });
 
-// SAVE CONFIG (Tampilkan Error Asli)
 app.post("/api/admin/save-config", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Init Failed: " + dbError });
   try {
@@ -233,7 +314,7 @@ app.post("/api/admin/save-assets", async (req, res) => {
   }
 });
 
-// SYNC DIGIFLAZZ (OPTIMIZED CHUNKING)
+// SYNC DIGIFLAZZ (FIX FILTER ERROR)
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db) return res.status(500).json({ error: "Database Error: " + dbError });
 
@@ -257,10 +338,17 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       },
     );
 
-    const digiProducts = response.data.data;
-    if (!digiProducts)
-      throw new Error("Gagal mengambil data Digiflazz (Response Kosong)");
+    // VALIDASI RESPON DIGIFLAZZ SEBELUM PROSES
+    if (!response.data || !Array.isArray(response.data.data)) {
+      // Jika bukan array, berarti Error Message dari Digiflazz
+      const errMsg = JSON.stringify(response.data);
+      console.error("Digiflazz Error Respon:", errMsg);
+      throw new Error(
+        "Respon Digiflazz Gagal (Cek IP Whitelist/Saldo): " + errMsg,
+      );
+    }
 
+    const digiProducts = response.data.data; // Ini PASTI Array sekarang
     const gameProducts = digiProducts.filter(
       (item) => item.category === "Games",
     );
@@ -279,12 +367,11 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
           brand: item.brand,
           category: item.category,
           price_modal: item.price,
-          price_sell: item.price + 1000, // Default markup 1000
+          price_sell: item.price + 1000,
           image: "assets/default.png",
-          is_active: false, // Default mati
+          is_active: false,
           is_promo: false,
         };
-        // Set merge: true agar markup lama tidak hilang
         batch.set(db.collection("products").doc(sku), newData, { merge: true });
       });
       await batch.commit();
