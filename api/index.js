@@ -93,11 +93,12 @@ async function getConfig() {
   return config;
 }
 
+// Ubah ke "api" jika sudah Production
+const TRIPAY_MODE = "api-sandbox";
+
 // ==========================================
 // 3. ROUTES TRANSAKSI
 // ==========================================
-
-const TRIPAY_MODE = "api-sandbox";
 
 // A. Create Transaction (Topup Coin)
 app.post("/api/topup-coin", async (req, res) => {
@@ -169,7 +170,7 @@ app.post("/api/topup-coin", async (req, res) => {
         method: method,
         status: "UNPAID",
         checkout_url: tripayRes.data.data.checkout_url,
-        qr_url: tripayRes.data.data.qr_url, // Penting untuk QRIS
+        qr_url: tripayRes.data.data.qr_url,
         pay_code: tripayRes.data.data.pay_code,
         created_at: Date.now(),
       });
@@ -298,8 +299,7 @@ app.post("/api/transaction", async (req, res) => {
   }
 });
 
-// C. [BARU] GET Detail Transaksi (Penyebab 404 Sebelumnya)
-// Endpoint ini wajib ada agar invoice.html bisa mengambil data
+// C. GET Detail Transaksi
 app.get("/api/transaction/:ref", async (req, res) => {
   if (!db)
     return res.status(500).json({ success: false, message: "Database Error" });
@@ -323,7 +323,90 @@ app.get("/api/transaction/:ref", async (req, res) => {
 });
 
 // ==========================================
-// 4. PUBLIC ROUTES LAINNYA
+// 4. [PENTING] CALLBACK HANDLER (Agar Status Update Otomatis)
+// ==========================================
+app.post("/api/callback", async (req, res) => {
+  if (!db)
+    return res.status(500).json({ success: false, message: "Database Error" });
+
+  const config = await getConfig();
+
+  // 1. Ambil Signature dari Header
+  const tripaySignature = req.headers["x-callback-signature"];
+  const jsonBody = req.body;
+
+  // 2. Verifikasi Signature (Keamanan)
+  const hmac = crypto
+    .createHmac("sha256", config.tripay.private_key)
+    .update(JSON.stringify(jsonBody))
+    .digest("hex");
+
+  if (tripaySignature !== hmac) {
+    console.error("Invalid Signature Callback");
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid Signature" });
+  }
+
+  // 3. Proses Data Callback
+  const event = req.headers["x-callback-event"]; // e.g., payment_status
+  const { reference, merchant_ref, status } = jsonBody;
+
+  console.log(`Callback Received: ${reference} -> ${status}`);
+
+  try {
+    if (status === "PAID") {
+      const trxRef = db.collection("transactions").doc(reference);
+      const doc = await trxRef.get();
+
+      if (doc.exists) {
+        const data = doc.data();
+
+        // Update status transaksi
+        await trxRef.update({
+          status: "PAID",
+          paid_at: Date.now(),
+          last_update: Date.now(),
+        });
+
+        // JIKA INI DEPOSIT COIN -> Tambahkan saldo ke user
+        if (
+          data.type === "DEPOSIT" &&
+          data.user_uid &&
+          data.status !== "PAID"
+        ) {
+          const userRef = db.collection("users").doc(data.user_uid);
+          await db.runTransaction(async (t) => {
+            const userDoc = await t.get(userRef);
+            if (userDoc.exists) {
+              const currentCoins = userDoc.data().hawai_coins || 0;
+              t.update(userRef, {
+                hawai_coins: currentCoins + parseInt(data.amount),
+              });
+            }
+          });
+          console.log(`Deposit Success: ${data.user_uid} + ${data.amount}`);
+        }
+
+        // JIKA INI GAME TOPUP -> Proses ke Digiflazz (Opsional, perlu coding tambahan)
+        // if (data.type === 'GAME_TOPUP') { ... callDigiflazz() ... }
+      }
+    } else if (status === "EXPIRED" || status === "FAILED") {
+      await db.collection("transactions").doc(reference).update({
+        status: status,
+        last_update: Date.now(),
+      });
+    }
+
+    res.json({ success: true }); // Respon wajib ke Tripay
+  } catch (error) {
+    console.error("Callback Error:", error);
+    res.status(500).json({ success: false });
+  }
+});
+
+// ==========================================
+// 5. PUBLIC ROUTES LAINNYA
 // ==========================================
 
 app.get("/api/init-data", async (req, res) => {
