@@ -43,7 +43,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // --- 4. HELPER: GET CONFIG ---
 async function getConfig() {
-  // Default Config dari Env Vars
   let config = {
     tripay: {
       merchant_code: process.env.TRIPAY_MERCHANT_CODE || "",
@@ -57,13 +56,11 @@ async function getConfig() {
     admin_password: process.env.ADMIN_PASSWORD || "admin",
   };
 
-  // Timpa dengan data database jika ada
   if (db) {
     try {
       const doc = await db.collection("settings").doc("general").get();
       if (doc.exists) {
         const dbConfig = doc.data();
-        // Merge manual
         if (dbConfig.tripay)
           config.tripay = { ...config.tripay, ...dbConfig.tripay };
         if (dbConfig.digiflazz)
@@ -125,7 +122,7 @@ app.post("/api/check-nickname", async (req, res) => {
     } else if (game && game.toLowerCase().includes("free")) {
       apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
     } else {
-      return res.json({ success: true, name: "Gamer" }); // Fallback
+      return res.json({ success: true, name: "Gamer" });
     }
 
     if (apiUrl) {
@@ -226,7 +223,6 @@ app.post("/api/transaction", async (req, res) => {
 // ROUTES ADMIN (BACKOFFICE)
 // ==========================================
 
-// 1. LOGIN ADMIN
 app.post("/api/admin/login", async (req, res) => {
   const config = await getConfig();
   if (req.body.password === config.admin_password) {
@@ -236,35 +232,25 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-// 2. GET CONFIG & DATA
 app.get("/api/admin/config", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
   try {
     const config = await getConfig();
-
-    // Ambil SEMUA produk
     const productsSnap = await db.collection("products").get();
     const products = productsSnap.docs.map((doc) => doc.data());
 
-    // Ambil Assets
     let assets = { sliders: [], banners: {} };
     try {
       const assetsDoc = await db.collection("settings").doc("assets").get();
       if (assetsDoc.exists) assets = assetsDoc.data();
     } catch (e) {}
 
-    res.json({
-      config: config,
-      products: products,
-      assets: assets,
-    });
+    res.json({ config, products, assets });
   } catch (e) {
-    console.error("Admin Fetch Error:", e);
-    res.status(500).json({ error: "Gagal load data admin" });
+    res.status(500).json({ error: "Gagal load data" });
   }
 });
 
-// 3. SAVE CONFIG
 app.post("/api/admin/save-config", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
   try {
@@ -274,12 +260,10 @@ app.post("/api/admin/save-config", async (req, res) => {
       .set(req.body, { merge: true });
     res.json({ success: true });
   } catch (e) {
-    console.error("Save Config Error:", e);
     res.status(500).json({ error: "Gagal simpan config" });
   }
 });
 
-// 4. SAVE PRODUCTS
 app.post("/api/admin/save-products", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
   try {
@@ -296,20 +280,23 @@ app.post("/api/admin/save-products", async (req, res) => {
   }
 });
 
-// 5. SYNC DIGIFLAZZ (INI ROUTE YANG HILANG SEBELUMNYA)
+app.post("/api/admin/save-assets", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    await db.collection("settings").doc("assets").set(req.body);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Gagal simpan assets" });
+  }
+});
+
 app.post("/api/admin/sync-digiflazz", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
-
-  // Ambil username & key langsung dari DB/Env
   const config = await getConfig();
   const { username, api_key } = config.digiflazz;
 
-  console.log("Mencoba Sync Digiflazz dengan User:", username);
-
   if (!username || !api_key) {
-    return res
-      .status(400)
-      .json({ message: "Username/Key Digiflazz Kosong! Cek Settings." });
+    return res.status(400).json({ message: "Username/Key Digiflazz Kosong!" });
   }
 
   try {
@@ -327,15 +314,9 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
     );
 
     const digiProducts = response.data.data;
-
-    if (!digiProducts) {
-      throw new Error("Respon Kosong dari Digiflazz");
-    }
-
     const batch = db.batch();
     let count = 0;
 
-    // Ambil data lama (untuk mapping harga)
     const oldDataSnap = await db.collection("products").get();
     const oldDataMap = {};
     oldDataSnap.forEach((doc) => {
@@ -346,7 +327,6 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
       if (item.category === "Games") {
         const sku = item.buyer_sku_code;
         const oldItem = oldDataMap[sku];
-
         const newData = {
           sku: sku,
           name: item.product_name,
@@ -361,7 +341,6 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
           is_active: oldItem ? oldItem.is_active : false,
           is_promo: oldItem ? oldItem.is_promo || false : false,
         };
-
         const ref = db.collection("products").doc(sku);
         batch.set(ref, newData);
         count++;
@@ -369,18 +348,12 @@ app.post("/api/admin/sync-digiflazz", async (req, res) => {
     });
 
     await batch.commit();
-    res.json({ success: true, message: `Sukses Sync ${count} Produk!` });
+    res.json({ success: true, message: `Berhasil sync ${count} produk!` });
   } catch (error) {
-    console.error("Digi Sync Error:", error.response?.data || error.message);
-    res.status(500).json({
-      success: false,
-      message: "Gagal Koneksi Digiflazz",
-      detail: error.message,
-    });
+    res.status(500).json({ success: false, message: "Gagal Sync Digiflazz" });
   }
 });
 
-// 6. UPLOAD IMAGE
 app.post("/api/admin/upload", upload.single("image"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
   const b64 = Buffer.from(req.file.buffer).toString("base64");
