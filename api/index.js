@@ -94,14 +94,12 @@ async function getConfig() {
 }
 
 // ==========================================
-// 3. ROUTES TRANSAKSI (FIXED SANDBOX MODE)
+// 3. ROUTES TRANSAKSI
 // ==========================================
 
-// --- LOGIC MODE TRIPAY ---
-// Ubah ke "api" hanya jika Anda sudah siap Live/Production
 const TRIPAY_MODE = "api-sandbox";
-// -------------------------
 
+// A. Create Transaction (Topup Coin)
 app.post("/api/topup-coin", async (req, res) => {
   if (!db)
     return res
@@ -152,13 +150,13 @@ app.post("/api/topup-coin", async (req, res) => {
 
     console.log(`Sending to Tripay (${TRIPAY_MODE}):`, JSON.stringify(payload));
 
-    // [FIX] Menggunakan TRIPAY_MODE variable
     const tripayRes = await axios.post(
       `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
       payload,
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
+    // Simpan dengan ID Dokumen = Reference Tripay (agar mudah di-GET)
     await db
       .collection("transactions")
       .doc(tripayRes.data.data.reference)
@@ -171,6 +169,8 @@ app.post("/api/topup-coin", async (req, res) => {
         method: method,
         status: "UNPAID",
         checkout_url: tripayRes.data.data.checkout_url,
+        qr_url: tripayRes.data.data.qr_url, // Penting untuk QRIS
+        pay_code: tripayRes.data.data.pay_code,
         created_at: Date.now(),
       });
 
@@ -182,6 +182,7 @@ app.post("/api/topup-coin", async (req, res) => {
   }
 });
 
+// B. Create Transaction (Game Topup)
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res
@@ -270,7 +271,6 @@ app.post("/api/transaction", async (req, res) => {
       signature,
     };
 
-    // [FIX] Menggunakan TRIPAY_MODE variable
     const tripayRes = await axios.post(
       `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
       payload,
@@ -298,8 +298,32 @@ app.post("/api/transaction", async (req, res) => {
   }
 });
 
+// C. [BARU] GET Detail Transaksi (Penyebab 404 Sebelumnya)
+// Endpoint ini wajib ada agar invoice.html bisa mengambil data
+app.get("/api/transaction/:ref", async (req, res) => {
+  if (!db)
+    return res.status(500).json({ success: false, message: "Database Error" });
+
+  const { ref } = req.params;
+
+  try {
+    const doc = await db.collection("transactions").doc(ref).get();
+
+    if (!doc.exists) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Transaksi tidak ditemukan" });
+    }
+
+    res.json({ success: true, data: doc.data() });
+  } catch (error) {
+    console.error("Get Trx Error:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
 // ==========================================
-// 4. PUBLIC ROUTES
+// 4. PUBLIC ROUTES LAINNYA
 // ==========================================
 
 app.get("/api/init-data", async (req, res) => {
@@ -342,7 +366,6 @@ app.get("/api/channels", async (req, res) => {
     ];
     let tripayChannels = [];
     if (config.tripay.api_key) {
-      // [FIX] Menggunakan TRIPAY_MODE variable
       const response = await axios.get(
         `https://tripay.co.id/${TRIPAY_MODE}/merchant/payment-channel`,
         { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
@@ -418,7 +441,6 @@ app.get("/api/user/:uid", async (req, res) => {
   }
 });
 
-// Admin routes & others (retained)
 app.post("/api/admin/login", async (req, res) => {
   const config = await getConfig();
   if (req.body.password === config.admin_password) res.json({ success: true });
