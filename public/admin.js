@@ -65,9 +65,9 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- Helper Config ---
+// --- Helper Config (LOGIKA PASSWORD DIPERBAIKI) ---
 async function getConfig() {
-  // 1. Ambil dari Environment Variables (PRIORITAS UTAMA UNTUK PASSWORD)
+  // 1. Default Hardcoded
   let config = {
     tripay: {
       merchant_code: process.env.TRIPAY_MERCHANT_CODE,
@@ -75,33 +75,35 @@ async function getConfig() {
       private_key: process.env.TRIPAY_PRIVATE_KEY,
     },
     point_reward_percent: 5,
-    admin_password: process.env.ADMIN_PASSWORD || "admin", // Default jika ENV kosong
+    admin_password: "admin", // Default paling dasar
   };
 
-  // 2. Timpa dengan data DB (KECUALI PASSWORD jika ENV ada)
+  // 2. Cek Environment Variable (PRIORITAS 1)
+  // Pastikan di-trim untuk membuang spasi tidak sengaja
+  const envPass = process.env.ADMIN_PASSWORD;
+  if (envPass && envPass.trim() !== "") {
+    config.admin_password = envPass.trim();
+  }
+
+  // 3. Cek Database (PRIORITAS 2 - Hanya jika Env Var kosong)
   if (db) {
     try {
       const doc = await db.collection("settings").doc("general").get();
       if (doc.exists) {
         const dbConfig = doc.data();
 
-        // Config Reward
         if (dbConfig.point_reward_percent)
           config.point_reward_percent = dbConfig.point_reward_percent;
-
-        // Config Tripay (Prioritaskan DB jika user update dari admin panel)
         if (dbConfig.tripay?.api_key)
           config.tripay = { ...config.tripay, ...dbConfig.tripay };
 
-        // [FIX] Logika Password:
-        // Jika di .env (Vercel) TIDAK ADA password, baru ambil dari DB.
-        // Jika di .env ADA password, GUNAKAN ITU (Abaikan DB).
-        if (!process.env.ADMIN_PASSWORD && dbConfig.admin_password) {
-          config.admin_password = dbConfig.admin_password;
+        // Hanya gunakan password DB jika ENV tidak di-set
+        if ((!envPass || envPass.trim() === "") && dbConfig.admin_password) {
+          config.admin_password = String(dbConfig.admin_password).trim();
         }
       }
     } catch (e) {
-      console.warn("⚠️ Gagal baca config DB, menggunakan ENV.");
+      console.warn("⚠️ Gagal baca config DB, menggunakan ENV/Default.");
     }
   }
   return config;
@@ -114,7 +116,6 @@ const TRIPAY_MODE = "api-sandbox";
 // 3. ROUTES TRANSAKSI
 // ==========================================
 
-// A. Create Transaction (Topup Coin)
 app.post("/api/topup-coin", async (req, res) => {
   if (!db)
     return res
@@ -171,7 +172,6 @@ app.post("/api/topup-coin", async (req, res) => {
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
-    // Simpan dengan ID Dokumen = Reference Tripay (agar mudah di-GET)
     await db
       .collection("transactions")
       .doc(tripayRes.data.data.reference)
@@ -197,7 +197,6 @@ app.post("/api/topup-coin", async (req, res) => {
   }
 });
 
-// B. Create Transaction (Game Topup)
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res
@@ -337,7 +336,7 @@ app.get("/api/transaction/:ref", async (req, res) => {
 });
 
 // ==========================================
-// 4. [PENTING] CALLBACK HANDLER & REWARD SYSTEM
+// 4. CALLBACK HANDLER
 // ==========================================
 app.post("/api/callback", async (req, res) => {
   if (!db)
@@ -422,138 +421,28 @@ app.post("/api/callback", async (req, res) => {
 });
 
 // ==========================================
-// 5. PUBLIC ROUTES LAINNYA
+// 5. ADMIN & LOGIN ROUTES (DIPERBAIKI)
 // ==========================================
 
-app.get("/api/init-data", async (req, res) => {
-  if (!db) return res.json({ sliders: [], banners: {}, products: [] });
-  try {
-    const productsSnap = await db
-      .collection("products")
-      .where("is_active", "==", true)
-      .get();
-    const products = productsSnap.docs.map((doc) => doc.data());
-    let assets = { sliders: [], banners: {} };
-    try {
-      const doc = await db.collection("settings").doc("assets").get();
-      if (doc.exists) assets = doc.data();
-    } catch (e) {}
-    const config = await getConfig();
-    res.json({
-      sliders: assets.sliders,
-      banners: assets.banners,
-      products,
-      reward_percent: config.point_reward_percent,
-    });
-  } catch (e) {
-    console.error(e);
-    res.json({ sliders: [], banners: {}, products: [] });
-  }
-});
-
-app.get("/api/channels", async (req, res) => {
-  const config = await getConfig();
-  try {
-    const manualChannels = [
-      {
-        code: "HAWAI_COIN",
-        name: "HAWAI Coin (Saldo Akun)",
-        group: "Balance",
-        icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
-        total_fee: { flat: 0, percent: 0 },
-      },
-    ];
-    let tripayChannels = [];
-    if (config.tripay.api_key) {
-      const response = await axios.get(
-        `https://tripay.co.id/${TRIPAY_MODE}/merchant/payment-channel`,
-        { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
-      );
-      tripayChannels = response.data.data || [];
-    }
-    res.json({ success: true, data: [...manualChannels, ...tripayChannels] });
-  } catch (error) {
-    console.error("Channel Error:", error.message);
-    res.json({ success: true, data: [] });
-  }
-});
-
-app.post("/api/check-nickname", async (req, res) => {
-  const { game, id, zone } = req.body;
-  try {
-    let apiUrl = "";
-    if (game && game.toLowerCase().includes("mobile"))
-      apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
-    else if (game && game.toLowerCase().includes("free"))
-      apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
-    else return res.json({ success: true, name: "Gamer" });
-
-    const response = await axios.get(apiUrl);
-    if (response.data.success)
-      return res.json({ success: true, name: response.data.name });
-    return res.json({ success: false, message: "ID Tidak Ditemukan" });
-  } catch (e) {
-    res.json({ success: false, message: "Gagal Cek ID" });
-  }
-});
-
-app.post("/api/auth/google", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "Database Error" });
-  const { idToken } = req.body;
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-    const email = decodedToken.email;
-    const name = decodedToken.name || "User";
-    const picture = decodedToken.picture || "";
-    const userRef = db.collection("users").doc(uid);
-    const userDoc = await userRef.get();
-    if (!userDoc.exists) {
-      await userRef.set({
-        uid,
-        email,
-        name,
-        picture,
-        hawai_coins: 0,
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } else {
-      await userRef.update({ name, picture, email });
-    }
-    const userData = (await userRef.get()).data();
-    res.json({ success: true, user: userData });
-  } catch (error) {
-    console.error("Auth Error:", error);
-    res.status(401).json({ success: false, message: "Invalid Token" });
-  }
-});
-
-app.get("/api/user/:uid", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "Database Error" });
-  try {
-    const userDoc = await db.collection("users").doc(req.params.uid).get();
-    if (!userDoc.exists)
-      return res.status(404).json({ message: "User not found" });
-    res.json({ success: true, user: userDoc.data() });
-  } catch (e) {
-    res.status(500).json({ message: "Server Error" });
-  }
-});
-
-// [LOGIN ADMIN DENGAN LOG]
+// Endpoint Login Admin
 app.post("/api/admin/login", async (req, res) => {
   const config = await getConfig();
 
-  // Debug Log (Cek di Vercel Logs)
-  console.log("Login Attempt:");
-  console.log("- Input:", req.body.password);
-  console.log("- Expected:", config.admin_password);
-  console.log("- Source ENV:", process.env.ADMIN_PASSWORD ? "YES" : "NO");
+  // Ambil input dan pastikan string serta trim spasi
+  const inputPassword = String(req.body.password || "").trim();
+  const serverPassword = String(config.admin_password || "admin").trim();
 
-  if (req.body.password === config.admin_password) {
+  // Logging untuk Debugging (Cek Vercel Logs jika error)
+  console.log("--- LOGIN DEBUG ---");
+  console.log("Input Pass (Length):", inputPassword.length);
+  console.log("Server Pass (Length):", serverPassword.length);
+  console.log("Is Match:", inputPassword === serverPassword);
+  console.log("Using ENV?", process.env.ADMIN_PASSWORD ? "YES" : "NO");
+
+  if (inputPassword === serverPassword) {
     res.json({ success: true });
   } else {
-    res.status(401).json({ success: false });
+    res.status(401).json({ success: false, message: "Password Salah" });
   }
 });
 
@@ -697,18 +586,127 @@ app.get("/api/admin/config", async (req, res) => {
         const aDoc = await db.collection("settings").doc("assets").get();
         if (aDoc.exists) assets = aDoc.data();
       } catch (e) {
-        return res.json({
-          config,
-          products: [],
-          assets: {},
-          db_connected: false,
-          db_error: e.message,
-        });
+        // ignore
       }
     }
     res.json({ config, products, assets, db_connected: !!db });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/check-nickname", async (req, res) => {
+  const { game, id, zone } = req.body;
+  try {
+    let apiUrl = "";
+    if (game && game.toLowerCase().includes("mobile"))
+      apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
+    else if (game && game.toLowerCase().includes("free"))
+      apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
+    else return res.json({ success: true, name: "Gamer" });
+
+    const response = await axios.get(apiUrl);
+    if (response.data.success)
+      return res.json({ success: true, name: response.data.name });
+    return res.json({ success: false, message: "ID Tidak Ditemukan" });
+  } catch (e) {
+    res.json({ success: false, message: "Gagal Cek ID" });
+  }
+});
+
+app.post("/api/auth/google", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database Error" });
+  const { idToken } = req.body;
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    const email = decodedToken.email;
+    const name = decodedToken.name || "User";
+    const picture = decodedToken.picture || "";
+    const userRef = db.collection("users").doc(uid);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+      await userRef.set({
+        uid,
+        email,
+        name,
+        picture,
+        hawai_coins: 0,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await userRef.update({ name, picture, email });
+    }
+    const userData = (await userRef.get()).data();
+    res.json({ success: true, user: userData });
+  } catch (error) {
+    console.error("Auth Error:", error);
+    res.status(401).json({ success: false, message: "Invalid Token" });
+  }
+});
+
+app.get("/api/user/:uid", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database Error" });
+  try {
+    const userDoc = await db.collection("users").doc(req.params.uid).get();
+    if (!userDoc.exists)
+      return res.status(404).json({ message: "User not found" });
+    res.json({ success: true, user: userDoc.data() });
+  } catch (e) {
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+app.get("/api/init-data", async (req, res) => {
+  if (!db) return res.json({ sliders: [], banners: {}, products: [] });
+  try {
+    const productsSnap = await db
+      .collection("products")
+      .where("is_active", "==", true)
+      .get();
+    const products = productsSnap.docs.map((doc) => doc.data());
+    let assets = { sliders: [], banners: {} };
+    try {
+      const doc = await db.collection("settings").doc("assets").get();
+      if (doc.exists) assets = doc.data();
+    } catch (e) {}
+    const config = await getConfig();
+    res.json({
+      sliders: assets.sliders,
+      banners: assets.banners,
+      products,
+      reward_percent: config.point_reward_percent,
+    });
+  } catch (e) {
+    console.error(e);
+    res.json({ sliders: [], banners: {}, products: [] });
+  }
+});
+
+app.get("/api/channels", async (req, res) => {
+  const config = await getConfig();
+  try {
+    const manualChannels = [
+      {
+        code: "HAWAI_COIN",
+        name: "HAWAI Coin (Saldo Akun)",
+        group: "Balance",
+        icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
+        total_fee: { flat: 0, percent: 0 },
+      },
+    ];
+    let tripayChannels = [];
+    if (config.tripay.api_key) {
+      const response = await axios.get(
+        `https://tripay.co.id/${TRIPAY_MODE}/merchant/payment-channel`,
+        { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
+      );
+      tripayChannels = response.data.data || [];
+    }
+    res.json({ success: true, data: [...manualChannels, ...tripayChannels] });
+  } catch (error) {
+    console.error("Channel Error:", error.message);
+    res.json({ success: true, data: [] });
   }
 });
 
