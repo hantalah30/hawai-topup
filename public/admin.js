@@ -14,7 +14,7 @@ let db = {
 
 // --- AUTH ---
 async function login() {
-  const pass = document.getElementById("adminPass").value;
+  const pass = document.getElementById("admin_password").value;
   const btn = document.querySelector("#loginOverlay button");
   const originalText = btn.innerText;
 
@@ -463,7 +463,7 @@ async function saveConfig() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/save-config`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "applicaation/json" },
       body: JSON.stringify(cfg),
     });
 
