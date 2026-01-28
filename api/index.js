@@ -22,7 +22,7 @@ function initFirebase() {
 
     if (!projectId || !clientEmail || !privateKey) {
       console.error("❌ CRITICAL: Env Vars Firebase tidak ditemukan!");
-      dbError = "Env Vars Missing in Vercel";
+      dbError = "Env Vars Missing";
       return;
     }
 
@@ -93,14 +93,189 @@ async function getConfig() {
   return config;
 }
 
-// Ubah ke "api" jika sudah Production
 const TRIPAY_MODE = "api-sandbox";
 
 // ==========================================
-// 3. ROUTES TRANSAKSI
+// 3. ADMIN ENDPOINTS (PUBLIC/FRONTEND AUTH)
 // ==========================================
 
-// A. Create Transaction (Topup Coin)
+// [FIX] Dummy login endpoint agar frontend lama tidak 404
+app.post("/api/admin/login", (req, res) => {
+  res.json({ success: true, message: "Auth handled by client" });
+});
+
+// [FIX] Endpoint Config
+app.get("/api/admin/config", async (req, res) => {
+  try {
+    const config = await getConfig();
+    let products = [],
+      assets = { sliders: [], banners: {} };
+    if (db) {
+      try {
+        const pSnap = await db.collection("products").get();
+        products = pSnap.docs.map((d) => d.data());
+        const aDoc = await db.collection("settings").doc("assets").get();
+        if (aDoc.exists) assets = aDoc.data();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Hapus data sensitif sebelum dikirim
+    delete config.tripay.private_key;
+
+    res.json({ config, products, assets, db_connected: !!db });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// [FIX] Endpoint Users
+app.get("/api/admin/users", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    const snap = await db
+      .collection("users")
+      .orderBy("created_at", "desc")
+      .get();
+    const users = snap.docs.map((d) => d.data());
+    res.json(users);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// [FIX] Update Balance
+app.post("/api/admin/update-balance", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  const { uid, newBalance } = req.body;
+  try {
+    await db
+      .collection("users")
+      .doc(uid)
+      .update({ hawai_coins: parseInt(newBalance) });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// [FIX] Save Config
+app.post("/api/admin/save-config", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    await db
+      .collection("settings")
+      .doc("general")
+      .set(req.body, { merge: true });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// [FIX] Save Products
+app.post("/api/admin/save-products", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    const batch = db.batch();
+    req.body.forEach((p) => batch.set(db.collection("products").doc(p.sku), p));
+    await batch.commit();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// [FIX] Save Assets
+app.post("/api/admin/save-assets", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    await db.collection("settings").doc("assets").set(req.body);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// [FIX] Upload Image
+app.post("/api/admin/upload", upload.single("image"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file" });
+  const b64 = Buffer.from(req.file.buffer).toString("base64");
+  res.json({ filepath: `data:${req.file.mimetype};base64,${b64}` });
+});
+
+// [FIX] Sync Digiflazz
+app.post("/api/admin/sync-digiflazz", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  const config = await getConfig();
+  const { username, api_key } = config.digiflazz;
+
+  if (!username || !api_key)
+    return res.status(400).json({ message: "API Key Kosong" });
+
+  try {
+    const sign = crypto
+      .createHash("md5")
+      .update(username + api_key + "pricelist")
+      .digest("hex");
+    const response = await axios.post(
+      "https://api.digiflazz.com/v1/price-list",
+      {
+        cmd: "prepaid",
+        username,
+        sign,
+      },
+    );
+
+    if (!response.data || !Array.isArray(response.data.data)) {
+      throw new Error("Gagal ambil data Digiflazz");
+    }
+
+    const gameProducts = response.data.data.filter(
+      (item) => item.category === "Games",
+    );
+    const chunkSize = 100;
+
+    for (let i = 0; i < gameProducts.length; i += chunkSize) {
+      const batch = db.batch();
+      const chunk = gameProducts.slice(i, i + chunkSize);
+      chunk.forEach((item) => {
+        const sku = item.buyer_sku_code;
+        const newData = {
+          sku: sku,
+          name: item.product_name,
+          brand: item.brand,
+          category: item.category,
+          price_modal: item.price,
+          price_sell: item.price + 1000,
+          image: "assets/default.png",
+          is_active: false,
+          is_promo: false,
+        };
+        batch.set(db.collection("products").doc(sku), newData, { merge: true });
+      });
+      await batch.commit();
+    }
+
+    res.json({
+      success: true,
+      message: `Sukses Sync ${gameProducts.length} Produk!`,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "Sync Error: " + error.message });
+  }
+});
+
+// ==========================================
+// 4. PUBLIC ROUTES
+// ==========================================
+
+// Create Transaction (Topup Coin)
 app.post("/api/topup-coin", async (req, res) => {
   if (!db)
     return res
@@ -149,14 +324,13 @@ app.post("/api/topup-coin", async (req, res) => {
       signature,
     };
 
-    console.log(`Sending to Tripay (${TRIPAY_MODE}):`, JSON.stringify(payload));
-
     const tripayRes = await axios.post(
       `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
       payload,
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
+    // Simpan dengan ID Dokumen = Reference Tripay (agar mudah di-GET)
     await db
       .collection("transactions")
       .doc(tripayRes.data.data.reference)
@@ -176,13 +350,12 @@ app.post("/api/topup-coin", async (req, res) => {
 
     res.json({ success: true, data: tripayRes.data.data });
   } catch (e) {
-    console.error("Topup Coin Error:", e.response?.data || e.message);
     const msg = e.response?.data?.message || e.message;
     res.status(500).json({ success: false, message: "Tripay Error: " + msg });
   }
 });
 
-// B. Create Transaction (Game Topup)
+// Create Transaction (Game Topup)
 app.post("/api/transaction", async (req, res) => {
   if (!db)
     return res
@@ -215,14 +388,13 @@ app.post("/api/transaction", async (req, res) => {
       productName,
       nickname: safeNickname,
       user_id: customer_no,
-      user_uid: user_uid || null, // Jika null, berarti Guest
+      user_uid: user_uid || null,
       amount: parseInt(amount),
       method,
       status: "UNPAID",
       created_at: Date.now(),
     };
 
-    // --- PEMBAYARAN VIA COIN (Langsung Dapat Reward Jika Login) ---
     if (method === "HAWAI_COIN") {
       if (!user_uid)
         return res
@@ -237,15 +409,11 @@ app.post("/api/transaction", async (req, res) => {
         const currentCoins = userData.hawai_coins || 0;
         if (currentCoins < amount) throw new Error("Saldo tidak cukup");
 
-        // Kurangi Saldo
         t.update(userRef, { hawai_coins: currentCoins - parseInt(amount) });
-
         transactionData.status = "PAID";
         transactionData.paid_at = Date.now();
         t.set(db.collection("transactions").doc(merchantRef), transactionData);
       });
-
-      // Proses Digiflazz disini (Opsional)
 
       return res.json({
         success: true,
@@ -256,7 +424,6 @@ app.post("/api/transaction", async (req, res) => {
       });
     }
 
-    // --- PEMBAYARAN VIA TRIPAY ---
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -298,13 +465,12 @@ app.post("/api/transaction", async (req, res) => {
 
     res.json({ success: true, data: { ...data, ref_id: data.reference } });
   } catch (error) {
-    console.error("Trx Error:", error.response?.data || error.message);
     const msg = error.response?.data?.message || error.message;
     res.status(500).json({ success: false, message: "Gagal: " + msg });
   }
 });
 
-// C. GET Detail Transaksi
+// GET Detail Transaksi
 app.get("/api/transaction/:ref", async (req, res) => {
   if (!db)
     return res.status(500).json({ success: false, message: "Database Error" });
@@ -322,21 +488,15 @@ app.get("/api/transaction/:ref", async (req, res) => {
 
     res.json({ success: true, data: doc.data() });
   } catch (error) {
-    console.error("Get Trx Error:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 });
 
-// ==========================================
-// 4. [PENTING] CALLBACK HANDLER & REWARD SYSTEM
-// ==========================================
+// CALLBACK
 app.post("/api/callback", async (req, res) => {
-  if (!db)
-    return res.status(500).json({ success: false, message: "Database Error" });
-
+  if (!db) return res.status(500).json({ success: false });
   const config = await getConfig();
 
-  // 1. Validasi Signature
   const tripaySignature = req.headers["x-callback-signature"];
   const jsonBody = req.body;
   const hmac = crypto
@@ -360,44 +520,32 @@ app.post("/api/callback", async (req, res) => {
       if (doc.exists) {
         const data = doc.data();
 
-        // Cek agar tidak memproses ulang transaksi yang sudah PAID
         if (data.status === "PAID") {
           return res.json({ success: true, message: "Already Paid" });
         }
 
-        // Update status transaksi menjadi PAID
         await trxRef.update({
           status: "PAID",
           paid_at: Date.now(),
           last_update: Date.now(),
         });
 
-        // ==========================================
-        // FITUR REWARD POINT (CASHBACK)
-        // ==========================================
         if (data.type === "GAME_TOPUP" && data.user_uid) {
-          const rewardPercent = config.point_reward_percent || 5; // Default 5%
+          const rewardPercent = config.point_reward_percent || 5;
           const points = Math.floor(
             parseInt(data.amount) * (rewardPercent / 100),
           );
 
           if (points > 0) {
-            // Update saldo user secara atomic (Increment)
             await db
               .collection("users")
               .doc(data.user_uid)
               .update({
                 hawai_coins: admin.firestore.FieldValue.increment(points),
               });
-            console.log(
-              `[REWARD] Memberi ${points} coins ke user ${data.user_uid}`,
-            );
           }
         }
 
-        // ==========================================
-        // FITUR DEPOSIT SALDO (TOPUP COIN)
-        // ==========================================
         if (data.type === "DEPOSIT" && data.user_uid) {
           await db
             .collection("users")
@@ -407,13 +555,7 @@ app.post("/api/callback", async (req, res) => {
                 parseInt(data.amount),
               ),
             });
-          console.log(
-            `[DEPOSIT] Masuk ${data.amount} coins ke user ${data.user_uid}`,
-          );
         }
-
-        // Disini bisa panggil API Digiflazz untuk proses item game
-        // await processDigiflazz(data);
       }
     } else if (status === "EXPIRED" || status === "FAILED") {
       await db.collection("transactions").doc(reference).update({
@@ -424,15 +566,11 @@ app.post("/api/callback", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Callback Error:", error);
     res.status(500).json({ success: false });
   }
 });
 
-// ==========================================
-// 5. PUBLIC ROUTES LAINNYA
-// ==========================================
-
+// Public Routes Lainnya
 app.get("/api/init-data", async (req, res) => {
   if (!db) return res.json({ sliders: [], banners: {}, products: [] });
   try {
@@ -454,7 +592,6 @@ app.get("/api/init-data", async (req, res) => {
       reward_percent: config.point_reward_percent,
     });
   } catch (e) {
-    console.error(e);
     res.json({ sliders: [], banners: {}, products: [] });
   }
 });
@@ -481,7 +618,6 @@ app.get("/api/channels", async (req, res) => {
     }
     res.json({ success: true, data: [...manualChannels, ...tripayChannels] });
   } catch (error) {
-    console.error("Channel Error:", error.message);
     res.json({ success: true, data: [] });
   }
 });
@@ -531,7 +667,6 @@ app.post("/api/auth/google", async (req, res) => {
     const userData = (await userRef.get()).data();
     res.json({ success: true, user: userData });
   } catch (error) {
-    console.error("Auth Error:", error);
     res.status(401).json({ success: false, message: "Invalid Token" });
   }
 });
@@ -545,33 +680,6 @@ app.get("/api/user/:uid", async (req, res) => {
     res.json({ success: true, user: userDoc.data() });
   } catch (e) {
     res.status(500).json({ message: "Server Error" });
-  }
-});
-
-app.post("/api/admin/login", (req, res) => {
-  res.json({ success: true, message: "Logged in via Frontend Auth" });
-});
-
-app.get("/api/admin/config", async (req, res) => {
-  try {
-    const config = await getConfig();
-    let products = [],
-      assets = { sliders: [], banners: {} };
-    if (db) {
-      try {
-        const pSnap = await db.collection("products").get();
-        products = pSnap.docs.map((d) => d.data());
-        const aDoc = await db.collection("settings").doc("assets").get();
-        if (aDoc.exists) assets = aDoc.data();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    // Kirim full config ke admin
-    res.json({ config, products, assets, db_connected: !!db });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
   }
 });
 
