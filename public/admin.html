@@ -137,13 +137,14 @@
             >
               <div class="btn-group">
                 <button
-                  onclick="alert('Fitur Sync perlu Backend Trigger')"
+                  id="btnSync"
+                  onclick="syncDigiflazz()"
                   class="btn btn-primary btn-sm"
                 >
-                  <i class="fas fa-sync"></i> Sync
+                  <i class="fas fa-sync"></i> Sync Digi
                 </button>
                 <button
-                  onclick="resetData()"
+                  onclick="alert('Fitur Reset Dimatikan')"
                   class="btn btn-outline-danger btn-sm"
                 >
                   <i class="fas fa-trash"></i> Reset
@@ -154,20 +155,33 @@
                 id="filterBrand"
                 class="form-select form-select-sm border-primary fw-bold"
                 style="width: 200px"
-                onchange="renderProducts()"
+                onchange="filterProducts()"
               >
-                <option value="ALL">-- Semua Game --</option>
+                <option value="">-- Loading --</option>
               </select>
               <input
                 type="text"
                 id="searchSku"
                 class="form-control form-control-sm w-auto"
                 placeholder="Cari Produk..."
-                onkeyup="renderProducts()"
+                onkeyup="filterProducts()"
               />
               <button
+                onclick="document.getElementById('bulkImgInput').click()"
+                class="btn btn-warning btn-sm ms-auto"
+              >
+                <i class="fas fa-images"></i> Bulk Img
+              </button>
+              <input
+                type="file"
+                id="bulkImgInput"
+                class="d-none"
+                onchange="processBulkImage(this)"
+              />
+              <button
+                id="btnSaveProd"
                 onclick="saveProducts()"
-                class="btn btn-success btn-sm ms-auto px-3"
+                class="btn btn-success btn-sm px-3"
               >
                 <i class="fas fa-save"></i> SIMPAN
               </button>
@@ -191,19 +205,34 @@
                     <th>Nama Produk</th>
                     <th width="80" class="text-center">Promo</th>
                     <th width="120">Modal</th>
+                    <th width="120">Markup</th>
                     <th width="120">Harga Jual</th>
                     <th width="80">Aktif</th>
                   </tr>
                 </thead>
                 <tbody id="productTable">
                   <tr>
-                    <td colspan="7" class="text-center p-5">
-                      Menunggu Data...
+                    <td colspan="8" class="text-center p-5">
+                      Silakan pilih kategori game...
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-assets">
+          <div class="card p-4">
+            <h5>Slider Home</h5>
+            <div class="d-flex gap-2 mb-3 flex-wrap" id="sliderContainer"></div>
+            <input type="file" id="uploadSlider" onchange="uploadNewSlider()" />
+            <hr />
+            <h5>Banner Game</h5>
+            <div
+              id="bannerContainer"
+              style="max-height: 400px; overflow-y: auto"
+            ></div>
           </div>
         </div>
 
@@ -223,7 +252,8 @@
                 <tr>
                   <th>Nama</th>
                   <th>Email</th>
-                  <th>Saldo</th>
+                  <th>Saldo Coin</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody id="userTableBody"></tbody>
@@ -233,197 +263,52 @@
 
         <div class="tab-pane fade" id="tab-api">
           <div class="card p-4">
-            <h5>Konfigurasi (Read Only)</h5>
-            <p class="text-muted">
-              Untuk keamanan, edit API Key langsung di Environment Variable
-              Vercel.
-            </p>
+            <h5>Konfigurasi Digiflazz & Tripay</h5>
+            <div class="row mt-3">
+              <div class="col-md-6">
+                <h6>Digiflazz</h6>
+                <div class="mb-2">
+                  <label>Username</label
+                  ><input type="text" id="digi_user" class="form-control" />
+                </div>
+                <div class="mb-2">
+                  <label>API Key</label
+                  ><input type="text" id="digi_api" class="form-control" />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <h6>Tripay</h6>
+                <div class="mb-2">
+                  <label>Merchant Code</label
+                  ><input
+                    type="text"
+                    id="tripay_merchant"
+                    class="form-control"
+                  />
+                </div>
+                <div class="mb-2">
+                  <label>API Key</label
+                  ><input type="text" id="tripay_api" class="form-control" />
+                </div>
+                <div class="mb-2">
+                  <label>Private Key</label
+                  ><input
+                    type="text"
+                    id="tripay_private"
+                    class="form-control"
+                  />
+                </div>
+              </div>
+            </div>
+            <button onclick="saveConfig()" class="btn btn-primary mt-3">
+              Simpan Konfigurasi
+            </button>
           </div>
         </div>
       </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-      let productsData = [];
-      let usersData = [];
-
-      // ===========================
-      // 1. LOGIC LOGIN (FIXED)
-      // ===========================
-      async function login() {
-        const pass = document.getElementById("adminPass").value;
-        const btn = document.querySelector("#loginOverlay button");
-
-        // BYPASS INSTAN DI CLIENT SIDE (Sesuai Request)
-        if (pass === "hawainerlah") {
-          document.getElementById("loginOverlay").style.display = "none";
-          document.getElementById("adminPanel").style.display = "block";
-          loadInitialData(); // Load data setelah login
-          return;
-        }
-
-        // Coba Login ke Server
-        try {
-          btn.innerHTML = "Loading...";
-          const res = await fetch("/api/admin/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password: pass }),
-          });
-          const data = await res.json();
-
-          if (data.success) {
-            document.getElementById("loginOverlay").style.display = "none";
-            document.getElementById("adminPanel").style.display = "block";
-            loadInitialData();
-          } else {
-            alert("Password Salah!");
-          }
-        } catch (e) {
-          alert("Gagal koneksi ke server: " + e.message);
-        } finally {
-          btn.innerHTML = "Masuk";
-        }
-      }
-
-      function logout() {
-        location.reload();
-      }
-
-      // ===========================
-      // 2. LOAD DATA DARI SERVER
-      // ===========================
-      async function loadInitialData() {
-        try {
-          const res = await fetch("/api/admin/config");
-          const data = await res.json();
-
-          if (data.products) {
-            productsData = data.products;
-            populateBrands();
-            renderProducts();
-          }
-        } catch (e) {
-          console.error("Gagal load data", e);
-        }
-      }
-
-      async function loadUsers() {
-        try {
-          const res = await fetch("/api/admin/users");
-          usersData = await res.json();
-          const tbody = document.getElementById("userTableBody");
-          tbody.innerHTML = "";
-          usersData.forEach((u) => {
-            tbody.innerHTML += `
-                    <tr>
-                        <td>${u.name || "User"}</td>
-                        <td>${u.email || "-"}</td>
-                        <td>${u.hawai_coins || 0}</td>
-                    </tr>
-                  `;
-          });
-        } catch (e) {
-          alert("Gagal load users");
-        }
-      }
-
-      // ===========================
-      // 3. TABLE & FILTER LOGIC
-      // ===========================
-      function populateBrands() {
-        const brands = [...new Set(productsData.map((p) => p.brand))].sort();
-        const sel = document.getElementById("filterBrand");
-        sel.innerHTML = '<option value="ALL">-- Semua Game --</option>';
-        brands.forEach((b) => {
-          sel.innerHTML += `<option value="${b}">${b}</option>`;
-        });
-      }
-
-      function renderProducts() {
-        const filter = document.getElementById("filterBrand").value;
-        const search = document.getElementById("searchSku").value.toLowerCase();
-        const tbody = document.getElementById("productTable");
-
-        const filtered = productsData.filter((p) => {
-          const matchBrand = filter === "ALL" || p.brand === filter;
-          const matchSearch =
-            p.name.toLowerCase().includes(search) ||
-            p.sku.toLowerCase().includes(search);
-          return matchBrand && matchSearch;
-        });
-
-        if (filtered.length === 0) {
-          tbody.innerHTML =
-            '<tr><td colspan="7" class="text-center">Tidak ada data</td></tr>';
-          return;
-        }
-
-        let html = "";
-        // Limit render 100 items agar browser tidak lag
-        filtered.slice(0, 100).forEach((p, index) => {
-          html += `
-                <tr>
-                    <td class="text-center"><input type="checkbox" class="form-check-input prod-check" value="${p.sku}"></td>
-                    <td><img src="${p.image || "https://via.placeholder.com/50"}" class="preview-img"></td>
-                    <td>
-                        <div class="fw-bold">${p.name}</div>
-                        <div class="sku-text">${p.sku} | ${p.brand}</div>
-                    </td>
-                    <td class="text-center">
-                        <input type="checkbox" class="form-check-input" ${p.is_promo ? "checked" : ""} onchange="updateLocal('${p.sku}', 'is_promo', this.checked)">
-                    </td>
-                    <td>Rp ${parseInt(p.price_modal).toLocaleString()}</td>
-                    <td>
-                        <input type="number" class="form-control form-control-sm" value="${p.price_sell}" onchange="updateLocal('${p.sku}', 'price_sell', this.value)">
-                    </td>
-                    <td>
-                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" ${p.is_active ? "checked" : ""} onchange="updateLocal('${p.sku}', 'is_active', this.checked)">
-                        </div>
-                    </td>
-                </tr>
-              `;
-        });
-        tbody.innerHTML = html;
-      }
-
-      function updateLocal(sku, field, value) {
-        const idx = productsData.findIndex((p) => p.sku === sku);
-        if (idx > -1) {
-          productsData[idx][field] = value;
-        }
-      }
-
-      async function saveProducts() {
-        const btn = document.getElementById("btnSaveProd");
-        btn.innerHTML = "Menyimpan...";
-        try {
-          await fetch("/api/admin/save-products", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(productsData),
-          });
-          alert("Berhasil disimpan!");
-        } catch (e) {
-          alert("Gagal simpan");
-        } finally {
-          btn.innerHTML = '<i class="fas fa-save"></i> SIMPAN';
-        }
-      }
-
-      function toggleSelectAll(source) {
-        const checkboxes = document.querySelectorAll(".prod-check");
-        checkboxes.forEach((cb) => (cb.checked = source.checked));
-      }
-    </script>
-
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="admin.js"></script>
-    <script src="firebase-config.js"></script>
   </body>
 </html>

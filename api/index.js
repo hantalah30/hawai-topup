@@ -554,4 +554,30 @@ app.post("/api/admin/login", async (req, res) => {
   else res.status(401).json({ success: false });
 });
 
+// ... (Bagian atas sama)
+app.get("/api/admin/config", async (req, res) => {
+  try {
+    const config = await getConfig();
+    let products = [],
+      assets = { sliders: [], banners: {} };
+    if (db) {
+      try {
+        // Pastikan fetch produk tidak crash jika collection kosong
+        const pSnap = await db.collection("products").get();
+        products = pSnap.docs.map((d) => d.data());
+
+        const aDoc = await db.collection("settings").doc("assets").get();
+        if (aDoc.exists) assets = aDoc.data();
+      } catch (err) {
+        console.error("Firestore read error:", err);
+      }
+    }
+    // Kirim apa adanya, jangan error 500
+    res.json({ config, products, assets, db_connected: !!db });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+// ... (Sisa kode sama)
+
 module.exports = app;
