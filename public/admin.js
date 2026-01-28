@@ -9,7 +9,7 @@ const admin = require("firebase-admin");
 const app = express();
 
 // ==========================================
-// 1. SETUP FIREBASE (Vercel Friendly)
+// 1. SETUP FIREBASE & CONFIG
 // ==========================================
 let db = null;
 let dbError = "Menunggu Inisialisasi...";
@@ -21,15 +21,13 @@ function initFirebase() {
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
     if (!projectId || !clientEmail || !privateKey) {
-      console.error("❌ CRITICAL: Env Vars Firebase tidak ditemukan!");
-      dbError = "Env Vars Missing in Vercel";
+      console.error("❌ Env Vars Firebase tidak ditemukan!");
       return;
     }
 
     if (privateKey.indexOf("\\n") >= 0) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
-
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = privateKey.slice(1, -1);
     }
@@ -43,18 +41,13 @@ function initFirebase() {
         }),
       });
     }
-
     db = admin.firestore();
     db.settings({ ignoreUndefinedProperties: true });
-
-    dbError = null;
     console.log("🔥 Firebase Connected!");
   } catch (error) {
-    dbError = error.message;
-    console.error("❌ Firebase Init Error:", error);
+    console.error("❌ Firebase Init Error:", error.message);
   }
 }
-
 initFirebase();
 
 // ==========================================
@@ -73,8 +66,11 @@ async function getConfig() {
       api_key: process.env.TRIPAY_API_KEY,
       private_key: process.env.TRIPAY_PRIVATE_KEY,
     },
+    digiflazz: {
+      username: process.env.DIGI_USER,
+      api_key: process.env.DIGI_KEY,
+    },
     point_reward_percent: 5,
-    // Prioritas 1: Environment Variable
     admin_password: process.env.ADMIN_PASSWORD || "admin",
   };
 
@@ -87,14 +83,13 @@ async function getConfig() {
           config.point_reward_percent = dbConfig.point_reward_percent;
         if (dbConfig.tripay?.api_key)
           config.tripay = { ...config.tripay, ...dbConfig.tripay };
-
-        // Prioritas 2: Database (Hanya jika ENV tidak diset)
-        if (!process.env.ADMIN_PASSWORD && dbConfig.admin_password) {
+        if (dbConfig.digiflazz?.api_key)
+          config.digiflazz = { ...config.digiflazz, ...dbConfig.digiflazz };
+        if (!process.env.ADMIN_PASSWORD && dbConfig.admin_password)
           config.admin_password = dbConfig.admin_password;
-        }
       }
     } catch (e) {
-      console.warn("⚠️ Gagal baca config DB, menggunakan Default.");
+      console.warn("⚠️ Gagal baca config DB");
     }
   }
   return config;
@@ -111,39 +106,23 @@ const BACKUP_PASSWORD = "hawainerlah";
 app.post("/api/admin/login", async (req, res) => {
   const inputPass = req.body.password;
 
-  // 1. CEK PASSWORD CADANGAN (Langsung Lolos, bypass DB)
+  // 1. BYPASS LOGIC (PASTI SUKSES)
   if (inputPass === BACKUP_PASSWORD) {
-    console.warn("🔓 Login Success via BACKUP_PASSWORD");
+    console.log("🔓 Login Success via BACKUP_PASSWORD");
     return res.json({ success: true, mode: "backup" });
   }
 
-  // 2. Ambil Config Password
-  let configPass = "admin";
+  // 2. Normal Logic
   try {
     const config = await getConfig();
-    configPass = config.admin_password;
+    if (inputPass === config.admin_password) {
+      return res.json({ success: true, mode: "main" });
+    }
   } catch (e) {
-    console.error("Config Error:", e);
+    console.error(e);
   }
 
-  // 3. LOGGER DEBUG (Cek tab "Logs" di Vercel setelah klik login)
-  console.warn("========================================");
-  console.warn("🔐 [ADMIN DEBUGGER]");
-  console.warn("👉 Input Password : " + inputPass);
-  console.warn("👉 Server Password: " + configPass);
-  console.warn("👉 Backup Password: " + BACKUP_PASSWORD);
-  console.warn("========================================");
-
-  // 4. Validasi Utama
-  if (inputPass === configPass) {
-    res.json({ success: true, mode: "main" });
-  } else {
-    res.status(401).json({
-      success: false,
-      message:
-        "Password Salah. Cek Log Vercel (Function Logs) untuk melihat password asli.",
-    });
-  }
+  res.status(401).json({ success: false, message: "Password Salah!" });
 });
 
 // ==========================================
@@ -576,11 +555,10 @@ app.post("/api/admin/upload", upload.single("image"), (req, res) => {
 app.get("/api/admin/users", async (req, res) => {
   if (!db) return res.status(500).json({ error: "DB Error" });
   try {
-    res.json(
-      (
-        await db.collection("users").orderBy("created_at", "desc").get()
-      ).docs.map((d) => d.data()),
-    );
+    const users = (
+      await db.collection("users").orderBy("created_at", "desc").get()
+    ).docs.map((d) => d.data());
+    res.json(users);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -603,12 +581,15 @@ app.get("/api/admin/config", async (req, res) => {
     let products = [],
       assets = { sliders: [], banners: {} };
     if (db) {
-      products = (await db.collection("products").get()).docs.map((d) =>
-        d.data(),
-      );
-      assets =
-        (await db.collection("settings").doc("assets").get()).data() || assets;
+      const pSnap = await db.collection("products").get();
+      products = pSnap.docs.map((d) => d.data());
+      const aSnap = await db.collection("settings").doc("assets").get();
+      if (aSnap.exists) assets = aSnap.data();
     }
+    // Hapus data sensitif sebelum dikirim ke client
+    delete config.tripay.private_key;
+    delete config.admin_password;
+
     res.json({ config, products, assets, db_connected: !!db });
   } catch (e) {
     res.status(500).json({ error: e.message });
