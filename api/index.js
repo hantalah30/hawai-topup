@@ -157,7 +157,6 @@ app.post("/api/topup-coin", async (req, res) => {
       { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
     );
 
-    // Simpan dengan ID Dokumen = Reference Tripay (agar mudah di-GET)
     await db
       .collection("transactions")
       .doc(tripayRes.data.data.reference)
@@ -216,13 +215,14 @@ app.post("/api/transaction", async (req, res) => {
       productName,
       nickname: safeNickname,
       user_id: customer_no,
-      user_uid: user_uid || null,
+      user_uid: user_uid || null, // Jika null, berarti Guest
       amount: parseInt(amount),
       method,
       status: "UNPAID",
       created_at: Date.now(),
     };
 
+    // --- PEMBAYARAN VIA COIN (Langsung Dapat Reward Jika Login) ---
     if (method === "HAWAI_COIN") {
       if (!user_uid)
         return res
@@ -237,11 +237,15 @@ app.post("/api/transaction", async (req, res) => {
         const currentCoins = userData.hawai_coins || 0;
         if (currentCoins < amount) throw new Error("Saldo tidak cukup");
 
+        // Kurangi Saldo
         t.update(userRef, { hawai_coins: currentCoins - parseInt(amount) });
+
         transactionData.status = "PAID";
         transactionData.paid_at = Date.now();
         t.set(db.collection("transactions").doc(merchantRef), transactionData);
       });
+
+      // Proses Digiflazz disini (Opsional)
 
       return res.json({
         success: true,
@@ -252,6 +256,7 @@ app.post("/api/transaction", async (req, res) => {
       });
     }
 
+    // --- PEMBAYARAN VIA TRIPAY ---
     const signature = crypto
       .createHmac("sha256", config.tripay.private_key)
       .update(config.tripay.merchant_code + merchantRef + amount)
@@ -323,7 +328,7 @@ app.get("/api/transaction/:ref", async (req, res) => {
 });
 
 // ==========================================
-// 4. [PENTING] CALLBACK HANDLER (Agar Status Update Otomatis)
+// 4. [PENTING] CALLBACK HANDLER & REWARD SYSTEM
 // ==========================================
 app.post("/api/callback", async (req, res) => {
   if (!db)
@@ -331,28 +336,21 @@ app.post("/api/callback", async (req, res) => {
 
   const config = await getConfig();
 
-  // 1. Ambil Signature dari Header
+  // 1. Validasi Signature
   const tripaySignature = req.headers["x-callback-signature"];
   const jsonBody = req.body;
-
-  // 2. Verifikasi Signature (Keamanan)
   const hmac = crypto
     .createHmac("sha256", config.tripay.private_key)
     .update(JSON.stringify(jsonBody))
     .digest("hex");
 
   if (tripaySignature !== hmac) {
-    console.error("Invalid Signature Callback");
     return res
       .status(400)
       .json({ success: false, message: "Invalid Signature" });
   }
 
-  // 3. Proses Data Callback
-  const event = req.headers["x-callback-event"]; // e.g., payment_status
-  const { reference, merchant_ref, status } = jsonBody;
-
-  console.log(`Callback Received: ${reference} -> ${status}`);
+  const { reference, status } = jsonBody;
 
   try {
     if (status === "PAID") {
@@ -362,34 +360,60 @@ app.post("/api/callback", async (req, res) => {
       if (doc.exists) {
         const data = doc.data();
 
-        // Update status transaksi
+        // Cek agar tidak memproses ulang transaksi yang sudah PAID
+        if (data.status === "PAID") {
+          return res.json({ success: true, message: "Already Paid" });
+        }
+
+        // Update status transaksi menjadi PAID
         await trxRef.update({
           status: "PAID",
           paid_at: Date.now(),
           last_update: Date.now(),
         });
 
-        // JIKA INI DEPOSIT COIN -> Tambahkan saldo ke user
-        if (
-          data.type === "DEPOSIT" &&
-          data.user_uid &&
-          data.status !== "PAID"
-        ) {
-          const userRef = db.collection("users").doc(data.user_uid);
-          await db.runTransaction(async (t) => {
-            const userDoc = await t.get(userRef);
-            if (userDoc.exists) {
-              const currentCoins = userDoc.data().hawai_coins || 0;
-              t.update(userRef, {
-                hawai_coins: currentCoins + parseInt(data.amount),
+        // ==========================================
+        // FITUR REWARD POINT (CASHBACK)
+        // ==========================================
+        if (data.type === "GAME_TOPUP" && data.user_uid) {
+          const rewardPercent = config.point_reward_percent || 5; // Default 5%
+          const points = Math.floor(
+            parseInt(data.amount) * (rewardPercent / 100),
+          );
+
+          if (points > 0) {
+            // Update saldo user secara atomic (Increment)
+            await db
+              .collection("users")
+              .doc(data.user_uid)
+              .update({
+                hawai_coins: admin.firestore.FieldValue.increment(points),
               });
-            }
-          });
-          console.log(`Deposit Success: ${data.user_uid} + ${data.amount}`);
+            console.log(
+              `[REWARD] Memberi ${points} coins ke user ${data.user_uid}`,
+            );
+          }
         }
 
-        // JIKA INI GAME TOPUP -> Proses ke Digiflazz (Opsional, perlu coding tambahan)
-        // if (data.type === 'GAME_TOPUP') { ... callDigiflazz() ... }
+        // ==========================================
+        // FITUR DEPOSIT SALDO (TOPUP COIN)
+        // ==========================================
+        if (data.type === "DEPOSIT" && data.user_uid) {
+          await db
+            .collection("users")
+            .doc(data.user_uid)
+            .update({
+              hawai_coins: admin.firestore.FieldValue.increment(
+                parseInt(data.amount),
+              ),
+            });
+          console.log(
+            `[DEPOSIT] Masuk ${data.amount} coins ke user ${data.user_uid}`,
+          );
+        }
+
+        // Disini bisa panggil API Digiflazz untuk proses item game
+        // await processDigiflazz(data);
       }
     } else if (status === "EXPIRED" || status === "FAILED") {
       await db.collection("transactions").doc(reference).update({
@@ -398,7 +422,7 @@ app.post("/api/callback", async (req, res) => {
       });
     }
 
-    res.json({ success: true }); // Respon wajib ke Tripay
+    res.json({ success: true });
   } catch (error) {
     console.error("Callback Error:", error);
     res.status(500).json({ success: false });
