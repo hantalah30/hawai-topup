@@ -2,97 +2,109 @@
 const API_BASE_URL = "";
 
 // Global State
-let db = {
-  config: { tripay: {}, digiflazz: {}, admin_password: "admin" },
+let dbState = {
+  config: { tripay: {}, digiflazz: {} },
   products: [],
   assets: { sliders: [], banners: {} },
 };
 
-// --- AUTH ---
-async function login() {
-  const passInput = document.getElementById("adminPass");
-  const btn = document.querySelector("#loginOverlay button");
+// Global User Token (untuk dikirim ke backend jika perlu otentikasi server-side nanti)
+let idToken = null;
 
-  if (!passInput) return;
-
-  const pass = passInput.value;
-  btn.innerText = "Loading...";
-  btn.disabled = true;
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pass }),
-    });
-    const data = await res.json();
-
-    if (data.success) {
+// --- AUTH (FIREBASE CLIENT) ---
+document.addEventListener("DOMContentLoaded", () => {
+  // Cek status login saat load
+  firebase.auth().onAuthStateChanged(async (user) => {
+    if (user) {
+      // User sudah login
       document.getElementById("loginOverlay").style.display = "none";
       document.getElementById("adminPanel").style.display = "block";
-      loadData(); // LOAD DATA SETELAH LOGIN SUKSES
+      document.getElementById("adminName").innerText =
+        user.displayName || user.email;
+
+      // Simpan token
+      idToken = await user.getIdToken();
+
+      // Load Data
+      loadData();
     } else {
-      alert("Password Salah! Gunakan 'hawainerlah' jika lupa.");
+      // Belum login
+      document.getElementById("loginOverlay").style.display = "flex";
+      document.getElementById("adminPanel").style.display = "none";
+      document.getElementById("authStatus").innerText = "Silakan login.";
     }
-  } catch (e) {
-    console.error(e);
-    alert("Gagal Login: Cek Koneksi");
-  } finally {
-    btn.innerText = "Masuk";
-    btn.disabled = false;
-  }
+  });
+});
+
+function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  document.getElementById("authStatus").innerText = "Membuka Popup...";
+
+  firebase
+    .auth()
+    .signInWithPopup(provider)
+    .catch((error) => {
+      alert("Login Gagal: " + error.message);
+      document.getElementById("authStatus").innerText = "Gagal.";
+    });
 }
 
 function logout() {
-  location.reload();
+  if (confirm("Keluar dari Admin Panel?")) {
+    firebase
+      .auth()
+      .signOut()
+      .then(() => location.reload());
+  }
 }
 
 // --- CORE DATA LOADER ---
 async function loadData() {
   try {
+    // Ambil data tanpa validasi password backend (karena sudah lolos Firebase Auth di frontend)
     const res = await fetch(`${API_BASE_URL}/api/admin/config`);
     const data = await res.json();
 
     if (data) {
-      if (data.config) db.config = data.config;
-      if (data.products) db.products = data.products; // LOAD PRODUK KE MEMORY
-      if (data.assets) db.assets = data.assets;
+      if (data.config) dbState.config = data.config;
+      if (data.products) dbState.products = data.products;
+      if (data.assets) dbState.assets = data.assets;
 
-      console.log("Data Loaded:", db.products.length, "products");
+      console.log("Data Loaded:", dbState.products.length, "products");
     }
 
     // ISI FORM CONFIG
-    if (db.config.digiflazz) {
-      const du = document.getElementById("digi_user");
-      const da = document.getElementById("digi_api");
-      if (du) du.value = db.config.digiflazz.username || "";
-      if (da) da.value = db.config.digiflazz.api_key || "";
+    if (dbState.config.digiflazz) {
+      setVal("digi_user", dbState.config.digiflazz.username);
+      setVal("digi_api", dbState.config.digiflazz.api_key);
     }
 
-    if (db.config.tripay) {
-      const tm = document.getElementById("tripay_merchant");
-      const ta = document.getElementById("tripay_api");
-      const tp = document.getElementById("tripay_private");
-      if (tm) tm.value = db.config.tripay.merchant_code || "";
-      if (ta) ta.value = db.config.tripay.api_key || "";
-      if (tp) tp.value = db.config.tripay.private_key || "";
+    if (dbState.config.tripay) {
+      setVal("tripay_merchant", dbState.config.tripay.merchant_code);
+      setVal("tripay_api", dbState.config.tripay.api_key);
+      setVal("tripay_private", dbState.config.tripay.private_key);
     }
 
     renderAssets();
     populateBrandFilter();
 
-    // Tampilkan 100 produk pertama agar tabel tidak kosong
-    renderProductTable(db.products.slice(0, 100));
+    // Tampilkan 100 produk pertama
+    renderProductTable(dbState.products.slice(0, 100));
   } catch (e) {
     console.error("Gagal load data:", e);
     alert("Gagal memuat data dari server.");
   }
 }
 
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val || "";
+}
+
 // --- PRODUCTS ---
 function populateBrandFilter() {
   const brands = [
-    ...new Set(db.products.map((p) => p.brand || "Lainnya")),
+    ...new Set(dbState.products.map((p) => p.brand || "Lainnya")),
   ].sort();
   const select = document.getElementById("filterBrand");
   if (!select) return;
@@ -113,7 +125,7 @@ function filterProducts() {
   const brand = brandEl.value;
   const search = (searchEl.value || "").toLowerCase();
 
-  const filtered = db.products.filter((p) => {
+  const filtered = dbState.products.filter((p) => {
     const pBrand = p.brand || "Lainnya";
     const matchBrand = brand === "ALL_DATA" || !brand || pBrand === brand;
     const matchSearch =
@@ -137,8 +149,7 @@ function renderProductTable(data) {
   }
 
   data.forEach((p) => {
-    // Cari index asli di array utama db.products agar update markup tersimpan benar
-    const realIndex = db.products.findIndex((item) => item.sku === p.sku);
+    const realIndex = dbState.products.findIndex((item) => item.sku === p.sku);
 
     let imgUrl = "assets/default.png";
     if (p.image && !p.image.includes("default")) {
@@ -149,7 +160,6 @@ function renderProductTable(data) {
     }
 
     const modal = parseInt(p.price_modal) || 0;
-    // Hitung markup: Jika di DB blm ada markup, hitung dari selisih jual - modal
     const currentMarkup =
       p.markup !== undefined
         ? parseInt(p.markup)
@@ -182,20 +192,20 @@ function toggleSelectAll(source) {
 }
 
 function updateMarkup(idx, val) {
-  if (db.products[idx]) {
+  if (dbState.products[idx]) {
     const markup = parseInt(val) || 0;
-    db.products[idx].markup = markup;
-    db.products[idx].price_sell =
-      (parseInt(db.products[idx].price_modal) || 0) + markup;
+    dbState.products[idx].markup = markup;
+    dbState.products[idx].price_sell =
+      (parseInt(dbState.products[idx].price_modal) || 0) + markup;
 
     const sellElem = document.getElementById(`sell-${idx}`);
     if (sellElem)
-      sellElem.innerText = `Rp ${db.products[idx].price_sell.toLocaleString()}`;
+      sellElem.innerText = `Rp ${dbState.products[idx].price_sell.toLocaleString()}`;
   }
 }
 
 function toggleActive(idx, checked) {
-  if (db.products[idx]) db.products[idx].is_active = checked;
+  if (dbState.products[idx]) dbState.products[idx].is_active = checked;
 }
 
 function triggerUpload(idx) {
@@ -214,8 +224,8 @@ async function uploadProdImg(input, idx) {
       body: formData,
     });
     const data = await res.json();
-    if (db.products[idx]) {
-      db.products[idx].image = data.filepath;
+    if (dbState.products[idx]) {
+      dbState.products[idx].image = data.filepath;
       filterProducts();
     }
   } catch (e) {
@@ -224,8 +234,8 @@ async function uploadProdImg(input, idx) {
 }
 
 function togglePromo(idx) {
-  if (db.products[idx]) {
-    db.products[idx].is_promo = !db.products[idx].is_promo;
+  if (dbState.products[idx]) {
+    dbState.products[idx].is_promo = !dbState.products[idx].is_promo;
     filterProducts();
   }
 }
@@ -265,10 +275,10 @@ async function processBulkImage(input) {
     const data = await res.json();
 
     selectedIndices.forEach((idx) => {
-      if (db.products[idx]) db.products[idx].image = data.filepath;
+      if (dbState.products[idx]) dbState.products[idx].image = data.filepath;
     });
 
-    await saveProducts(); // Auto Save setelah bulk upload
+    await saveProducts(); // Auto Save
     filterProducts();
     alert("✅ Gambar berhasil diupdate!");
   } catch (e) {
@@ -286,9 +296,11 @@ async function processBulkImage(input) {
 async function syncDigiflazz() {
   if (!confirm("Tarik data Digiflazz? Proses ini agak lama.")) return;
   const btn = document.getElementById("btnSync");
-  const oldHtml = btn.innerHTML;
-  btn.innerHTML = "⏳ Syncing...";
-  btn.disabled = true;
+  const oldHtml = btn ? btn.innerHTML : "Sync";
+  if (btn) {
+    btn.innerHTML = "⏳ Syncing...";
+    btn.disabled = true;
+  }
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/sync-digiflazz`, {
@@ -301,29 +313,35 @@ async function syncDigiflazz() {
   } catch (e) {
     alert("Gagal Sync: " + e.message);
   } finally {
-    btn.innerHTML = oldHtml;
-    btn.disabled = false;
+    if (btn) {
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
   }
 }
 
 async function saveProducts() {
   const btn = document.getElementById("btnSaveProd");
-  const oldHtml = btn.innerHTML;
-  btn.innerHTML = "Saving...";
-  btn.disabled = true;
+  const oldHtml = btn ? btn.innerHTML : "Save";
+  if (btn) {
+    btn.innerHTML = "Saving...";
+    btn.disabled = true;
+  }
 
   try {
     await fetch(`${API_BASE_URL}/api/admin/save-products`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(db.products),
+      body: JSON.stringify(dbState.products),
     });
     alert("✅ Data Produk Tersimpan!");
   } catch (e) {
     alert("Gagal menyimpan produk.");
   } finally {
-    btn.innerHTML = oldHtml;
-    btn.disabled = false;
+    if (btn) {
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
   }
 }
 
@@ -338,7 +356,6 @@ async function saveConfig() {
       api_key: document.getElementById("tripay_api").value,
       private_key: document.getElementById("tripay_private").value,
     },
-    admin_password: db.config.admin_password || "admin",
   };
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/save-config`, {
@@ -349,7 +366,7 @@ async function saveConfig() {
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "Unknown Server Error");
     alert("✅ Konfigurasi Tersimpan!");
-    db.config = cfg;
+    dbState.config = cfg;
   } catch (e) {
     alert("❌ ERROR: " + e.message);
   }
@@ -360,7 +377,7 @@ function renderAssets() {
   const sDiv = document.getElementById("sliderContainer");
   if (sDiv) {
     sDiv.innerHTML = "";
-    (db.assets.sliders || []).forEach((url, i) => {
+    (dbState.assets.sliders || []).forEach((url, i) => {
       let disp = url.startsWith("http") ? url : `${API_BASE_URL}/${url}`;
       sDiv.innerHTML += `<div class="position-relative"><img src="${disp}" style="width:120px;height:70px;object-fit:cover;border-radius:5px;"><button onclick="delSlider(${i})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0" style="border-radius:50%">&times;</button></div>`;
     });
@@ -369,11 +386,12 @@ function renderAssets() {
   if (bDiv) {
     bDiv.innerHTML = "";
     const brands = [
-      ...new Set(db.products.map((p) => p.brand || "Lainnya")),
+      ...new Set(dbState.products.map((p) => p.brand || "Lainnya")),
     ].sort();
     brands.forEach((b) => {
       const curr =
-        (db.assets.banners && db.assets.banners[b]) || "assets/default.png";
+        (dbState.assets.banners && dbState.assets.banners[b]) ||
+        "assets/default.png";
       const disp = curr.startsWith("http") ? curr : `${API_BASE_URL}/${curr}`;
       bDiv.innerHTML += `<div class="d-flex justify-content-between align-items-center mb-2 border p-2 rounded bg-white"><span class="small fw-bold text-dark">${b}</span><div class="d-flex gap-2 align-items-center"><img src="${disp}" style="width:60px;height:30px;object-fit:cover;"><label class="btn btn-sm btn-outline-primary py-0">Upload <input type="file" class="d-none" onchange="uploadBanner('${b}', this)"></label></div></div>`;
     });
@@ -394,8 +412,8 @@ async function uploadNewSlider() {
       body: formData,
     });
     const data = await res.json();
-    if (!db.assets.sliders) db.assets.sliders = [];
-    db.assets.sliders.push(data.filepath);
+    if (!dbState.assets.sliders) dbState.assets.sliders = [];
+    dbState.assets.sliders.push(data.filepath);
     renderAssets();
     saveAssets(true);
   } catch (e) {}
@@ -403,7 +421,7 @@ async function uploadNewSlider() {
 
 function delSlider(i) {
   if (confirm("Hapus slider?")) {
-    db.assets.sliders.splice(i, 1);
+    dbState.assets.sliders.splice(i, 1);
     renderAssets();
     saveAssets(true);
   }
@@ -420,8 +438,8 @@ async function uploadBanner(brand, input) {
       body: formData,
     });
     const data = await res.json();
-    if (!db.assets.banners) db.assets.banners = {};
-    db.assets.banners[brand] = data.filepath;
+    if (!dbState.assets.banners) dbState.assets.banners = {};
+    dbState.assets.banners[brand] = data.filepath;
     renderAssets();
     saveAssets(true);
   } catch (e) {}
@@ -432,7 +450,7 @@ async function saveAssets(silent = false) {
     await fetch(`${API_BASE_URL}/api/admin/save-assets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(db.assets),
+      body: JSON.stringify(dbState.assets),
     });
     if (!silent) alert("Asset tersimpan!");
   } catch (e) {
@@ -474,8 +492,8 @@ async function editBalance(uid) {
   }
 }
 
-// --- EXPOSE GLOBAL (Agar HTML bisa panggil) ---
-window.login = login;
+// EXPOSE TO WINDOW
+window.loginWithGoogle = loginWithGoogle;
 window.logout = logout;
 window.loadData = loadData;
 window.loadUsers = loadUsers;
