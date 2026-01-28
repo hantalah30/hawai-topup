@@ -6,7 +6,7 @@ let db = {
   config: {
     tripay: {},
     digiflazz: {},
-    admin_password: "admin",
+    admin_password: "hawaiminlah",
   },
   products: [],
   assets: { sliders: [], banners: {} },
@@ -457,7 +457,7 @@ async function saveConfig() {
       api_key: document.getElementById("tripay_api").value,
       private_key: document.getElementById("tripay_private").value,
     },
-    admin_password: db.config.admin_password || "admin",
+    admin_password: db.config.admin_password || "hawaiminlah",
   };
 
   try {
