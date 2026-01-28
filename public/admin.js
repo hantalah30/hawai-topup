@@ -1,501 +1,715 @@
-// Arahkan ke endpoint API relative path
-const API_BASE_URL = "";
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const crypto = require("crypto");
+const axios = require("axios");
+const multer = require("multer");
+const admin = require("firebase-admin");
 
-// Default state agar tidak undefined saat awal load
-let db = {
-  config: {
-    tripay: {},
-    digiflazz: {},
-    admin_password: "hawaiminlah",
-  },
-  products: [],
-  assets: { sliders: [], banners: {} },
-};
+const app = express();
 
-// --- AUTH ---
-async function login() {
-  const pass = document.getElementById("admin_password").value;
-  const btn = document.querySelector("#loginOverlay button");
-  const originalText = btn.innerText;
+// ==========================================
+// 1. SETUP FIREBASE (Vercel Friendly)
+// ==========================================
+let db = null;
+let dbError = "Menunggu Inisialisasi...";
 
-  btn.innerText = "Loading...";
-  btn.disabled = true;
-
+function initFirebase() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pass }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      document.getElementById("loginOverlay").style.display = "none";
-      document.getElementById("adminPanel").style.display = "block";
-      loadData();
-    } else {
-      alert("Password Salah");
-    }
-  } catch (e) {
-    alert("Gagal Login: Cek Koneksi / Server");
-  } finally {
-    btn.innerText = originalText;
-    btn.disabled = false;
-  }
-}
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-function logout() {
-  location.reload();
-}
-
-async function loadData() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/config`);
-    const data = await res.json();
-
-    // ALERT JIKA DB ERROR (PENTING!)
-    if (data.db_connected === false) {
-      alert(
-        "🚨 DATABASE ERROR: " +
-          (data.db_error || "Unknown Error") +
-          "\n\nPeriksa Environment Variables di Vercel (Private Key, Project ID, dll)!",
-      );
-    }
-
-    // UPDATE STATE
-    if (data) {
-      if (data.config) db.config = data.config;
-      if (data.products) db.products = data.products;
-      if (data.assets) db.assets = data.assets;
-    }
-
-    // FILL FORM
-    const conf = db.config || {};
-
-    if (conf.digiflazz) {
-      document.getElementById("digi_user").value =
-        conf.digiflazz.username || "";
-      document.getElementById("digi_api").value = conf.digiflazz.api_key || "";
-    }
-
-    if (conf.tripay) {
-      document.getElementById("tripay_merchant").value =
-        conf.tripay.merchant_code || "";
-      document.getElementById("tripay_api").value = conf.tripay.api_key || "";
-      document.getElementById("tripay_private").value =
-        conf.tripay.private_key || "";
-    }
-
-    renderAssets();
-    populateBrandFilter();
-    filterProducts();
-  } catch (e) {
-    console.error("Gagal load data:", e);
-    alert("Server Error saat memuat data.");
-  }
-}
-
-// --- PRODUCTS ---
-function populateBrandFilter() {
-  const brands = [
-    ...new Set(db.products.map((p) => p.brand || "Lainnya")),
-  ].sort();
-  const select = document.getElementById("filterBrand");
-
-  select.innerHTML =
-    '<option value="" disabled selected>-- Pilih Game --</option>';
-  select.innerHTML += '<option value="ALL_DATA">SEMUA DATA (BERAT)</option>';
-
-  brands.forEach(
-    (b) => (select.innerHTML += `<option value="${b}">${b}</option>`),
-  );
-}
-
-function filterProducts() {
-  const brand = document.getElementById("filterBrand").value;
-  const search = (
-    document.getElementById("searchSku").value || ""
-  ).toLowerCase();
-
-  if (!brand && !search) return;
-
-  const selectAll = document.getElementById("selectAll");
-  if (selectAll) selectAll.checked = false;
-
-  const filtered = db.products.filter((p) => {
-    const pBrand = p.brand || "Lainnya";
-    const matchBrand = brand === "ALL_DATA" || !brand || pBrand === brand;
-    const matchSearch =
-      (p.sku || "").toLowerCase().includes(search) ||
-      (p.name || "").toLowerCase().includes(search);
-    return matchBrand && matchSearch;
-  });
-
-  renderProductTable(filtered.slice(0, 200));
-}
-
-function renderProductTable(data) {
-  const tbody = document.getElementById("productTable");
-  tbody.innerHTML = "";
-
-  if (data.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="7" class="text-center py-3">Produk tidak ditemukan.</td></tr>';
-    return;
-  }
-
-  data.forEach((p) => {
-    const realIndex = db.products.findIndex((item) => item.sku === p.sku);
-
-    // --- PERBAIKAN LOGIKA GAMBAR ADMIN ---
-    let imgUrl = "assets/default.png";
-    if (p.image && !p.image.includes("default")) {
-      if (p.image.startsWith("http") || p.image.startsWith("data:")) {
-        // Support Link Luar & Base64
-        imgUrl = p.image;
-      } else {
-        // Support File Lokal
-        imgUrl = `${API_BASE_URL}/${p.image}`;
-      }
-    }
-
-    const modal = parseInt(p.price_modal) || 0;
-    const markup = parseInt(p.markup) || 0;
-    const jual = modal + markup;
-    const promoClass = p.is_promo
-      ? "text-danger fa-beat"
-      : "text-secondary opacity-25";
-
-    tbody.innerHTML += `
-            <tr class="${p.is_active ? "" : "table-light text-muted"}">
-                <td class="text-center">
-                    <input type="checkbox" class="form-check-input prod-select" value="${realIndex}">
-                </td>
-                <td>
-                    <img src="${imgUrl}" class="preview-img" onclick="triggerUpload(${realIndex})" title="Klik untuk ganti gambar">
-                    <input type="file" id="file-${realIndex}" class="d-none" onchange="uploadProdImg(this, ${realIndex})">
-                </td>
-                <td>
-                    <div class="fw-bold text-truncate" style="max-width: 250px;">${p.name}</div>
-                    <small class="sku-text">${p.sku} | ${p.brand}</small>
-                </td>
-                <td class="text-center" style="cursor: pointer;" onclick="togglePromo(${realIndex})">
-                    <i class="fas fa-fire ${promoClass} fs-5"></i>
-                </td>
-                <td>
-                    <input type="number" class="form-control form-control-sm" style="width:80px" 
-                        value="${markup}" onchange="updateMarkup(${realIndex}, this.value)">
-                </td>
-                <td class="fw-bold text-success" id="sell-${realIndex}">Rp ${jual.toLocaleString()}</td>
-                <td>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" ${p.is_active ? "checked" : ""} onchange="toggleActive(${realIndex}, this.checked)">
-                    </div>
-                </td>
-            </tr>
-        `;
-  });
-}
-
-// --- ACTIONS ---
-function toggleSelectAll(source) {
-  document
-    .querySelectorAll(".prod-select")
-    .forEach((cb) => (cb.checked = source.checked));
-}
-
-function updateMarkup(idx, val) {
-  if (db.products[idx]) {
-    const markup = parseInt(val) || 0;
-    db.products[idx].markup = markup;
-    db.products[idx].price_sell = (db.products[idx].price_modal || 0) + markup;
-    const sellElem = document.getElementById(`sell-${idx}`);
-    if (sellElem)
-      sellElem.innerText = `Rp ${db.products[idx].price_sell.toLocaleString()}`;
-  }
-}
-
-function toggleActive(idx, checked) {
-  if (db.products[idx]) db.products[idx].is_active = checked;
-}
-
-function triggerUpload(idx) {
-  const input = document.getElementById(`file-${idx}`);
-  if (input) input.click();
-}
-
-async function uploadProdImg(input, idx) {
-  const file = input.files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("image", file);
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    if (db.products[idx]) {
-      db.products[idx].image = data.filepath;
-      filterProducts();
-    }
-  } catch (e) {
-    alert("Gagal Upload Gambar");
-  }
-}
-
-function togglePromo(idx) {
-  if (db.products[idx]) {
-    db.products[idx].is_promo = !db.products[idx].is_promo;
-    filterProducts();
-  }
-}
-
-// --- BULK ACTION ---
-async function processBulkImage(input) {
-  const file = input.files[0];
-  if (!file) return;
-
-  const checkboxes = document.querySelectorAll(".prod-select:checked");
-  const selectedIndices = Array.from(checkboxes).map((cb) =>
-    parseInt(cb.value),
-  );
-
-  if (selectedIndices.length === 0) {
-    const currentBrand = document.getElementById("filterBrand").value;
-    if (!currentBrand) return alert("Pilih Kategori Game atau centang produk!");
-    if (
-      !confirm(
-        `⚠️ Ganti gambar untuk SEMUA PRODUK di kategori ${currentBrand}?`,
-      )
-    ) {
-      input.value = "";
+    if (!projectId || !clientEmail || !privateKey) {
+      console.error("❌ CRITICAL: Env Vars Firebase tidak ditemukan!");
+      dbError = "Env Vars Missing in Vercel";
       return;
     }
-    document
-      .querySelectorAll(".prod-select")
-      .forEach((cb) => selectedIndices.push(parseInt(cb.value)));
-  } else {
-    if (
-      !confirm(`Ganti gambar untuk ${selectedIndices.length} produk terpilih?`)
-    ) {
-      input.value = "";
-      return;
+
+    if (privateKey.indexOf("\\n") >= 0) {
+      privateKey = privateKey.replace(/\\n/g, "\n");
     }
-  }
 
-  const btn = document.querySelector('button[onclick*="bulkImgInput"]');
-  const originalHtml = btn.innerHTML;
-  btn.innerHTML = "⏳ Uploading...";
-  btn.disabled = true;
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
 
-  try {
-    const formData = new FormData();
-    formData.append("image", file);
-    const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+    }
 
-    selectedIndices.forEach((idx) => {
-      if (db.products[idx]) db.products[idx].image = data.filepath;
-    });
-    await saveProducts();
-    filterProducts();
-    alert("✅ Gambar berhasil diupdate!");
-  } catch (e) {
-    alert("Gagal update massal.");
-  } finally {
-    input.value = "";
-    btn.innerHTML = originalHtml;
-    btn.disabled = false;
+    db = admin.firestore();
+    db.settings({ ignoreUndefinedProperties: true });
+
+    dbError = null;
+    console.log("🔥 Firebase Connected!");
+  } catch (error) {
+    dbError = error.message;
+    console.error("❌ Firebase Init Error:", error);
   }
 }
 
-// --- SERVER SYNC & SAVE ---
-async function syncDigiflazz() {
-  if (!confirm("Tarik data Digiflazz?")) return;
-  const btn = document.getElementById("btnSync");
-  const oldHtml = btn.innerHTML;
-  btn.innerHTML = "⏳ Syncing...";
-  btn.disabled = true;
+initFirebase();
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/sync-digiflazz`, {
-      method: "POST",
-    });
-    const data = await res.json();
+// ==========================================
+// 2. MIDDLEWARE
+// ==========================================
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+const upload = multer({ storage: multer.memoryStorage() });
 
-    if (!res.ok)
-      throw new Error(data.message || data.error || "Server Error 500");
-
-    alert(data.message);
-    loadData();
-  } catch (e) {
-    alert("Gagal Sync: " + e.message);
-  } finally {
-    btn.innerHTML = oldHtml;
-    btn.disabled = false;
-  }
-}
-
-async function deleteAllProducts() {
-  alert("Fitur Reset dimatikan demi keamanan.");
-}
-
-async function saveProducts() {
-  const btn = document.getElementById("btnSaveProd");
-  const oldHtml = btn.innerHTML;
-  btn.innerHTML = "Saving...";
-  btn.disabled = true;
-
-  try {
-    await fetch(`${API_BASE_URL}/api/admin/save-products`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(db.products),
-    });
-    alert("✅ Data Produk Tersimpan!");
-  } catch (e) {
-    alert("Gagal menyimpan produk.");
-  } finally {
-    btn.innerHTML = oldHtml;
-    btn.disabled = false;
-  }
-}
-
-// --- ASSETS & CONFIG ---
-function renderAssets() {
-  const sDiv = document.getElementById("sliderContainer");
-  if (sDiv) {
-    sDiv.innerHTML = "";
-    (db.assets.sliders || []).forEach((url, i) => {
-      let disp = url.startsWith("http") ? url : `${API_BASE_URL}/${url}`;
-      sDiv.innerHTML += `<div class="position-relative"><img src="${disp}" style="width:120px;height:70px;object-fit:cover;border-radius:5px;"><button onclick="delSlider(${i})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0" style="border-radius:50%">&times;</button></div>`;
-    });
-  }
-  const bDiv = document.getElementById("bannerContainer");
-  if (bDiv) {
-    bDiv.innerHTML = "";
-    const brands = [
-      ...new Set(db.products.map((p) => p.brand || "Lainnya")),
-    ].sort();
-    brands.forEach((b) => {
-      const curr =
-        (db.assets.banners && db.assets.banners[b]) || "assets/default.png";
-      const disp = curr.startsWith("http") ? curr : `${API_BASE_URL}/${curr}`;
-      bDiv.innerHTML += `<div class="d-flex justify-content-between align-items-center mb-2 border p-2 rounded bg-white"><span class="small fw-bold text-dark">${b}</span><div class="d-flex gap-2 align-items-center"><img src="${disp}" style="width:60px;height:30px;object-fit:cover;"><label class="btn btn-sm btn-outline-primary py-0">Upload <input type="file" class="d-none" onchange="uploadBanner('${b}', this)"></label></div></div>`;
-    });
-  }
-}
-
-async function uploadNewSlider() {
-  const file = document.getElementById("uploadSlider").files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("image", file);
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    if (!db.assets.sliders) db.assets.sliders = [];
-    db.assets.sliders.push(data.filepath);
-    renderAssets();
-    saveAssets(true);
-  } catch (e) {}
-}
-
-function delSlider(i) {
-  if (confirm("Hapus slider?")) {
-    db.assets.sliders.splice(i, 1);
-    renderAssets();
-    saveAssets(true);
-  }
-}
-
-async function uploadBanner(brand, input) {
-  const file = input.files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("image", file);
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    if (!db.assets.banners) db.assets.banners = {};
-    db.assets.banners[brand] = data.filepath;
-    renderAssets();
-    saveAssets(true);
-  } catch (e) {}
-}
-
-async function saveAssets(silent = false) {
-  try {
-    await fetch(`${API_BASE_URL}/api/admin/save-assets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(db.assets),
-    });
-    if (!silent) alert("Asset tersimpan!");
-  } catch (e) {
-    if (!silent) alert("Gagal simpan asset");
-  }
-}
-
-async function saveConfig() {
-  const cfg = {
-    digiflazz: {
-      username: document.getElementById("digi_user").value,
-      api_key: document.getElementById("digi_api").value,
-    },
+// --- Helper Config ---
+async function getConfig() {
+  // 1. Ambil dari Environment Variables (PRIORITAS UTAMA UNTUK PASSWORD)
+  let config = {
     tripay: {
-      merchant_code: document.getElementById("tripay_merchant").value,
-      api_key: document.getElementById("tripay_api").value,
-      private_key: document.getElementById("tripay_private").value,
+      merchant_code: process.env.TRIPAY_MERCHANT_CODE,
+      api_key: process.env.TRIPAY_API_KEY,
+      private_key: process.env.TRIPAY_PRIVATE_KEY,
     },
-    admin_password: db.config.admin_password || "hawaiminlah",
+    point_reward_percent: 5,
+    admin_password: process.env.ADMIN_PASSWORD || "admin", // Default jika ENV kosong
   };
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/save-config`, {
-      method: "POST",
-      headers: { "Content-Type": "applicaation/json" },
-      body: JSON.stringify(cfg),
+  // 2. Timpa dengan data DB (KECUALI PASSWORD jika ENV ada)
+  if (db) {
+    try {
+      const doc = await db.collection("settings").doc("general").get();
+      if (doc.exists) {
+        const dbConfig = doc.data();
+
+        // Config Reward
+        if (dbConfig.point_reward_percent)
+          config.point_reward_percent = dbConfig.point_reward_percent;
+
+        // Config Tripay (Prioritaskan DB jika user update dari admin panel)
+        if (dbConfig.tripay?.api_key)
+          config.tripay = { ...config.tripay, ...dbConfig.tripay };
+
+        // [FIX] Logika Password:
+        // Jika di .env (Vercel) TIDAK ADA password, baru ambil dari DB.
+        // Jika di .env ADA password, GUNAKAN ITU (Abaikan DB).
+        if (!process.env.ADMIN_PASSWORD && dbConfig.admin_password) {
+          config.admin_password = dbConfig.admin_password;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Gagal baca config DB, menggunakan ENV.");
+    }
+  }
+  return config;
+}
+
+// Ubah ke "api" jika sudah Production
+const TRIPAY_MODE = "api-sandbox";
+
+// ==========================================
+// 3. ROUTES TRANSAKSI
+// ==========================================
+
+// A. Create Transaction (Topup Coin)
+app.post("/api/topup-coin", async (req, res) => {
+  if (!db)
+    return res
+      .status(500)
+      .json({ success: false, message: "Database Error: " + dbError });
+
+  const config = await getConfig();
+  if (!config.tripay.private_key || !config.tripay.api_key) {
+    return res.status(500).json({
+      success: false,
+      message: "Server Config Error: Tripay Keys Missing",
     });
+  }
 
-    const json = await res.json();
+  const { amount, method, user_uid, user_name } = req.body;
 
-    if (!res.ok) {
-      // TAMPILKAN ERROR ASLI DARI GOOGLE / FIREBASE
-      throw new Error(json.error || json.message || "Unknown Server Error");
+  if (!user_uid)
+    return res.status(400).json({ success: false, message: "Login Required" });
+
+  try {
+    const merchantRef =
+      "DEP-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
+
+    const signature = crypto
+      .createHmac("sha256", config.tripay.private_key)
+      .update(config.tripay.merchant_code + merchantRef + amount)
+      .digest("hex");
+
+    const payload = {
+      method,
+      merchant_ref: merchantRef,
+      amount,
+      customer_name: user_name || "User",
+      customer_email: "user@hawai.com",
+      customer_phone: "08123456789",
+      order_items: [
+        {
+          sku: "DEPOSIT_COIN",
+          name: "Topup HAWAI Coin",
+          price: parseInt(amount),
+          quantity: 1,
+        },
+      ],
+      return_url: "https://hawai-topup.vercel.app/",
+      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      signature,
+    };
+
+    console.log(`Sending to Tripay (${TRIPAY_MODE}):`, JSON.stringify(payload));
+
+    const tripayRes = await axios.post(
+      `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
+      payload,
+      { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
+    );
+
+    // Simpan dengan ID Dokumen = Reference Tripay (agar mudah di-GET)
+    await db
+      .collection("transactions")
+      .doc(tripayRes.data.data.reference)
+      .set({
+        ref_id: tripayRes.data.data.reference,
+        merchant_ref: merchantRef,
+        type: "DEPOSIT",
+        user_uid: user_uid,
+        amount: parseInt(amount),
+        method: method,
+        status: "UNPAID",
+        checkout_url: tripayRes.data.data.checkout_url,
+        qr_url: tripayRes.data.data.qr_url,
+        pay_code: tripayRes.data.data.pay_code,
+        created_at: Date.now(),
+      });
+
+    res.json({ success: true, data: tripayRes.data.data });
+  } catch (e) {
+    console.error("Topup Coin Error:", e.response?.data || e.message);
+    const msg = e.response?.data?.message || e.message;
+    res.status(500).json({ success: false, message: "Tripay Error: " + msg });
+  }
+});
+
+// B. Create Transaction (Game Topup)
+app.post("/api/transaction", async (req, res) => {
+  if (!db)
+    return res
+      .status(500)
+      .json({ success: false, message: "Database Error: " + dbError });
+
+  const config = await getConfig();
+  if (!config.tripay.private_key)
+    return res
+      .status(500)
+      .json({ success: false, message: "Tripay Private Key Missing" });
+
+  const { sku, amount, customer_no, method, nickname, game, user_uid } =
+    req.body;
+
+  try {
+    const productDoc = await db.collection("products").doc(sku).get();
+    const productName = productDoc.exists
+      ? productDoc.data().name
+      : "Topup Game";
+    const merchantRef =
+      "INV-" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 100);
+    const safeNickname = nickname || "-";
+
+    let transactionData = {
+      ref_id: merchantRef,
+      merchant_ref: merchantRef,
+      type: "GAME_TOPUP",
+      game,
+      productName,
+      nickname: safeNickname,
+      user_id: customer_no,
+      user_uid: user_uid || null,
+      amount: parseInt(amount),
+      method,
+      status: "UNPAID",
+      created_at: Date.now(),
+    };
+
+    if (method === "HAWAI_COIN") {
+      if (!user_uid)
+        return res
+          .status(400)
+          .json({ success: false, message: "Login required" });
+
+      const userRef = db.collection("users").doc(user_uid);
+      await db.runTransaction(async (t) => {
+        const userDoc = await t.get(userRef);
+        if (!userDoc.exists) throw new Error("User not found");
+        const userData = userDoc.data();
+        const currentCoins = userData.hawai_coins || 0;
+        if (currentCoins < amount) throw new Error("Saldo tidak cukup");
+
+        t.update(userRef, { hawai_coins: currentCoins - parseInt(amount) });
+        transactionData.status = "PAID";
+        transactionData.paid_at = Date.now();
+        t.set(db.collection("transactions").doc(merchantRef), transactionData);
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          reference: merchantRef,
+          checkout_url: `https://hawai-topup.vercel.app/invoice.html?ref=${merchantRef}`,
+        },
+      });
     }
 
-    alert("✅ Konfigurasi Tersimpan!");
-    db.config = cfg;
-  } catch (e) {
-    alert("❌ ERROR: " + e.message);
-  }
-}
+    const signature = crypto
+      .createHmac("sha256", config.tripay.private_key)
+      .update(config.tripay.merchant_code + merchantRef + amount)
+      .digest("hex");
 
-// Tambahkan fungsi ini di admin.js
-async function loadUsers() {
-  const res = await fetch(`${API_BASE_URL}/api/admin/users`);
-  const users = await res.json();
-  const tbody = document.getElementById("userTableBody");
-  tbody.innerHTML = "";
-  users.forEach((u) => {
-    tbody.innerHTML += `
-        <tr>
-            <td>${u.name}</td>
-            <td>${u.email}</td>
-            <td>${(u.hawai_coins || 0).toLocaleString()}</td>
-            <td>
-                <button class="btn btn-sm btn-primary" onclick="editBalance('${u.uid}')">Edit Saldo</button>
-            </td>
-        </tr>`;
-  });
-}
+    const payload = {
+      method,
+      merchant_ref: merchantRef,
+      amount: parseInt(amount),
+      customer_name: safeNickname,
+      customer_email: "cust@email.com",
+      customer_phone: customer_no,
+      order_items: [
+        { sku, name: productName, price: parseInt(amount), quantity: 1 },
+      ],
+      return_url: "https://hawai-topup.vercel.app/invoice.html",
+      expired_time: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      signature,
+    };
+
+    const tripayRes = await axios.post(
+      `https://tripay.co.id/${TRIPAY_MODE}/transaction/create`,
+      payload,
+      { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
+    );
+
+    const data = tripayRes.data.data;
+
+    await db
+      .collection("transactions")
+      .doc(data.reference)
+      .set({
+        ...transactionData,
+        ref_id: data.reference,
+        qr_url: data.qr_url,
+        pay_code: data.pay_code,
+        checkout_url: data.checkout_url,
+      });
+
+    res.json({ success: true, data: { ...data, ref_id: data.reference } });
+  } catch (error) {
+    console.error("Trx Error:", error.response?.data || error.message);
+    const msg = error.response?.data?.message || error.message;
+    res.status(500).json({ success: false, message: "Gagal: " + msg });
+  }
+});
+
+// C. GET Detail Transaksi
+app.get("/api/transaction/:ref", async (req, res) => {
+  if (!db)
+    return res.status(500).json({ success: false, message: "Database Error" });
+
+  const { ref } = req.params;
+
+  try {
+    const doc = await db.collection("transactions").doc(ref).get();
+
+    if (!doc.exists) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Transaksi tidak ditemukan" });
+    }
+
+    res.json({ success: true, data: doc.data() });
+  } catch (error) {
+    console.error("Get Trx Error:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+// ==========================================
+// 4. [PENTING] CALLBACK HANDLER & REWARD SYSTEM
+// ==========================================
+app.post("/api/callback", async (req, res) => {
+  if (!db)
+    return res.status(500).json({ success: false, message: "Database Error" });
+
+  const config = await getConfig();
+
+  const tripaySignature = req.headers["x-callback-signature"];
+  const jsonBody = req.body;
+  const hmac = crypto
+    .createHmac("sha256", config.tripay.private_key)
+    .update(JSON.stringify(jsonBody))
+    .digest("hex");
+
+  if (tripaySignature !== hmac) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid Signature" });
+  }
+
+  const { reference, status } = jsonBody;
+
+  try {
+    if (status === "PAID") {
+      const trxRef = db.collection("transactions").doc(reference);
+      const doc = await trxRef.get();
+
+      if (doc.exists) {
+        const data = doc.data();
+
+        if (data.status === "PAID") {
+          return res.json({ success: true, message: "Already Paid" });
+        }
+
+        await trxRef.update({
+          status: "PAID",
+          paid_at: Date.now(),
+          last_update: Date.now(),
+        });
+
+        // REWARD SYSTEM
+        if (data.type === "GAME_TOPUP" && data.user_uid) {
+          const rewardPercent = config.point_reward_percent || 5;
+          const points = Math.floor(
+            parseInt(data.amount) * (rewardPercent / 100),
+          );
+
+          if (points > 0) {
+            await db
+              .collection("users")
+              .doc(data.user_uid)
+              .update({
+                hawai_coins: admin.firestore.FieldValue.increment(points),
+              });
+          }
+        }
+
+        // DEPOSIT SYSTEM
+        if (data.type === "DEPOSIT" && data.user_uid) {
+          await db
+            .collection("users")
+            .doc(data.user_uid)
+            .update({
+              hawai_coins: admin.firestore.FieldValue.increment(
+                parseInt(data.amount),
+              ),
+            });
+        }
+      }
+    } else if (status === "EXPIRED" || status === "FAILED") {
+      await db.collection("transactions").doc(reference).update({
+        status: status,
+        last_update: Date.now(),
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Callback Error:", error);
+    res.status(500).json({ success: false });
+  }
+});
+
+// ==========================================
+// 5. PUBLIC ROUTES LAINNYA
+// ==========================================
+
+app.get("/api/init-data", async (req, res) => {
+  if (!db) return res.json({ sliders: [], banners: {}, products: [] });
+  try {
+    const productsSnap = await db
+      .collection("products")
+      .where("is_active", "==", true)
+      .get();
+    const products = productsSnap.docs.map((doc) => doc.data());
+    let assets = { sliders: [], banners: {} };
+    try {
+      const doc = await db.collection("settings").doc("assets").get();
+      if (doc.exists) assets = doc.data();
+    } catch (e) {}
+    const config = await getConfig();
+    res.json({
+      sliders: assets.sliders,
+      banners: assets.banners,
+      products,
+      reward_percent: config.point_reward_percent,
+    });
+  } catch (e) {
+    console.error(e);
+    res.json({ sliders: [], banners: {}, products: [] });
+  }
+});
+
+app.get("/api/channels", async (req, res) => {
+  const config = await getConfig();
+  try {
+    const manualChannels = [
+      {
+        code: "HAWAI_COIN",
+        name: "HAWAI Coin (Saldo Akun)",
+        group: "Balance",
+        icon_url: "https://cdn-icons-png.flaticon.com/512/8562/8562294.png",
+        total_fee: { flat: 0, percent: 0 },
+      },
+    ];
+    let tripayChannels = [];
+    if (config.tripay.api_key) {
+      const response = await axios.get(
+        `https://tripay.co.id/${TRIPAY_MODE}/merchant/payment-channel`,
+        { headers: { Authorization: `Bearer ${config.tripay.api_key}` } },
+      );
+      tripayChannels = response.data.data || [];
+    }
+    res.json({ success: true, data: [...manualChannels, ...tripayChannels] });
+  } catch (error) {
+    console.error("Channel Error:", error.message);
+    res.json({ success: true, data: [] });
+  }
+});
+
+app.post("/api/check-nickname", async (req, res) => {
+  const { game, id, zone } = req.body;
+  try {
+    let apiUrl = "";
+    if (game && game.toLowerCase().includes("mobile"))
+      apiUrl = `https://api.isan.eu.org/nickname/ml?id=${id}&zone=${zone}`;
+    else if (game && game.toLowerCase().includes("free"))
+      apiUrl = `https://api.isan.eu.org/nickname/ff?id=${id}`;
+    else return res.json({ success: true, name: "Gamer" });
+
+    const response = await axios.get(apiUrl);
+    if (response.data.success)
+      return res.json({ success: true, name: response.data.name });
+    return res.json({ success: false, message: "ID Tidak Ditemukan" });
+  } catch (e) {
+    res.json({ success: false, message: "Gagal Cek ID" });
+  }
+});
+
+app.post("/api/auth/google", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database Error" });
+  const { idToken } = req.body;
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    const email = decodedToken.email;
+    const name = decodedToken.name || "User";
+    const picture = decodedToken.picture || "";
+    const userRef = db.collection("users").doc(uid);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+      await userRef.set({
+        uid,
+        email,
+        name,
+        picture,
+        hawai_coins: 0,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await userRef.update({ name, picture, email });
+    }
+    const userData = (await userRef.get()).data();
+    res.json({ success: true, user: userData });
+  } catch (error) {
+    console.error("Auth Error:", error);
+    res.status(401).json({ success: false, message: "Invalid Token" });
+  }
+});
+
+app.get("/api/user/:uid", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database Error" });
+  try {
+    const userDoc = await db.collection("users").doc(req.params.uid).get();
+    if (!userDoc.exists)
+      return res.status(404).json({ message: "User not found" });
+    res.json({ success: true, user: userDoc.data() });
+  } catch (e) {
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// [LOGIN ADMIN DENGAN LOG]
+app.post("/api/admin/login", async (req, res) => {
+  const config = await getConfig();
+
+  // Debug Log (Cek di Vercel Logs)
+  console.log("Login Attempt:");
+  console.log("- Input:", req.body.password);
+  console.log("- Expected:", config.admin_password);
+  console.log("- Source ENV:", process.env.ADMIN_PASSWORD ? "YES" : "NO");
+
+  if (req.body.password === config.admin_password) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false });
+  }
+});
+
+// --- ADMIN FEATURES ---
+app.post("/api/admin/save-config", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Init Failed: " + dbError });
+  try {
+    await db
+      .collection("settings")
+      .doc("general")
+      .set(req.body, { merge: true });
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Save Error:", e.message);
+    res.status(500).json({ error: "Gagal Simpan ke DB: " + e.message });
+  }
+});
+
+app.post("/api/admin/save-products", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    const batch = db.batch();
+    req.body.forEach((p) => batch.set(db.collection("products").doc(p.sku), p));
+    await batch.commit();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/save-assets", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    await db.collection("settings").doc("assets").set(req.body);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/sync-digiflazz", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "Database Error: " + dbError });
+  const config = await getConfig();
+  const { username, api_key } = config.digiflazz;
+  if (!username || !api_key)
+    return res.status(400).json({ message: "API Key Kosong" });
+
+  try {
+    const sign = crypto
+      .createHash("md5")
+      .update(username + api_key + "pricelist")
+      .digest("hex");
+    const response = await axios.post(
+      "https://api.digiflazz.com/v1/price-list",
+      { cmd: "prepaid", username, sign },
+    );
+
+    if (!response.data || !Array.isArray(response.data.data)) {
+      throw new Error("Respon Digiflazz Gagal");
+    }
+
+    const gameProducts = response.data.data.filter(
+      (item) => item.category === "Games",
+    );
+    const chunkSize = 100;
+    for (let i = 0; i < gameProducts.length; i += chunkSize) {
+      const batch = db.batch();
+      const chunk = gameProducts.slice(i, i + chunkSize);
+      chunk.forEach((item) => {
+        const sku = item.buyer_sku_code;
+        const newData = {
+          sku: sku,
+          name: item.product_name,
+          brand: item.brand,
+          category: item.category,
+          price_modal: item.price,
+          price_sell: item.price + 1000,
+          image: "assets/default.png",
+          is_active: false,
+          is_promo: false,
+        };
+        batch.set(db.collection("products").doc(sku), newData, { merge: true });
+      });
+      await batch.commit();
+    }
+    res.json({
+      success: true,
+      message: `Sukses Sync ${gameProducts.length} Produk!`,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "Sync Error: " + error.message });
+  }
+});
+
+app.post("/api/admin/upload", upload.single("image"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file" });
+  const b64 = Buffer.from(req.file.buffer).toString("base64");
+  res.json({ filepath: `data:${req.file.mimetype};base64,${b64}` });
+});
+
+app.get("/api/admin/users", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  try {
+    const snap = await db
+      .collection("users")
+      .orderBy("created_at", "desc")
+      .get();
+    const users = snap.docs.map((d) => d.data());
+    res.json(users);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/admin/update-balance", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB Error" });
+  const { uid, newBalance } = req.body;
+  try {
+    await db
+      .collection("users")
+      .doc(uid)
+      .update({ hawai_coins: parseInt(newBalance) });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/admin/config", async (req, res) => {
+  try {
+    const config = await getConfig();
+    let products = [];
+    let assets = { sliders: [], banners: {} };
+
+    if (db) {
+      try {
+        const pSnap = await db.collection("products").get();
+        products = pSnap.docs.map((doc) => doc.data());
+        const aDoc = await db.collection("settings").doc("assets").get();
+        if (aDoc.exists) assets = aDoc.data();
+      } catch (e) {
+        return res.json({
+          config,
+          products: [],
+          assets: {},
+          db_connected: false,
+          db_error: e.message,
+        });
+      }
+    }
+    res.json({ config, products, assets, db_connected: !!db });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+module.exports = app;
