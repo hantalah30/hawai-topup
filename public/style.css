@@ -131,7 +131,6 @@ body {
   color: var(--accent);
 }
 
-/* Hacker Text Effect Class */
 .hacker-text {
   font-family: var(--font-mono);
   display: inline-block;
@@ -209,6 +208,120 @@ body {
    4. UI COMPONENTS
    ========================================= */
 
+/* --- PRELOADER (NEW) --- */
+#preloader {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease-out;
+}
+
+.loader-content {
+  text-align: center;
+  width: 300px;
+  font-family: var(--font-mono);
+}
+
+.loader-logo {
+  font-size: 4rem;
+  color: var(--primary);
+  margin-bottom: 20px;
+  animation: loaderPulse 1s infinite alternate;
+}
+
+.loader-text {
+  font-size: 1rem;
+  color: #fff;
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+}
+
+.loader-bar-bg {
+  width: 100%;
+  height: 4px;
+  background: #222;
+  position: relative;
+  overflow: hidden;
+}
+
+.loader-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  animation: loaderFill 2.5s ease-in-out forwards;
+  box-shadow: 0 0 15px var(--primary);
+}
+
+.loader-logs {
+  margin-top: 15px;
+  text-align: left;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.loader-logs p {
+  opacity: 0;
+  animation: logFade 0.5s forwards;
+}
+
+.loader-logs p:nth-child(1) {
+  animation-delay: 0.5s;
+}
+
+.loader-logs p:nth-child(2) {
+  animation-delay: 1.2s;
+}
+
+.loader-logs p:nth-child(3) {
+  animation-delay: 1.8s;
+}
+
+@keyframes loaderPulse {
+  from {
+    opacity: 0.5;
+    text-shadow: 0 0 0 transparent;
+  }
+
+  to {
+    opacity: 1;
+    text-shadow: 0 0 20px var(--primary);
+  }
+}
+
+@keyframes loaderFill {
+  0% {
+    width: 0%;
+  }
+
+  40% {
+    width: 30%;
+  }
+
+  70% {
+    width: 80%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes logFade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* --- BUTTONS --- */
 .btn-neon {
   background: rgba(0, 243, 255, 0.1);
@@ -251,7 +364,6 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  /* Increased height to accommodate ticker */
   height: 110px;
   background: rgba(5, 5, 10, 0.8);
   backdrop-filter: blur(12px);
@@ -307,7 +419,6 @@ body {
   margin: 0 auto;
   padding: 0 20px;
   height: 80px;
-  /* Rest of header */
 }
 
 /* Brand */
@@ -415,9 +526,7 @@ body {
 /* --- MAIN VIEWPORT --- */
 #viewport {
   padding-top: calc(110px + 20px);
-  /* adjusted for thicker header */
   padding-bottom: 120px;
-  /* Space for dock */
   min-height: 100vh;
 }
 
@@ -489,10 +598,33 @@ body {
   font-family: var(--font-head);
   font-size: 1.5rem;
   color: var(--text-main);
-  border-left: 4px solid var(--primary);
   padding-left: 15px;
   margin-bottom: 25px;
   text-transform: uppercase;
+  position: relative;
+  display: inline-block;
+}
+
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+}
+
+.section-title::after {
+  /* Tech deco line */
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  right: -50px;
+  width: 40px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), transparent);
 }
 
 .grid-games {
@@ -510,7 +642,6 @@ body {
   aspect-ratio: 3/4;
   cursor: pointer;
   transition: all 0.1s;
-  /* Faster for tilt */
   border: 1px solid transparent;
   background: #000;
   transform-style: preserve-3d;
@@ -544,7 +675,6 @@ body {
   padding: 15px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
   transform: translateZ(20px);
-  /* Pop out effect */
 }
 
 .gc-name {
@@ -559,6 +689,47 @@ body {
   font-size: 0.7rem;
   color: var(--primary);
 }
+
+/* --- RANK BADGES (NEW) --- */
+.rank-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50px;
+  height: 50px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: 5;
+  background: linear-gradient(135deg, var(--border-glass), transparent);
+  pointer-events: none;
+}
+
+.rank-badge::after {
+  content: attr(data-rank);
+  position: absolute;
+  top: 5px;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-weight: 900;
+  font-size: 1.2rem;
+  color: #fff;
+  text-shadow: 1px 1px 2px #000;
+}
+
+.rank-badge.rank-1 {
+  background: linear-gradient(135deg, #FFD700, transparent);
+}
+
+/* Gold */
+.rank-badge.rank-2 {
+  background: linear-gradient(135deg, #C0C0C0, transparent);
+}
+
+/* Silver */
+.rank-badge.rank-3 {
+  background: linear-gradient(135deg, #CD7F32, transparent);
+}
+
+/* Bronze */
 
 /* --- ORDER PAGE --- */
 .game-hero-banner {
@@ -680,7 +851,7 @@ body {
   transition: 0.3s;
 }
 
-/* Variant: Hot Deals */
+/* Variants */
 @keyframes pulse-hot {
   0% {
     box-shadow: 0 0 10px rgba(255, 69, 0, 0.4);
@@ -746,7 +917,6 @@ body {
   opacity: 1;
 }
 
-/* Variant: Membership */
 @keyframes shine-mem {
   0% {
     left: -150%;
@@ -1031,8 +1201,6 @@ body {
   .dock-nav {
     display: none;
   }
-
-  /* Hide dock on desktop usually, or style differently */
 }
 
 @media (max-width: 768px) {
@@ -1055,7 +1223,6 @@ body {
     grid-template-columns: 1fr 1fr;
   }
 
-  /* Disable custom cursor on mobile */
   * {
     cursor: auto !important;
   }
@@ -1072,16 +1239,11 @@ body {
   }
 }
 
-/* =========================================
-   5. NEW UPGRADES (Notifications, Search, Footer)
-   ========================================= */
-
-/* --- Cyber Toast (Notification) --- */
+/* --- TOASTS / FOOTER etc (Kept same) --- */
 .cyber-toast-container {
   position: fixed;
   top: 120px;
   right: 20px;
-  /* Lowered for thicker header */
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1155,7 +1317,6 @@ body {
   }
 }
 
-/* --- Smart Search Bar --- */
 .search-wrapper {
   position: relative;
   max-width: 500px;
@@ -1191,7 +1352,6 @@ body {
   pointer-events: none;
 }
 
-/* --- History Table --- */
 .history-table {
   width: 100%;
   border-collapse: collapse;
@@ -1243,7 +1403,6 @@ body {
   border: 1px solid red;
 }
 
-/* --- Cyber Footer --- */
 .cyber-footer {
   background: #020205;
   border-top: 1px solid var(--border-glass);

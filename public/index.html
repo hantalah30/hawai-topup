@@ -1,128 +1,150 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Hawai Topup - Cyberpunk Edition</title>
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <!-- VFX Layers -->
-    <canvas id="webgl-canvas"></canvas>
-    <div class="fx-scanlines"></div>
-    <div class="fx-vignette"></div>
 
-    <!-- Main App Container -->
-    <div id="app-interface">
-      
-      <!-- Safe Header -->
-      <header class="cyber-header">
-        <div class="header-inner">
-          <div class="brand" onclick="App.router('home')">
-            <div class="brand-logo"><i class="fas fa-bolt"></i></div>
-            <div class="brand-txt">
-              <span class="b-title">HAWAI</span>
-              <span class="b-ver">SYS.2.0</span>
-            </div>
-          </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hawai Topup - Cyberpunk Edition</title>
 
-          <!-- Auth & User Info -->
-          <div class="auth-container">
-            <button id="btnLogin" class="btn-neon" onclick="Auth.signIn()">
-              <i class="fab fa-google"></i> Login
-            </button>
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-            <div id="userInfo" class="user-panel hidden">
-              <div class="u-info">
-                <span id="userName" class="u-name">User</span>
-                <span class="u-bal" onclick="App.openTopupModal()">
-                  <i class="fas fa-coins text-warn"></i> <span id="userCoins">0</span>
-                </span>
-              </div>
-              <img id="userImg" src="" class="u-avatar" />
-              <button onclick="Auth.signOut()" class="btn-icon text-pink"><i class="fas fa-power-off"></i></button>
-            </div>
-          </div>
-        </div>
-      </header>
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
 
-      <!-- Dynamic Content Viewport -->
-      <main id="viewport"></main>
-
-      <!-- Mobile Dock Navigation -->
-      <nav class="dock-nav">
-        <div class="dock-item active" onclick="App.router('home')">
-          <i class="fas fa-home"></i>
-        </div>
-        <div class="dock-item" onclick="App.router('history')">
-          <i class="fas fa-history"></i>
-        </div>
-        <div class="dock-item" onclick="App.openTopupModal()">
-          <i class="fas fa-wallet"></i>
-        </div>
-      </nav>
-
-      <!-- MODALS -->
-
-      <!-- 1. Payment Method Modal -->
-      <div id="paymentModal" class="modal-overlay">
-        <div class="modal-box">
-          <div class="modal-header">
-            <h3><i class="fas fa-credit-card text-neon"></i> Payment Method</h3>
-            <button class="btn-icon" onclick="App.closeModal('paymentModal')">&times;</button>
-          </div>
-          <div id="paymentList" class="modal-body"></div>
-        </div>
+<body>
+  <!-- PRELOADER -->
+  <div id="preloader">
+    <div class="loader-content">
+      <div class="loader-logo"><i class="fas fa-bolt"></i></div>
+      <div class="loader-text hacker-text">INITIALIZING CORE SYSTEMS...</div>
+      <div class="loader-bar-bg">
+        <div class="loader-bar-fill"></div>
       </div>
+      <div class="loader-logs">
+        <p>> Mounting Drive C:/HAWAI/SYSTEM...</p>
+        <p>> Loading Assets...</p>
+        <p>> Establishing Secure Connection...</p>
+      </div>
+    </div>
+  </div>
 
-      <!-- 2. Coin Topup Modal -->
-      <div id="coinModal" class="modal-overlay">
-        <div class="modal-box">
-          <div class="modal-header">
-            <h3><i class="fas fa-coins text-warn"></i> Topup Wallet</h3>
-            <button class="btn-icon" onclick="App.closeModal('coinModal')">&times;</button>
+  <!-- VFX Layers -->
+  <canvas id="webgl-canvas"></canvas>
+  <div class="fx-scanlines"></div>
+  <div class="fx-vignette"></div>
+
+  <!-- Main App Container -->
+  <div id="app-interface">
+
+    <!-- Safe Header -->
+    <header class="cyber-header">
+      <div class="header-inner">
+        <div class="brand" onclick="App.router('home')">
+          <div class="brand-logo"><i class="fas fa-bolt"></i></div>
+          <div class="brand-txt">
+            <span class="b-title" onmouseover="FX.scrambleText(this)">HAWAI</span>
+            <span class="b-ver">SYS.2.0</span>
           </div>
-          <div class="modal-body">
-            <p class="text-muted mb-3">Instant saldo for quick payments.</p>
-            <div class="items-grid col-mob-2 mb-3">
-              <button class="btn-neon" onclick="App.selectCoin(10000)">10k</button>
-              <button class="btn-neon" onclick="App.selectCoin(25000)">25k</button>
-              <button class="btn-neon" onclick="App.selectCoin(50000)">50k</button>
-              <button class="btn-neon" onclick="App.selectCoin(100000)">100k</button>
+        </div>
+
+        <!-- Auth & User Info -->
+        <div class="auth-container">
+          <button id="btnLogin" class="btn-neon" onclick="Auth.signIn()">
+            <i class="fab fa-google"></i> Login
+          </button>
+
+          <div id="userInfo" class="user-panel hidden">
+            <div class="u-info">
+              <span id="userName" class="u-name">User</span>
+              <span class="u-bal" onclick="App.openTopupModal()">
+                <i class="fas fa-coins text-warn"></i> <span id="userCoins">0</span>
+              </span>
             </div>
-            <input type="number" id="customCoin" class="input-cyber" placeholder="Custom Amount (Min 10k)">
-            <button class="btn-neon" style="width:100%; margin-top:20px;" onclick="App.processTopupCoin()">TOPUP NOW</button>
+            <img id="userImg" src="" class="u-avatar" />
+            <button onclick="Auth.signOut()" class="btn-icon text-pink"><i class="fas fa-power-off"></i></button>
           </div>
         </div>
       </div>
+    </header>
 
-      <!-- 3. Receipt / Invoice Modal -->
-      <div id="modal-receipt" class="modal-overlay">
-        <div class="modal-box text-center">
-          <div class="modal-body">
-            <i class="fas fa-check-circle text-neon" style="font-size: 3rem; margin-bottom: 20px;"></i>
-            <h2 class="text-neon">ORDER SUCCESS</h2>
-            <div id="receipt-data" style="margin: 20px 0; border-top: 1px dashed var(--border-glass); border-bottom: 1px dashed var(--border-glass); padding: 15px 0;"></div>
-            <button class="btn-neon" onclick="Receipt.close()">CLOSE</button>
-          </div>
-        </div>
+    <!-- Dynamic Content Viewport -->
+    <main id="viewport"></main>
+
+    <!-- Mobile Dock Navigation -->
+    <nav class="dock-nav">
+      <div class="dock-item active" onclick="App.router('home')">
+        <i class="fas fa-home"></i>
       </div>
+      <div class="dock-item" onclick="App.router('history')">
+        <i class="fas fa-history"></i>
+      </div>
+      <div class="dock-item" onclick="App.openTopupModal()">
+        <i class="fas fa-wallet"></i>
+      </div>
+    </nav>
 
+    <!-- MODALS -->
+
+    <!-- 1. Payment Method Modal -->
+    <div id="paymentModal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3><i class="fas fa-credit-card text-neon"></i> Payment Method</h3>
+          <button class="btn-icon" onclick="App.closeModal('paymentModal')">&times;</button>
+        </div>
+        <div id="paymentList" class="modal-body"></div>
+      </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- 2. Coin Topup Modal -->
+    <div id="coinModal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3><i class="fas fa-coins text-warn"></i> Topup Wallet</h3>
+          <button class="btn-icon" onclick="App.closeModal('coinModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3">Instant saldo for quick payments.</p>
+          <div class="items-grid col-mob-2 mb-3">
+            <button class="btn-neon" onclick="App.selectCoin(10000)">10k</button>
+            <button class="btn-neon" onclick="App.selectCoin(25000)">25k</button>
+            <button class="btn-neon" onclick="App.selectCoin(50000)">50k</button>
+            <button class="btn-neon" onclick="App.selectCoin(100000)">100k</button>
+          </div>
+          <input type="number" id="customCoin" class="input-cyber" placeholder="Custom Amount (Min 10k)">
+          <button class="btn-neon" style="width:100%; margin-top:20px;" onclick="App.processTopupCoin()">TOPUP
+            NOW</button>
+        </div>
+      </div>
+    </div>
 
-    <script src="firebase-config.js"></script>
-    <script src="script.js"></script>
-  </body>
+    <!-- 3. Receipt / Invoice Modal -->
+    <div id="modal-receipt" class="modal-overlay">
+      <div class="modal-box text-center">
+        <div class="modal-body">
+          <i class="fas fa-check-circle text-neon" style="font-size: 3rem; margin-bottom: 20px;"></i>
+          <h2 class="text-neon">ORDER SUCCESS</h2>
+          <div id="receipt-data"
+            style="margin: 20px 0; border-top: 1px dashed var(--border-glass); border-bottom: 1px dashed var(--border-glass); padding: 15px 0;">
+          </div>
+          <button class="btn-neon" onclick="Receipt.close()">CLOSE</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+
 </html>

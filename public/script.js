@@ -119,10 +119,22 @@ const FX = {
     FX.initCursor();
     FX.initTicker();
     FX.initTilt();
+    FX.initPreloader();
+  },
+
+  initPreloader: () => {
+    // Simulate Boot Sequence
+    setTimeout(() => {
+      const preloader = document.getElementById("preloader");
+      if (preloader) {
+        preloader.style.opacity = "0";
+        preloader.style.pointerEvents = "none";
+      }
+    }, 3000); // 3 Seconds cinematic wait
   },
 
   initCursor: () => {
-    if (window.innerWidth < 768) return; // Disable on mobile
+    if (window.innerWidth < 768) return;
 
     const cursor = document.createElement("div");
     cursor.className = "custom-cursor";
@@ -135,14 +147,11 @@ const FX = {
     document.addEventListener("mousemove", (e) => {
       cursor.style.left = e.clientX + "px";
       cursor.style.top = e.clientY + "px";
-
-      // Trail delay
       setTimeout(() => {
         trail.style.left = e.clientX - 3 + "px";
         trail.style.top = e.clientY - 3 + "px";
       }, 50);
 
-      // Hover effect
       const target = e.target;
       if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('.game-card') || target.closest('.item-card')) {
         cursor.classList.add("hovered");
@@ -156,20 +165,17 @@ const FX = {
     const original = el.innerText;
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
     let iterations = 0;
-
     const interval = setInterval(() => {
       el.innerText = original.split("").map((letter, index) => {
         if (index < iterations) return original[index];
         return chars[Math.floor(Math.random() * chars.length)];
       }).join("");
-
       if (iterations >= original.length) clearInterval(interval);
       iterations += 1 / 3;
     }, 30);
   },
 
   initTicker: () => {
-    // Inject ticker into header if not present
     const header = document.querySelector('.cyber-header');
     if (header && !document.querySelector('.ticker-wrap')) {
       const wrap = document.createElement('div');
@@ -177,27 +183,22 @@ const FX = {
       wrap.innerHTML = `<div class="ticker" id="liveTicker"></div>`;
       header.prepend(wrap);
 
-      // Feed data
       const names = ["Zuxxy", "Ryzen", "Lemon", "Jess", "Oura", "Donkey", "R7", "Alberttt"];
       const items = ["366 Diamonds", "Weekly Diamond Pass", "Twilight Pass", "1000 CP", "Starlight Member"];
       const ticker = document.getElementById("liveTicker");
-
-      // Generate content
       let content = "";
       for (let i = 0; i < 10; i++) {
         let n = names[Math.floor(Math.random() * names.length)];
         let item = items[Math.floor(Math.random() * items.length)];
         content += `<div class="ticker-item"><i class="fas fa-shopping-cart"></i> ${n} bought ${item} <span class="text-muted">Just now</span></div>`;
       }
-      ticker.innerHTML = content + content; // Duplicate for smooth loop
+      ticker.innerHTML = content + content;
     }
   },
 
   updateXP: (coins) => {
-    // Max Level at 100,000 coins
     const max = 100000;
     const pct = Math.min((coins / max) * 100, 100);
-
     const panel = document.querySelector('.user-panel');
     if (panel) {
       let bar = panel.querySelector('.xp-bg');
@@ -211,20 +212,16 @@ const FX = {
   },
 
   initTilt: () => {
-    // Simple Vanilla Tilt implementation for 3D Cards
     document.addEventListener("mousemove", (e) => {
       document.querySelectorAll('.game-card, .item-card, .form-panel').forEach(card => {
         const rect = card.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
-        // Check if mouse is near/over element
         if (x > -50 && x < rect.width + 50 && y > -50 && y < rect.height + 50) {
           const centerX = rect.width / 2;
           const centerY = rect.height / 2;
-          const rotateX = ((y - centerY) / centerY) * -10; // Max 10deg
+          const rotateX = ((y - centerY) / centerY) * -10;
           const rotateY = ((x - centerX) / centerX) * 10;
-
           card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
         } else {
           card.style.transform = `perspective(1000px) rotateX(0) rotateY(0) scale(1)`;
@@ -255,7 +252,7 @@ const App = {
     await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
 
     if (typeof World !== "undefined") World.init();
-    FX.init(); // Initialize God Tier FX
+    FX.init(); // Initialize Preloader & FX
 
     App.router("home");
     document.addEventListener("click", () => Sound.click());
@@ -313,11 +310,8 @@ const App = {
     const icon = type === "error" ? "fa-exclamation-triangle" : "fa-check-circle";
     toast.innerHTML = `<i class="fas ${icon}"></i> <span>${msg}</span>`;
     container.appendChild(toast);
-
-    // Sound Effect
     if (type === "error") Sound.play(150, "sawtooth", 0.3);
     else Sound.success();
-
     setTimeout(() => {
       toast.style.opacity = "0";
       setTimeout(() => toast.remove(), 300);
@@ -328,15 +322,11 @@ const App = {
     try {
       const res = await fetch(`${API_URL}/init-data`);
       const data = await res.json();
-
       App.state.rawProducts = data.products || [];
       App.state.serverSliders = data.sliders || [];
       App.state.serverBanners = data.banners || {};
-
       if (data.reward_percent) CONFIG.rewardPercent = data.reward_percent;
-
       const uniqueBrands = [...new Set(App.state.rawProducts.map((p) => p.brand))];
-
       App.state.gamesList = uniqueBrands
         .map((brandName) => {
           if (!brandName) return null;
@@ -346,7 +336,6 @@ const App = {
             (p) => p.brand === brandName && !p.image.includes("default")
           );
           const serverImg = sampleProduct ? sampleProduct.image : null;
-
           return {
             id: brandName,
             name: brandName,
@@ -356,8 +345,7 @@ const App = {
           };
         })
         .filter((g) => g !== null);
-
-      App.state.displayedGames = [...App.state.gamesList]; // Init Displayed
+      App.state.displayedGames = [...App.state.gamesList];
       App.router("home");
     } catch (e) {
       console.error("Fetch Error:", e);
@@ -376,9 +364,7 @@ const App = {
     const vp = document.getElementById("viewport");
     if (!vp) return;
     window.scrollTo(0, 0);
-    // Remove active class from modals on navigation
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-
     if (page === "home") App.renderHome(vp);
     else if (page === "order") App.renderOrderPage(vp, param);
     else if (page === "history") App.renderHistory(vp);
@@ -396,12 +382,9 @@ const App = {
   processTopupCoin: () => {
     const amountInput = document.getElementById("customCoin");
     const amount = parseInt(amountInput.value);
-
     if (isNaN(amount) || amount < 10000) return App.showToast("Min Topup Rp 10.000", "error");
-
     App.state.selectedItem = { code: "DEPOSIT", price: amount, name: "Topup Coin" };
     App.state.transactionType = "COIN";
-
     App.closeModal("coinModal");
     Terminal.openPaymentSelect();
   },
@@ -409,8 +392,6 @@ const App = {
   filterGames: (query) => {
     const q = query.toLowerCase();
     App.state.displayedGames = App.state.gamesList.filter(g => g.name.toLowerCase().includes(q));
-
-    // Re-render only Grid
     const grid = document.getElementById('games-grid-container');
     if (grid) {
       if (App.state.displayedGames.length === 0) {
@@ -430,8 +411,6 @@ const App = {
 
   renderHome: (container) => {
     if (App.sliderInterval) clearInterval(App.sliderInterval);
-
-    // Reset filtering
     App.state.displayedGames = [...App.state.gamesList];
 
     let html = `
@@ -450,9 +429,16 @@ const App = {
     if (App.state.gamesList.length === 0) {
       html += `<div class="text-center text-muted" style="grid-column: 1/-1; padding: 50px;">LOADING GAMES...</div>`;
     } else {
-      App.state.gamesList.forEach((g) => {
+      App.state.gamesList.forEach((g, index) => {
+        // UPGRADE: Rank Badges
+        let badge = "";
+        if (index === 0) badge = `<div class="rank-badge rank-1" data-rank="1"></div>`;
+        if (index === 1) badge = `<div class="rank-badge rank-2" data-rank="2"></div>`;
+        if (index === 2) badge = `<div class="rank-badge rank-3" data-rank="3"></div>`;
+
         html += `
                     <div class="game-card" onclick="App.router('order', '${g.id}')">
+                        ${badge}
                         <div class="gc-bg" style="background-image: url('${g.banner}');"></div>
                         <div class="gc-info">
                             <div class="gc-name">${g.name}</div>
@@ -467,6 +453,7 @@ const App = {
     App.startSlider();
   },
 
+  // ... rest of functions (renderHistory, etc) remain same, just overwritten for safety
   renderHistory: async (container) => {
     if (!Auth.user) {
       container.innerHTML = `<div class="container text-center" style="padding-top:100px;">
@@ -477,9 +464,7 @@ const App = {
           </div>`;
       return;
     }
-
     container.innerHTML = `<div class="container text-center" style="padding-top:100px;"><i class="fas fa-circle-notch fa-spin fa-2x text-neon"></i><p>Accessing Database...</p></div>`;
-
     try {
       const res = await fetch(`${API_URL}/transactions?uid=${Auth.user.uid}`);
       let transactions = [];
@@ -487,7 +472,6 @@ const App = {
         const json = await res.json();
         transactions = json.data || [];
       }
-
       let html = `
           <div class="container" style="padding-top: 50px;">
               <h2 class="section-title" onmouseover="FX.scrambleText(this)">TRANSACTION LOGS</h2>
@@ -503,7 +487,6 @@ const App = {
                       </tr>
                   </thead>
                   <tbody>`;
-
       if (transactions.length === 0) {
         html += `<tr><td colspan="6" class="text-center">No transaction data found.</td></tr>`;
       } else {
@@ -511,7 +494,6 @@ const App = {
           let statusClass = "status-pending";
           if (t.status === "PAID" || t.status === "SUCCESS") statusClass = "status-success";
           if (t.status === "EXPIRED" || t.status === "FAILED") statusClass = "status-failed";
-
           html += `
                   <tr>
                       <td>${new Date(t.created_at).toLocaleDateString()}</td>
@@ -523,10 +505,8 @@ const App = {
                   </tr>`;
         });
       }
-
       html += `</tbody></table></div>`;
       container.innerHTML = html;
-
     } catch (e) {
       container.innerHTML = `<div class="container text-center" style="padding-top:100px;">
             <i class="fas fa-exclamation-triangle fa-3x text-pink mb-3"></i>
@@ -540,54 +520,27 @@ const App = {
     App.state.transactionType = "GAME";
     App.state.nickname = null;
     App.state.activeBrand = brandName;
-
     const items = App.state.rawProducts
       .filter((p) => p.brand === brandName && p.is_active !== false)
       .sort((a, b) => a.price_sell - b.price_sell);
-
-    // --- CATEGORIZATION LOGIC ---
     const promos = [];
     const members = [];
     const diamonds = [];
-
     items.forEach((p) => {
       const name = p.name.toLowerCase();
-      // 1. PRIORITY: Admin "Hot Deals" Flag (Fire Logo)
-      if (p.is_promo === true) {
-        promos.push(p);
-      }
-      // 2. Membership / Pass
-      else if (
-        name.includes("member") ||
-        name.includes("starlight") ||
-        name.includes("pass") ||
-        name.includes("wdp") ||
-        name.includes("bulanan") ||
-        name.includes("mingguan") ||
-        name.includes("twilight")
-      ) {
-        members.push(p);
-      }
-      // 3. Regular (Diamonds)
-      else {
-        diamonds.push(p);
-      }
+      if (p.is_promo === true) { promos.push(p); }
+      else if (name.includes("member") || name.includes("starlight") || name.includes("pass") || name.includes("wdp") || name.includes("bulanan") || name.includes("mingguan") || name.includes("twilight")) { members.push(p); }
+      else { diamonds.push(p); }
     });
-
     const gameData = App.state.gamesList.find((g) => g.id === brandName) || {
-      banner: DEFAULT_ASSETS.banner,
-      img: DEFAULT_ASSETS.logo,
-      theme: "#fff",
+      banner: DEFAULT_ASSETS.banner, img: DEFAULT_ASSETS.logo, theme: "#fff",
     };
-
     const isML = brandName.toLowerCase().includes("mobile");
     const zoneInput = isML
       ? `<input type="number" id="zone" class="input-cyber" placeholder="Zone" oninput="App.checkNickname()" style="flex:1;">`
       : `<input type="hidden" id="zone" value="">`;
-
     container.innerHTML = `
             <div class="game-hero-banner" style="background-image: url('${gameData.banner}');"></div>
-            
             <div class="container">
                 <div class="order-header">
                     <img src="${gameData.img}" class="game-poster">
@@ -596,7 +549,6 @@ const App = {
                         <p class="text-muted">Instant Delivery • Secure Payment • 24/7 Support</p>
                     </div>
                 </div>
-
                 <div class="form-panel">
                     <span class="panel-num">01</span>
                     <h3 class="mb-3">ACCOUNT DATA</h3>
@@ -606,11 +558,9 @@ const App = {
                     </div>
                     <div id="nick-result" class="mt-2 text-neon" style="font-size:0.9rem; min-height:20px;"></div>
                 </div>
-
                 <div class="form-panel">
                     <span class="panel-num">02</span>
                     <h3 class="mb-3">SELECT ITEM</h3>
-                    
                     ${promos.length > 0 ? `
                         <div class="cat-header cat-hot">
                             <div class="cat-icon"><i class="fas fa-fire"></i></div>
@@ -619,7 +569,6 @@ const App = {
                         <div class="items-grid">
                             ${promos.map((p) => App.renderItemCard(p, "hot")).join("")}
                         </div>` : ""}
-
                     ${members.length > 0 ? `
                         <div class="cat-header cat-mem">
                             <div class="cat-icon"><i class="fas fa-crown"></i></div>
@@ -628,7 +577,6 @@ const App = {
                         <div class="items-grid">
                             ${members.map((p) => App.renderItemCard(p, "member")).join("")}
                         </div>` : ""}
-
                     <div class="cat-header cat-dia">
                         <div class="cat-icon"><i class="far fa-gem"></i></div>
                         <div class="cat-title">TOP UP</div>
@@ -637,7 +585,6 @@ const App = {
                         ${diamonds.map((p) => App.renderItemCard(p, "diamond")).join("")}
                     </div>
                 </div>
-                
                 <div class="text-end mb-5">
                     <button class="btn-neon" style="padding: 15px 40px; font-size: 1.1rem;" onclick="Terminal.openPaymentSelect()">
                         PROCEED TO PAYMENT <i class="fas fa-arrow-right ml-2"></i>
@@ -646,34 +593,23 @@ const App = {
             </div>`;
   },
 
+  // Re-include this helper
   renderItemCard: (p, type = "diamond") => {
-    // Determine Class based on Type
     let cardClass = "item-card";
     if (type === "hot") cardClass += " card-hot";
     else if (type === "member") cardClass += " card-member";
     else cardClass += " card-diamond";
-
     const points = Math.floor(p.price_sell * (CONFIG.rewardPercent / 100));
-
-    // Handle Image Source
     let imgDisplay;
     if (p.image && !p.image.includes("default")) {
-      if (p.image.startsWith("http") || p.image.startsWith("data:")) {
-        imgDisplay = p.image;
-      } else {
-        imgDisplay = `${API_URL.replace("/api", "")}/${p.image}`;
-      }
+      if (p.image.startsWith("http") || p.image.startsWith("data:")) { imgDisplay = p.image; } else { imgDisplay = `${API_URL.replace("/api", "")}/${p.image}`; }
     } else {
       imgDisplay = DEFAULT_ASSETS.icons.diamond;
-      if (p.name.toLowerCase().includes("member"))
-        imgDisplay = DEFAULT_ASSETS.icons.member;
+      if (p.name.toLowerCase().includes("member")) imgDisplay = DEFAULT_ASSETS.icons.member;
     }
-
     return `
         <div class="${cardClass}" onclick="App.selectItem(this, '${p.sku}', ${p.price_sell}, '${p.name}')">
-            <!-- Background FX Layer -->
             <div class="item-bg-fx"></div>
-            
             <div class="item-content">
                 <div class="d-flex align-center gap-2 mb-2">
                     <img src="${imgDisplay}" class="item-icon" loading="lazy">
@@ -687,66 +623,53 @@ const App = {
         </div>`;
   },
 
-  checkNickname: async () => {
+  checkNickname: async () => { /* ... same as before ... */
     const uid = document.getElementById("uid").value;
     const zoneInput = document.getElementById("zone");
     const zone = zoneInput ? zoneInput.value : "";
     const res = document.getElementById("nick-result");
     const game = App.state.activeBrand || "";
-
-    if (uid.length < 4) {
-      res.innerHTML = "";
-      return;
-    }
-
+    if (uid.length < 4) { res.innerHTML = ""; return; }
     res.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Checking ID...`;
-
     try {
       const response = await fetch(`${API_URL}/check-nickname`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ game: game, id: uid, zone: zone }),
       });
       const data = await response.json();
       if (data.success) {
         res.innerHTML = `<span class="text-neon"><i class="fas fa-check-circle"></i> ${data.name}</span>`;
-        Sound.success();
-        App.state.nickname = data.name;
+        Sound.success(); App.state.nickname = data.name;
       } else {
         res.innerHTML = `<span class="text-pink"><i class="fas fa-times-circle"></i> Not Found</span>`;
         App.state.nickname = null;
       }
-    } catch (e) {
-      res.innerHTML = `<span class="text-muted">Offline Mode / Check Ignored</span>`;
-    }
+    } catch (e) { res.innerHTML = `<span class="text-muted">Offline Mode / Check Ignored</span>`; }
   },
 
   selectItem: (el, code, price, name) => {
     document.querySelectorAll(".item-card").forEach((i) => i.classList.remove("active"));
     el.classList.add("active");
-    App.state.selectedItem = { code, price, name };
-    Sound.click();
+    App.state.selectedItem = { code, price, name }; Sound.click();
   },
 
   startSlider: () => {
     const sliders = App.state.serverSliders.length > 0 ? App.state.serverSliders : ["assets/slider1.png"];
     const wrapper = document.getElementById("home-slider");
     if (!wrapper) return;
-
     wrapper.innerHTML = "";
     let curr = 0;
-
     const render = (idx) => {
       const imgUrl = sliders[idx];
       const div = document.createElement("div");
       div.className = "slide active";
+      // UPGRADE: GLITCH HERO TEXT
       div.innerHTML = `
                 <div class="slide-bg" style="background-image: url('${imgUrl}'), url('${DEFAULT_ASSETS.banner}')"></div>
                 <div class="slide-content">
                     <span class="hero-tag">FEATURED</span>
-                    <h1 class="hero-title">TOP UP <br> <span class="text-neon">LEVEL UP</span></h1>
+                    <h1 class="hero-title" onmouseover="FX.scrambleText(this)">TOP UP <br> <span class="text-neon">LEVEL UP</span></h1>
                 </div>`;
-
       const old = wrapper.querySelector(".slide");
       if (old) {
         old.classList.remove("active");
@@ -754,7 +677,6 @@ const App = {
       }
       wrapper.appendChild(div);
     };
-
     render(0);
     App.sliderInterval = setInterval(() => {
       curr = (curr + 1) % sliders.length;
@@ -763,38 +685,29 @@ const App = {
   },
 };
 
+// ... Terminal & World remain unchanged ...
 // --- LOGIC TRANSAKSI ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels, transactionType } = App.state;
-
-    if (transactionType === "GAME") {
-      const uid = document.getElementById("uid").value;
-      if (!uid) return App.showToast("Fill User ID First!", "error");
-    }
-
+    if (transactionType === "GAME") { const uid = document.getElementById("uid").value; if (!uid) return App.showToast("Fill User ID First!", "error"); }
     if (!selectedItem) return App.showToast("Select Item First!", "error");
-
     const listDiv = document.getElementById("paymentList");
     listDiv.innerHTML = "";
-
     if (!paymentChannels || paymentChannels.length === 0) {
       listDiv.innerHTML = `<div class="text-pink text-center p-3">No payment channels available</div>`;
     } else {
       paymentChannels.forEach((ch) => {
         if (transactionType === "COIN" && ch.code === "HAWAI_COIN") return;
-
         let fee = ch.total_fee?.flat || 0;
         let total = selectedItem.price + fee;
         let balanceCheck = "";
-
         if (ch.code === "HAWAI_COIN") {
           const userBal = Auth.user ? Auth.user.hawai_coins : 0;
           if (!Auth.user) balanceCheck = `<small class="text-pink">Login Required</small>`;
           else if (userBal < total) balanceCheck = `<small class="text-pink">Insufficient Balance</small>`;
           else balanceCheck = `<small class="text-neon">Balance Available</small>`;
         }
-
         listDiv.innerHTML += `
             <div class="pay-item" onclick="Terminal.processTransaction('${ch.code}')">
                 <img src="${ch.icon_url}" class="pay-logo">
@@ -807,59 +720,34 @@ const Terminal = {
             </div>`;
       });
     }
-
     document.getElementById("paymentModal").classList.add("active");
   },
-
   processTransaction: async (method) => {
     const { selectedItem, transactionType, activeBrand } = App.state;
-
     const payload = {
-      sku: selectedItem.code,
-      amount: selectedItem.price,
-      method: method,
-      user_uid: Auth.user ? Auth.user.uid : null,
-      user_name: Auth.user ? Auth.user.name : "Guest",
+      sku: selectedItem.code, amount: selectedItem.price, method: method,
+      user_uid: Auth.user ? Auth.user.uid : null, user_name: Auth.user ? Auth.user.name : "Guest",
     };
-
     let endpoint = "/transaction";
-
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
       const zone = document.getElementById("zone") ? document.getElementById("zone").value : "";
       payload.customer_no = uid + (zone ? ` (${zone})` : "");
       payload.game = activeBrand || "Game";
-
       let finalNickname = App.state.nickname || "-";
       payload.nickname = finalNickname;
-
-      if (method === "HAWAI_COIN" && !Auth.user) {
-        App.showToast("Please Login First", "error");
-        return;
-      }
-    } else if (transactionType === "COIN") {
-      endpoint = "/topup-coin";
-    }
-
-    // Lock UI (Optional)
+      if (method === "HAWAI_COIN" && !Auth.user) { App.showToast("Please Login First", "error"); return; }
+    } else if (transactionType === "COIN") { endpoint = "/topup-coin"; }
     const modalBody = document.querySelector('#paymentList');
     if (modalBody) modalBody.innerHTML = `<div class="text-center p-5"><i class="fas fa-circle-notch fa-spin fa-2x text-neon"></i><p>Processing...</p></div>`;
-
     try {
       const res = await fetch(`${API_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const json = await res.json();
-
       document.getElementById("paymentModal").classList.remove("active");
-
-      if (json.success) {
-        window.location.href = `/invoice.html?ref=${json.data.reference}`;
-      } else {
-        App.showToast(json.message || "Transaction Failed", "error");
-      }
+      if (json.success) { window.location.href = `/invoice.html?ref=${json.data.reference}`; }
+      else { App.showToast(json.message || "Transaction Failed", "error"); }
     } catch (e) {
       App.showToast("Error: " + e.message, "error");
       document.getElementById("paymentModal").classList.remove("active");
@@ -867,30 +755,23 @@ const Terminal = {
   },
 };
 
-// --- 3D WORLD (Simplified for Performance) ---
 const World = {
   init: () => {
     const cvs = document.getElementById("webgl-canvas");
     if (!cvs) return;
-
     if (typeof THREE === 'undefined') return;
-
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x050505, 0.02);
-
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 5, 10);
-
     const renderer = new THREE.WebGLRenderer({ canvas: cvs, alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
     const gridGeo = new THREE.PlaneGeometry(300, 300, 50, 50);
     const gridMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.1 });
     const grid = new THREE.Mesh(gridGeo, gridMat);
     grid.rotation.x = -Math.PI / 2;
     scene.add(grid);
-
     const starGeo = new THREE.BufferGeometry();
     const count = 500;
     const pos = new Float32Array(count * 3);
@@ -898,7 +779,6 @@ const World = {
     starGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xff0055, size: 0.2, transparent: true, opacity: 0.8 }));
     scene.add(stars);
-
     function animate() {
       requestAnimationFrame(animate);
       grid.position.z = (Date.now() * 0.005) % 6;
@@ -906,7 +786,6 @@ const World = {
       renderer.render(scene, camera);
     }
     animate();
-
     window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
