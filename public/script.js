@@ -260,8 +260,14 @@ const App = {
 
     items.forEach((p) => {
       const name = p.name.toLowerCase();
-      // Member/Pass/WDP
-      if (
+
+      // 1. PRIORITY: Admin "Hot Deals" Flag (Fire Logo)
+      // This directly connects to the Admin Toggle
+      if (p.is_promo === true) {
+        promos.push(p);
+      }
+      // 2. Membership / Pass
+      else if (
         name.includes("member") ||
         name.includes("starlight") ||
         name.includes("pass") ||
@@ -272,11 +278,7 @@ const App = {
       ) {
         members.push(p);
       }
-      // Promo checks (is_promo flag OR naming convention)
-      else if (p.is_promo === true || name.includes("promo") || name.includes("flash") || name.includes("special")) {
-        promos.push(p);
-      }
-      // Regular
+      // 3. Regular (Diamonds)
       else {
         diamonds.push(p);
       }

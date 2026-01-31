@@ -571,117 +571,146 @@ body {
 }
 
 /* Variant: Hot Deals */
-.card-hot {
-  border-color: #ff4500;
-  box-shadow: 0 0 10px rgba(255, 69, 0, 0.1) inset;
-  background: linear-gradient(135deg, rgba(255, 69, 0, 0.05), rgba(0, 0, 0, 0.8));
+@keyframes pulse-hot {
+  0% {
+    box-shadow: 0 0 10px rgba(255, 69, 0, 0.4);
+    border-color: #ff4500;
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(255, 69, 0, 0.8), 0 0 10px #ff0000;
+    border-color: #ff8c00;
+  }
+
+  100% {
+    box-shadow: 0 0 10px rgba(255, 69, 0, 0.4);
+    border-color: #ff4500;
+  }
 }
 
-.card-hot:hover,
-.card-hot.active {
-  box-shadow: 0 0 20px rgba(255, 69, 0, 0.4), 0 0 5px #ff4500;
-  border-color: #ff8c00;
-  transform: scale(1.02) translateY(-5px);
+.card-hot {
+  border-color: #ff4500;
+  box-shadow: 0 0 15px rgba(255, 69, 0, 0.2) inset;
+  background: linear-gradient(135deg, rgba(255, 69, 0, 0.1), rgba(20, 0, 0, 0.9));
+  animation: pulse-hot 2s infinite ease-in-out;
+}
+
+.card-hot:hover {
+  transform: scale(1.05) translateY(-5px);
+  z-index: 10;
+  animation: none;
+  box-shadow: 0 0 30px rgba(255, 69, 0, 0.6), 0 0 10px #ff4500;
+  border-color: #fff;
 }
 
 .card-hot.active {
   background: #ff4500;
+  animation: none;
+  box-shadow: 0 0 40px rgba(255, 69, 0, 0.8);
+  transform: scale(1.05);
 }
 
 .card-hot.active::before {
-  content: "HOT";
+  content: "🔥 HOT";
   position: absolute;
   top: 0;
   right: 0;
   background: #fff;
   color: #ff0000;
-  font-size: 0.6rem;
-  font-weight: bold;
-  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  padding: 3px 10px;
   border-radius: 0 0 0 8px;
   z-index: 5;
+  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 .card-hot .item-price {
   color: #ff8c00;
-  text-shadow: 0 0 5px rgba(255, 69, 0, 0.5);
+  text-shadow: 0 0 8px rgba(255, 69, 0, 0.8);
+  font-weight: bold;
 }
 
 .card-hot:hover .item-bg-fx {
-  background: radial-gradient(circle at center, rgba(255, 69, 0, 0.2) 0%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(255, 69, 0, 0.4) 0%, transparent 70%);
   opacity: 1;
 }
 
 /* Variant: Membership */
+@keyframes shine-mem {
+  0% {
+    left: -150%;
+  }
+
+  50% {
+    left: 150%;
+  }
+
+  100% {
+    left: 150%;
+  }
+}
+
 .card-member {
   border-color: #ffd700;
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(0, 0, 0, 0.8));
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(10, 10, 0, 0.9));
+  overflow: hidden;
   position: relative;
 }
 
 .card-member::after {
   content: "";
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(45deg, transparent, rgba(255, 215, 0, 0.3), transparent);
-  transform: rotate(45deg) translateY(-100%);
-  transition: 0.5s;
-  opacity: 0;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent);
+  transform: skewX(-20deg);
+  animation: shine-mem 3s infinite;
+  pointer-events: none;
 }
 
-.card-member:hover::after {
-  transform: rotate(45deg) translateY(0%);
-  opacity: 1;
-  transition: 0.8s;
-}
-
-.card-member:hover,
-.card-member.active {
+.card-member:hover {
   border-color: #ffe135;
-  box-shadow: 0 0 25px rgba(255, 215, 0, 0.25);
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.4);
+  transform: translateY(-5px);
 }
 
 .card-member.active {
-  background: linear-gradient(45deg, #ffd700, #b8860b);
-  border: none;
+  background: linear-gradient(135deg, #ffd700, #b8860b);
+  border: 1px solid #fff;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
 }
 
 .card-member .item-price {
   color: #ffd700;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
 }
 
 /* Variant: Diamond */
 .card-diamond .item-bg-fx {
-  background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 243, 255, 0.03) 10px, rgba(0, 243, 255, 0.03) 20px);
+  background:
+    linear-gradient(45deg, transparent 48%, rgba(0, 243, 255, 0.1) 50%, transparent 52%),
+    linear-gradient(-45deg, transparent 48%, rgba(0, 243, 255, 0.1) 50%, transparent 52%);
+  background-size: 20px 20px;
 }
 
 .card-diamond:hover .item-bg-fx {
-  opacity: 1;
-  animation: slideGrid 2s linear infinite;
+  opacity: 0.5;
 }
 
-@keyframes slideGrid {
-  from {
-    background-position: 0 0;
-  }
-
-  to {
-    background-position: 20px 0;
-  }
-}
-
-.card-diamond:hover,
-.card-diamond.active {
+.card-diamond:hover {
   border-color: var(--primary);
-  box-shadow: 0 0 15px var(--primary-glow);
-  background: rgba(0, 243, 255, 0.05);
+  box-shadow: 0 0 20px var(--primary-glow);
+  background: rgba(0, 243, 255, 0.08);
+  transform: translateY(-5px);
 }
 
 .card-diamond.active {
   background: var(--primary);
+  box-shadow: 0 0 30px var(--primary-glow);
+  border-color: #fff;
 }
 
 /* Universal Active State Override */
