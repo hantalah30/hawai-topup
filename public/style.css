@@ -52,6 +52,8 @@
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
   outline: none;
+  cursor: none !important;
+  /* HIDE DEFAULT CURSOR */
 }
 
 body {
@@ -129,8 +131,15 @@ body {
   color: var(--accent);
 }
 
+/* Hacker Text Effect Class */
+.hacker-text {
+  font-family: var(--font-mono);
+  display: inline-block;
+  min-width: 10px;
+}
+
 /* =========================================
-   3. VFX LAYERS (Background)
+   3. VFX LAYERS (Background & Cursor)
    ========================================= */
 #webgl-canvas {
   position: fixed;
@@ -157,6 +166,43 @@ body {
   background: radial-gradient(circle, transparent 50%, #000 120%);
   pointer-events: none;
   z-index: 11;
+}
+
+/* --- CYBER CURSOR --- */
+.custom-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: rgba(0, 243, 255, 0.1);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  transition: width 0.2s, height 0.2s, background 0.2s;
+  box-shadow: 0 0 10px var(--primary-glow);
+  mix-blend-mode: screen;
+}
+
+.custom-cursor.hovered {
+  width: 50px;
+  height: 50px;
+  background: rgba(0, 243, 255, 0.2);
+  border-color: #fff;
+  mix-blend-mode: difference;
+}
+
+.cursor-trail {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  background: var(--secondary);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.8;
 }
 
 /* =========================================
@@ -199,19 +245,57 @@ body {
   transform: scale(1.1);
 }
 
-/* --- HEADER --- */
+/* --- HEADER & TICKER --- */
 .cyber-header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--header-h);
-  background: rgba(5, 5, 10, 0.7);
+  /* Increased height to accommodate ticker */
+  height: 110px;
+  background: rgba(5, 5, 10, 0.8);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-glass);
   z-index: 100;
   display: flex;
+  flex-direction: column;
+}
+
+.ticker-wrap {
+  width: 100%;
+  height: 30px;
+  background: rgba(0, 243, 255, 0.1);
+  border-bottom: 1px solid var(--border-glass);
+  overflow: hidden;
+  display: flex;
   align-items: center;
+  position: relative;
+}
+
+.ticker {
+  display: inline-block;
+  white-space: nowrap;
+  animation: tick 30s linear infinite;
+  padding-left: 100%;
+}
+
+.ticker-item {
+  display: inline-block;
+  padding: 0 30px;
+  font-size: 0.8rem;
+  color: var(--primary);
+  text-shadow: 0 0 5px var(--primary-glow);
+  font-family: var(--font-mono);
+}
+
+@keyframes tick {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
 }
 
 .header-inner {
@@ -222,6 +306,8 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 20px;
+  height: 80px;
+  /* Rest of header */
 }
 
 /* Brand */
@@ -265,7 +351,7 @@ body {
   color: var(--text-muted);
 }
 
-/* User Info */
+/* User Info & XP Bar */
 .auth-container {
   display: flex;
   align-items: center;
@@ -280,6 +366,19 @@ body {
   padding: 5px 15px 5px 5px;
   border-radius: 30px;
   border: 1px solid var(--border-glass);
+  position: relative;
+  overflow: hidden;
+}
+
+.xp-bg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 0%;
+  background: var(--accent);
+  transition: width 1s ease-out;
+  box-shadow: 0 0 5px var(--accent);
 }
 
 .u-avatar {
@@ -315,7 +414,8 @@ body {
 
 /* --- MAIN VIEWPORT --- */
 #viewport {
-  padding-top: calc(var(--header-h) + 20px);
+  padding-top: calc(110px + 20px);
+  /* adjusted for thicker header */
   padding-bottom: 120px;
   /* Space for dock */
   min-height: 100vh;
@@ -399,6 +499,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 20px;
+  transform-style: preserve-3d;
 }
 
 /* Game Card */
@@ -408,13 +509,15 @@ body {
   overflow: hidden;
   aspect-ratio: 3/4;
   cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: all 0.1s;
+  /* Faster for tilt */
   border: 1px solid transparent;
   background: #000;
+  transform-style: preserve-3d;
+  transform: perspective(1000px);
 }
 
 .game-card:hover {
-  transform: translateY(-5px);
   box-shadow: 0 10px 30px rgba(0, 243, 255, 0.2);
   border-color: var(--primary);
 }
@@ -440,6 +543,8 @@ body {
   right: 0;
   padding: 15px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  transform: translateZ(20px);
+  /* Pop out effect */
 }
 
 .gc-name {
@@ -499,6 +604,8 @@ body {
   margin-bottom: 25px;
   position: relative;
   backdrop-filter: blur(5px);
+  transform-style: preserve-3d;
+  transform: perspective(1000px);
 }
 
 .panel-num {
@@ -530,7 +637,7 @@ body {
   box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
 }
 
-/* --- ITEM GRID & CATEGORIES (UPDATED) --- */
+/* --- ITEM GRID & CATEGORIES --- */
 .items-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -545,12 +652,14 @@ body {
   border-radius: 12px;
   padding: 15px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.1s cubic-bezier(0.25, 0.8, 0.25, 1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   min-height: 110px;
+  transform-style: preserve-3d;
+  transform: perspective(1000px);
 }
 
 .item-card:hover {
@@ -560,6 +669,7 @@ body {
 .item-card .item-content {
   position: relative;
   z-index: 2;
+  transform: translateZ(10px);
 }
 
 .item-card .item-bg-fx {
@@ -944,6 +1054,16 @@ body {
   .col-mob-2 {
     grid-template-columns: 1fr 1fr;
   }
+
+  /* Disable custom cursor on mobile */
+  * {
+    cursor: auto !important;
+  }
+
+  .custom-cursor,
+  .cursor-trail {
+    display: none !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -959,8 +1079,9 @@ body {
 /* --- Cyber Toast (Notification) --- */
 .cyber-toast-container {
   position: fixed;
-  top: 20px;
+  top: 120px;
   right: 20px;
+  /* Lowered for thicker header */
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1129,6 +1250,7 @@ body {
   padding: 50px 0 30px 0;
   margin-top: 80px;
   position: relative;
+  z-index: 10;
 }
 
 .footer-grid {

@@ -58,6 +58,9 @@ const Auth = {
         document.getElementById("userName").innerText = Auth.user.name.split(" ")[0];
         document.getElementById("userCoins").innerText = (Auth.user.hawai_coins || 0).toLocaleString();
         document.getElementById("userImg").src = Auth.user.picture;
+
+        // UPGRADE: Update XP Bar
+        FX.updateXP(Auth.user.hawai_coins || 0);
       }
     } else {
       if (btn) btn.classList.remove("hidden");
@@ -110,6 +113,127 @@ const Sound = {
   },
 };
 
+// --- FX ENGINE (GOD TIER) ---
+const FX = {
+  init: () => {
+    FX.initCursor();
+    FX.initTicker();
+    FX.initTilt();
+  },
+
+  initCursor: () => {
+    if (window.innerWidth < 768) return; // Disable on mobile
+
+    const cursor = document.createElement("div");
+    cursor.className = "custom-cursor";
+    document.body.appendChild(cursor);
+
+    const trail = document.createElement("div");
+    trail.className = "cursor-trail";
+    document.body.appendChild(trail);
+
+    document.addEventListener("mousemove", (e) => {
+      cursor.style.left = e.clientX + "px";
+      cursor.style.top = e.clientY + "px";
+
+      // Trail delay
+      setTimeout(() => {
+        trail.style.left = e.clientX - 3 + "px";
+        trail.style.top = e.clientY - 3 + "px";
+      }, 50);
+
+      // Hover effect
+      const target = e.target;
+      if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('.game-card') || target.closest('.item-card')) {
+        cursor.classList.add("hovered");
+      } else {
+        cursor.classList.remove("hovered");
+      }
+    });
+  },
+
+  scrambleText: (el) => {
+    const original = el.innerText;
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+    let iterations = 0;
+
+    const interval = setInterval(() => {
+      el.innerText = original.split("").map((letter, index) => {
+        if (index < iterations) return original[index];
+        return chars[Math.floor(Math.random() * chars.length)];
+      }).join("");
+
+      if (iterations >= original.length) clearInterval(interval);
+      iterations += 1 / 3;
+    }, 30);
+  },
+
+  initTicker: () => {
+    // Inject ticker into header if not present
+    const header = document.querySelector('.cyber-header');
+    if (header && !document.querySelector('.ticker-wrap')) {
+      const wrap = document.createElement('div');
+      wrap.className = 'ticker-wrap';
+      wrap.innerHTML = `<div class="ticker" id="liveTicker"></div>`;
+      header.prepend(wrap);
+
+      // Feed data
+      const names = ["Zuxxy", "Ryzen", "Lemon", "Jess", "Oura", "Donkey", "R7", "Alberttt"];
+      const items = ["366 Diamonds", "Weekly Diamond Pass", "Twilight Pass", "1000 CP", "Starlight Member"];
+      const ticker = document.getElementById("liveTicker");
+
+      // Generate content
+      let content = "";
+      for (let i = 0; i < 10; i++) {
+        let n = names[Math.floor(Math.random() * names.length)];
+        let item = items[Math.floor(Math.random() * items.length)];
+        content += `<div class="ticker-item"><i class="fas fa-shopping-cart"></i> ${n} bought ${item} <span class="text-muted">Just now</span></div>`;
+      }
+      ticker.innerHTML = content + content; // Duplicate for smooth loop
+    }
+  },
+
+  updateXP: (coins) => {
+    // Max Level at 100,000 coins
+    const max = 100000;
+    const pct = Math.min((coins / max) * 100, 100);
+
+    const panel = document.querySelector('.user-panel');
+    if (panel) {
+      let bar = panel.querySelector('.xp-bg');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'xp-bg';
+        panel.appendChild(bar);
+      }
+      setTimeout(() => bar.style.width = pct + "%", 500);
+    }
+  },
+
+  initTilt: () => {
+    // Simple Vanilla Tilt implementation for 3D Cards
+    document.addEventListener("mousemove", (e) => {
+      document.querySelectorAll('.game-card, .item-card, .form-panel').forEach(card => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Check if mouse is near/over element
+        if (x > -50 && x < rect.width + 50 && y > -50 && y < rect.height + 50) {
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          const rotateX = ((y - centerY) / centerY) * -10; // Max 10deg
+          const rotateY = ((x - centerX) / centerX) * 10;
+
+          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+        } else {
+          card.style.transform = `perspective(1000px) rotateX(0) rotateY(0) scale(1)`;
+        }
+      });
+    });
+  }
+};
+
 // --- APP ENGINE ---
 const App = {
   state: {
@@ -131,12 +255,13 @@ const App = {
     await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
 
     if (typeof World !== "undefined") World.init();
+    FX.init(); // Initialize God Tier FX
+
     App.router("home");
     document.addEventListener("click", () => Sound.click());
 
     // Inject Footer if not present
-    if (!document.getElementById('mainFormatter')) {
-      // Only inject if in index context
+    if (!document.getElementById('mainFooter')) {
       const vp = document.getElementById("viewport");
       if (vp) {
         const footer = document.createElement("footer");
@@ -146,7 +271,7 @@ const App = {
            <div class="container">
              <div class="footer-grid">
                <div class="footer-brand">
-                 <h2 class="text-neon">HAWAI TOPUP</h2>
+                 <h2 class="text-neon" onmouseover="FX.scrambleText(this)">HAWAI TOPUP</h2>
                  <p class="text-muted">The Next Gen Topup Platform. Instant, Secure, and Aesthetic.</p>
                </div>
                <div class="footer-links">
@@ -312,7 +437,7 @@ const App = {
     let html = `
             <div class="hero-slider" id="home-slider"></div>
             <div class="container">
-                <h2 class="section-title">TRENDING GAMES</h2>
+                <h2 class="section-title" onmouseover="FX.scrambleText(this)">TRENDING GAMES</h2>
                 
                 <!-- SEARCH BAR -->
                 <div class="search-wrapper">
@@ -356,12 +481,7 @@ const App = {
     container.innerHTML = `<div class="container text-center" style="padding-top:100px;"><i class="fas fa-circle-notch fa-spin fa-2x text-neon"></i><p>Accessing Database...</p></div>`;
 
     try {
-      // Change endpoint if needed
       const res = await fetch(`${API_URL}/transactions?uid=${Auth.user.uid}`);
-      // Assuming backend supports this, if not we mock it or handle error
-      // If no backend endpoint exists yet, we show a nice empty state or mock
-
-      // Let's assume response structure or fallback
       let transactions = [];
       if (res.ok) {
         const json = await res.json();
@@ -370,7 +490,7 @@ const App = {
 
       let html = `
           <div class="container" style="padding-top: 50px;">
-              <h2 class="section-title">TRANSACTION HISTORY</h2>
+              <h2 class="section-title" onmouseover="FX.scrambleText(this)">TRANSACTION LOGS</h2>
               <table class="history-table">
                   <thead>
                       <tr>
@@ -472,7 +592,7 @@ const App = {
                 <div class="order-header">
                     <img src="${gameData.img}" class="game-poster">
                     <div class="game-meta" style="flex:1; padding-top:20px;">
-                        <h1 class="text-neon">${brandName}</h1>
+                        <h1 class="text-neon" onmouseover="FX.scrambleText(this)">${brandName}</h1>
                         <p class="text-muted">Instant Delivery • Secure Payment • 24/7 Support</p>
                     </div>
                 </div>
