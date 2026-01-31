@@ -11,12 +11,8 @@ const CONFIG = {
 // --- AUTH SYSTEM ---
 const Auth = {
   user: null,
-
   init: () => {
-    if (!firebase.apps.length) {
-      console.error("Firebase belum di-init! Cek file firebase-config.js");
-      return;
-    }
+    if (!firebase.apps.length) return;
 
     firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
@@ -28,7 +24,6 @@ const Auth = {
             body: JSON.stringify({ idToken }),
           });
           const data = await res.json();
-
           if (data.success) {
             Auth.user = data.user;
             Auth.updateUI(true);
@@ -50,9 +45,7 @@ const Auth = {
     });
   },
 
-  signOut: () => {
-    firebase.auth().signOut();
-  },
+  signOut: () => { firebase.auth().signOut(); },
 
   updateUI: (isLoggedIn) => {
     const btn = document.getElementById("btnLogin");
@@ -75,26 +68,10 @@ const Auth = {
 
 // --- PRESET ASSETS ---
 const PRESET_ASSETS = {
-  "MOBILE LEGENDS": {
-    logo: "assets/lance2.png",
-    banner: "assets/ml-banner.png",
-    theme: "#00f3ff",
-  },
-  "Free Fire": {
-    logo: "assets/ff.jpg",
-    banner: "assets/ff-banner.jpg",
-    theme: "#ff9900",
-  },
-  "PUBG Mobile": {
-    logo: "https://cdn-icons-png.flaticon.com/512/3408/3408506.png",
-    banner: "https://wallpaperaccess.com/full/1239676.jpg",
-    theme: "#f2a900",
-  },
-  "Valorant": {
-    logo: "https://img.icons8.com/color/480/valorant.png",
-    banner: "https://images4.alphacoders.com/114/1149479.jpg",
-    theme: "#ff4655",
-  },
+  "MOBILE LEGENDS": { logo: "assets/lance2.png", banner: "assets/ml-banner.png", theme: "#00f3ff" },
+  "Free Fire": { logo: "assets/ff.jpg", banner: "assets/ff-banner.jpg", theme: "#ff9900" },
+  "PUBG Mobile": { logo: "https://cdn-icons-png.flaticon.com/512/3408/3408506.png", banner: "https://wallpaperaccess.com/full/1239676.jpg", theme: "#f2a900" },
+  "Valorant": { logo: "https://img.icons8.com/color/480/valorant.png", banner: "https://images4.alphacoders.com/114/1149479.jpg", theme: "#ff4655" },
 };
 
 const DEFAULT_ASSETS = {
@@ -200,18 +177,13 @@ const App = {
     try {
       const res = await fetch(`${API_URL}/channels`);
       const json = await res.json();
-      if (json.success && json.data) {
-        App.state.paymentChannels = json.data;
-      }
-    } catch (e) {
-      console.error("Gagal load channel pembayaran");
-    }
+      if (json.success && json.data) App.state.paymentChannels = json.data;
+    } catch (e) { console.error("Gagal load channel pembayaran"); }
   },
 
   router: (page, param = null) => {
     const vp = document.getElementById("viewport");
     if (!vp) return;
-
     window.scrollTo(0, 0);
     // Remove active class from modals on navigation
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
@@ -227,27 +199,16 @@ const App = {
     if (modal) modal.classList.add("active");
   },
 
-  selectCoin: (amount) => {
-    document.getElementById("customCoin").value = amount;
-  },
-
-  closeModal: (id) => {
-    document.getElementById(id).classList.remove("active");
-  },
+  selectCoin: (amount) => document.getElementById("customCoin").value = amount,
+  closeModal: (id) => document.getElementById(id).classList.remove("active"),
 
   processTopupCoin: () => {
     const amountInput = document.getElementById("customCoin");
     const amount = parseInt(amountInput.value);
 
-    if (isNaN(amount) || amount < 10000) {
-      return alert("Min Topup Rp 10.000");
-    }
+    if (isNaN(amount) || amount < 10000) return alert("Min Topup Rp 10.000");
 
-    App.state.selectedItem = {
-      code: "DEPOSIT",
-      price: amount,
-      name: "Topup Coin",
-    };
+    App.state.selectedItem = { code: "DEPOSIT", price: amount, name: "Topup Coin" };
     App.state.transactionType = "COIN";
 
     App.closeModal("coinModal");
@@ -292,6 +253,35 @@ const App = {
       .filter((p) => p.brand === brandName && p.is_active !== false)
       .sort((a, b) => a.price_sell - b.price_sell);
 
+    // --- CATEGORIZATION LOGIC ---
+    const promos = [];
+    const members = [];
+    const diamonds = [];
+
+    items.forEach((p) => {
+      const name = p.name.toLowerCase();
+      // Member/Pass/WDP
+      if (
+        name.includes("member") ||
+        name.includes("starlight") ||
+        name.includes("pass") ||
+        name.includes("wdp") ||
+        name.includes("bulanan") ||
+        name.includes("mingguan") ||
+        name.includes("twilight")
+      ) {
+        members.push(p);
+      }
+      // Promo checks (is_promo flag OR naming convention)
+      else if (p.is_promo === true || name.includes("promo") || name.includes("flash") || name.includes("special")) {
+        promos.push(p);
+      }
+      // Regular
+      else {
+        diamonds.push(p);
+      }
+    });
+
     const gameData = App.state.gamesList.find((g) => g.id === brandName) || {
       banner: DEFAULT_ASSETS.banner,
       img: DEFAULT_ASSETS.logo,
@@ -328,8 +318,37 @@ const App = {
                 <div class="form-panel">
                     <span class="panel-num">02</span>
                     <h3 class="mb-3">SELECT ITEM</h3>
+                    
+                    ${promos.length > 0
+        ? `
+                        <div class="cat-header cat-hot">
+                            <div class="cat-icon"><i class="fas fa-fire"></i></div>
+                            <div class="cat-title">HOT DEALS</div>
+                        </div>
+                        <div class="items-grid">
+                            ${promos.map((p) => App.renderItemCard(p, "hot")).join("")}
+                        </div>`
+        : ""
+      }
+
+                    ${members.length > 0
+        ? `
+                        <div class="cat-header cat-mem">
+                            <div class="cat-icon"><i class="fas fa-crown"></i></div>
+                            <div class="cat-title">MEMBERSHIP / PASS</div>
+                        </div>
+                        <div class="items-grid">
+                            ${members.map((p) => App.renderItemCard(p, "member")).join("")}
+                        </div>`
+        : ""
+      }
+
+                    <div class="cat-header cat-dia">
+                        <div class="cat-icon"><i class="far fa-gem"></i></div>
+                        <div class="cat-title">TOP UP</div>
+                    </div>
                     <div class="items-grid">
-                        ${items.map((p) => App.renderItemCard(p)).join("")}
+                        ${diamonds.map((p) => App.renderItemCard(p, "diamond")).join("")}
                     </div>
                 </div>
                 
@@ -341,8 +360,13 @@ const App = {
             </div>`;
   },
 
-  renderItemCard: (p) => {
+  renderItemCard: (p, type = "diamond") => {
+    // Determine Class based on Type
     let cardClass = "item-card";
+    if (type === "hot") cardClass += " card-hot";
+    else if (type === "member") cardClass += " card-member";
+    else cardClass += " card-diamond";
+
     const points = Math.floor(p.price_sell * (CONFIG.rewardPercent / 100));
 
     // Handle Image Source
@@ -361,13 +385,18 @@ const App = {
 
     return `
         <div class="${cardClass}" onclick="App.selectItem(this, '${p.sku}', ${p.price_sell}, '${p.name}')">
-            <div class="d-flex align-center gap-2 mb-2">
-                <img src="${imgDisplay}" class="item-icon" loading="lazy">
-                <div class="item-name">${p.name}</div>
-            </div>
-            <div class="item-price">Rp ${p.price_sell.toLocaleString()}</div>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">
-                +${points} Coins
+            <!-- Background FX Layer -->
+            <div class="item-bg-fx"></div>
+            
+            <div class="item-content">
+                <div class="d-flex align-center gap-2 mb-2">
+                    <img src="${imgDisplay}" class="item-icon" loading="lazy">
+                    <div class="item-name">${p.name}</div>
+                </div>
+                <div class="item-price">Rp ${p.price_sell.toLocaleString()}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">
+                    +${points} Coins
+                </div>
             </div>
         </div>`;
   },
@@ -552,27 +581,16 @@ const Terminal = {
   },
 };
 
-const Receipt = {
-  // Not heavily used if we redirect to invoice.html, but good for local fallback
-  show: () => {
-    document.getElementById("modal-receipt").classList.add("active");
-  },
-  close: () => {
-    document.getElementById("modal-receipt").classList.remove("active");
-  },
-};
-
 // --- 3D WORLD (Simplified for Performance) ---
 const World = {
   init: () => {
     const cvs = document.getElementById("webgl-canvas");
     if (!cvs) return;
 
-    // Check if Three is loaded
     if (typeof THREE === 'undefined') return;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x050505, 0.02); // Match bg-void
+    scene.fog = new THREE.FogExp2(0x050505, 0.02);
 
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 5, 10);
@@ -581,14 +599,12 @@ const World = {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // Moving Grid
     const gridGeo = new THREE.PlaneGeometry(300, 300, 50, 50);
     const gridMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.1 });
     const grid = new THREE.Mesh(gridGeo, gridMat);
     grid.rotation.x = -Math.PI / 2;
     scene.add(grid);
 
-    // Particles
     const starGeo = new THREE.BufferGeometry();
     const count = 500;
     const pos = new Float32Array(count * 3);
@@ -599,7 +615,7 @@ const World = {
 
     function animate() {
       requestAnimationFrame(animate);
-      grid.position.z = (Date.now() * 0.005) % 6; // Endless scroll illusion
+      grid.position.z = (Date.now() * 0.005) % 6;
       stars.rotation.y += 0.0005;
       renderer.render(scene, camera);
     }
