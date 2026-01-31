@@ -951,3 +951,235 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* =========================================
+   5. NEW UPGRADES (Notifications, Search, Footer)
+   ========================================= */
+
+/* --- Cyber Toast (Notification) --- */
+.cyber-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.cyber-toast {
+  background: rgba(10, 15, 20, 0.95);
+  border: 1px solid var(--primary);
+  color: #fff;
+  padding: 15px 20px;
+  min-width: 300px;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  backdrop-filter: blur(10px);
+  animation: slideInRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-toast.error {
+  border-color: #ff0055;
+}
+
+.cyber-toast.error i {
+  color: #ff0055;
+}
+
+.cyber-toast i {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.cyber-toast::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--primary);
+  animation: toastTimer 3s linear forwards;
+}
+
+.cyber-toast.error::after {
+  background: #ff0055;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastTimer {
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
+  }
+}
+
+/* --- Smart Search Bar --- */
+.search-wrapper {
+  position: relative;
+  max-width: 500px;
+  margin: 0 auto 30px auto;
+}
+
+.input-holo {
+  width: 100%;
+  background: rgba(0, 243, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  padding: 15px 20px 15px 50px;
+  border-radius: 50px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  transition: 0.3s;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.05);
+}
+
+.input-holo:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 25px rgba(0, 243, 255, 0.2);
+  background: rgba(0, 243, 255, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--primary);
+  font-size: 1.2rem;
+  pointer-events: none;
+}
+
+/* --- History Table --- */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.history-table th {
+  text-align: left;
+  padding: 15px;
+  background: rgba(0, 243, 255, 0.1);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  border-bottom: 2px solid var(--border-glass);
+}
+
+.history-table td {
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: var(--font-body);
+}
+
+.status-badge {
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  display: inline-block;
+}
+
+.status-success {
+  background: rgba(0, 180, 0, 0.2);
+  color: #0f0;
+  border: 1px solid #0f0;
+}
+
+.status-pending {
+  background: rgba(255, 165, 0, 0.2);
+  color: orange;
+  border: 1px solid orange;
+}
+
+.status-failed {
+  background: rgba(255, 0, 0, 0.2);
+  color: red;
+  border: 1px solid red;
+}
+
+/* --- Cyber Footer --- */
+.cyber-footer {
+  background: #020205;
+  border-top: 1px solid var(--border-glass);
+  padding: 50px 0 30px 0;
+  margin-top: 80px;
+  position: relative;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.footer-brand h2 {
+  font-family: var(--font-head);
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.footer-links h4 {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  font-family: var(--font-mono);
+}
+
+.footer-links ul {
+  list-style: none;
+}
+
+.footer-links li {
+  margin-bottom: 10px;
+}
+
+.footer-links a {
+  color: #fff;
+  text-decoration: none;
+  transition: 0.2s;
+}
+
+.footer-links a:hover {
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--primary-glow);
+}
+
+.copy-bar {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 20px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 768px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+}

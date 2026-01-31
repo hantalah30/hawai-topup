@@ -41,7 +41,7 @@ const Auth = {
   signIn: () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     firebase.auth().signInWithPopup(provider).catch((error) => {
-      alert("Login Gagal: " + error.message);
+      App.showToast("Login Gagal: " + error.message, "error");
     });
   },
 
@@ -123,6 +123,7 @@ const App = {
     activeBrand: null,
     refId: null,
     nickname: null,
+    displayedGames: [], // For filtering
   },
 
   init: async () => {
@@ -132,6 +133,70 @@ const App = {
     if (typeof World !== "undefined") World.init();
     App.router("home");
     document.addEventListener("click", () => Sound.click());
+
+    // Inject Footer if not present
+    if (!document.getElementById('mainFormatter')) {
+      // Only inject if in index context
+      const vp = document.getElementById("viewport");
+      if (vp) {
+        const footer = document.createElement("footer");
+        footer.className = "cyber-footer";
+        footer.id = "mainFooter";
+        footer.innerHTML = `
+           <div class="container">
+             <div class="footer-grid">
+               <div class="footer-brand">
+                 <h2 class="text-neon">HAWAI TOPUP</h2>
+                 <p class="text-muted">The Next Gen Topup Platform. Instant, Secure, and Aesthetic.</p>
+               </div>
+               <div class="footer-links">
+                 <h4>QUICK LINKS</h4>
+                 <ul>
+                    <li><a href="#" onclick="App.router('home')">Home</a></li>
+                    <li><a href="#" onclick="App.router('history')">History</a></li>
+                    <li><a href="#" onclick="App.openTopupModal()">Top Up Coins</a></li>
+                 </ul>
+               </div>
+               <div class="footer-links">
+                 <h4>SUPPORT</h4>
+                 <ul>
+                    <li><a href="#">Contact Us</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                 </ul>
+               </div>
+             </div>
+             <div class="copy-bar text-center">
+               &copy; 2024 Hawai Topup Team. All Rights Reserved.
+             </div>
+           </div>`;
+        vp.after(footer);
+      }
+    }
+  },
+
+  showToast: (msg, type = "success") => {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toast-container";
+      container.className = "cyber-toast-container";
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.className = `cyber-toast ${type}`;
+    const icon = type === "error" ? "fa-exclamation-triangle" : "fa-check-circle";
+    toast.innerHTML = `<i class="fas ${icon}"></i> <span>${msg}</span>`;
+    container.appendChild(toast);
+
+    // Sound Effect
+    if (type === "error") Sound.play(150, "sawtooth", 0.3);
+    else Sound.success();
+
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
   },
 
   fetchData: async () => {
@@ -167,6 +232,7 @@ const App = {
         })
         .filter((g) => g !== null);
 
+      App.state.displayedGames = [...App.state.gamesList]; // Init Displayed
       App.router("home");
     } catch (e) {
       console.error("Fetch Error:", e);
@@ -190,11 +256,11 @@ const App = {
 
     if (page === "home") App.renderHome(vp);
     else if (page === "order") App.renderOrderPage(vp, param);
-    else if (page === "history") vp.innerHTML = `<div class="container text-center" style="padding-top:100px;"><h2>HISTORY LOGS</h2><p class="text-muted">Feature coming soon...</p></div>`;
+    else if (page === "history") App.renderHistory(vp);
   },
 
   openTopupModal: () => {
-    if (!Auth.user) return alert("Please Login First!");
+    if (!Auth.user) return App.showToast("Please Login First!", "error");
     const modal = document.getElementById("coinModal");
     if (modal) modal.classList.add("active");
   },
@@ -206,7 +272,7 @@ const App = {
     const amountInput = document.getElementById("customCoin");
     const amount = parseInt(amountInput.value);
 
-    if (isNaN(amount) || amount < 10000) return alert("Min Topup Rp 10.000");
+    if (isNaN(amount) || amount < 10000) return App.showToast("Min Topup Rp 10.000", "error");
 
     App.state.selectedItem = { code: "DEPOSIT", price: amount, name: "Topup Coin" };
     App.state.transactionType = "COIN";
@@ -215,33 +281,139 @@ const App = {
     Terminal.openPaymentSelect();
   },
 
-  renderHome: (container) => {
-    if (App.sliderInterval) clearInterval(App.sliderInterval);
+  filterGames: (query) => {
+    const q = query.toLowerCase();
+    App.state.displayedGames = App.state.gamesList.filter(g => g.name.toLowerCase().includes(q));
 
-    let html = `
-            <div class="hero-slider" id="home-slider"></div>
-            <div class="container">
-                <h2 class="section-title">TRENDING GAMES</h2>
-                <div class="grid-games">`;
-
-    App.state.gamesList.forEach((g) => {
-      html += `
+    // Re-render only Grid
+    const grid = document.getElementById('games-grid-container');
+    if (grid) {
+      if (App.state.displayedGames.length === 0) {
+        grid.innerHTML = `<div class="text-center text-muted" style="grid-column: 1/-1; padding: 50px;">NO GAMES FOUND</div>`;
+      } else {
+        grid.innerHTML = App.state.displayedGames.map(g => `
                 <div class="game-card" onclick="App.router('order', '${g.id}')">
                     <div class="gc-bg" style="background-image: url('${g.banner}');"></div>
                     <div class="gc-info">
                         <div class="gc-name">${g.name}</div>
                         <div class="gc-status">● SERVER ONLINE</div>
                     </div>
-                </div>`;
-    });
+                </div>`).join('');
+      }
+    }
+  },
+
+  renderHome: (container) => {
+    if (App.sliderInterval) clearInterval(App.sliderInterval);
+
+    // Reset filtering
+    App.state.displayedGames = [...App.state.gamesList];
+
+    let html = `
+            <div class="hero-slider" id="home-slider"></div>
+            <div class="container">
+                <h2 class="section-title">TRENDING GAMES</h2>
+                
+                <!-- SEARCH BAR -->
+                <div class="search-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="input-holo" placeholder="Search Games..." oninput="App.filterGames(this.value)">
+                </div>
+
+                <div class="grid-games" id="games-grid-container">`;
 
     if (App.state.gamesList.length === 0) {
       html += `<div class="text-center text-muted" style="grid-column: 1/-1; padding: 50px;">LOADING GAMES...</div>`;
+    } else {
+      App.state.gamesList.forEach((g) => {
+        html += `
+                    <div class="game-card" onclick="App.router('order', '${g.id}')">
+                        <div class="gc-bg" style="background-image: url('${g.banner}');"></div>
+                        <div class="gc-info">
+                            <div class="gc-name">${g.name}</div>
+                            <div class="gc-status">● SERVER ONLINE</div>
+                        </div>
+                    </div>`;
+      });
     }
 
     html += `</div></div>`;
     container.innerHTML = html;
     App.startSlider();
+  },
+
+  renderHistory: async (container) => {
+    if (!Auth.user) {
+      container.innerHTML = `<div class="container text-center" style="padding-top:100px;">
+            <i class="fas fa-lock fa-3x text-pink mb-3"></i>
+            <h2>LOGIN REQUIRED</h2>
+            <p class="text-muted">Please login to view your mission log.</p>
+            <button class="btn-neon mt-3" onclick="Auth.signIn()">Login with Google</button>
+          </div>`;
+      return;
+    }
+
+    container.innerHTML = `<div class="container text-center" style="padding-top:100px;"><i class="fas fa-circle-notch fa-spin fa-2x text-neon"></i><p>Accessing Database...</p></div>`;
+
+    try {
+      // Change endpoint if needed
+      const res = await fetch(`${API_URL}/transactions?uid=${Auth.user.uid}`);
+      // Assuming backend supports this, if not we mock it or handle error
+      // If no backend endpoint exists yet, we show a nice empty state or mock
+
+      // Let's assume response structure or fallback
+      let transactions = [];
+      if (res.ok) {
+        const json = await res.json();
+        transactions = json.data || [];
+      }
+
+      let html = `
+          <div class="container" style="padding-top: 50px;">
+              <h2 class="section-title">TRANSACTION HISTORY</h2>
+              <table class="history-table">
+                  <thead>
+                      <tr>
+                          <th>Date</th>
+                          <th>Ref ID</th>
+                          <th>Item</th>
+                          <th>Price</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                      </tr>
+                  </thead>
+                  <tbody>`;
+
+      if (transactions.length === 0) {
+        html += `<tr><td colspan="6" class="text-center">No transaction data found.</td></tr>`;
+      } else {
+        transactions.forEach(t => {
+          let statusClass = "status-pending";
+          if (t.status === "PAID" || t.status === "SUCCESS") statusClass = "status-success";
+          if (t.status === "EXPIRED" || t.status === "FAILED") statusClass = "status-failed";
+
+          html += `
+                  <tr>
+                      <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                      <td class="text-neon">#${t.reference}</td>
+                      <td>${t.item_name}</td>
+                      <td>Rp ${t.amount.toLocaleString()}</td>
+                      <td><span class="status-badge ${statusClass}">${t.status}</span></td>
+                      <td><a href="/invoice.html?ref=${t.reference}" class="btn-icon"><i class="fas fa-receipt"></i></a></td>
+                  </tr>`;
+        });
+      }
+
+      html += `</tbody></table></div>`;
+      container.innerHTML = html;
+
+    } catch (e) {
+      container.innerHTML = `<div class="container text-center" style="padding-top:100px;">
+            <i class="fas fa-exclamation-triangle fa-3x text-pink mb-3"></i>
+            <h2>SYSTEM ERROR</h2>
+            <p class="text-muted">Failed to retrieve data logs.</p>
+          </div>`;
+    }
   },
 
   renderOrderPage: (container, brandName) => {
@@ -260,9 +432,7 @@ const App = {
 
     items.forEach((p) => {
       const name = p.name.toLowerCase();
-
       // 1. PRIORITY: Admin "Hot Deals" Flag (Fire Logo)
-      // This directly connects to the Admin Toggle
       if (p.is_promo === true) {
         promos.push(p);
       }
@@ -321,29 +491,23 @@ const App = {
                     <span class="panel-num">02</span>
                     <h3 class="mb-3">SELECT ITEM</h3>
                     
-                    ${promos.length > 0
-        ? `
+                    ${promos.length > 0 ? `
                         <div class="cat-header cat-hot">
                             <div class="cat-icon"><i class="fas fa-fire"></i></div>
                             <div class="cat-title">HOT DEALS</div>
                         </div>
                         <div class="items-grid">
                             ${promos.map((p) => App.renderItemCard(p, "hot")).join("")}
-                        </div>`
-        : ""
-      }
+                        </div>` : ""}
 
-                    ${members.length > 0
-        ? `
+                    ${members.length > 0 ? `
                         <div class="cat-header cat-mem">
                             <div class="cat-icon"><i class="fas fa-crown"></i></div>
                             <div class="cat-title">MEMBERSHIP / PASS</div>
                         </div>
                         <div class="items-grid">
                             ${members.map((p) => App.renderItemCard(p, "member")).join("")}
-                        </div>`
-        : ""
-      }
+                        </div>` : ""}
 
                     <div class="cat-header cat-dia">
                         <div class="cat-icon"><i class="far fa-gem"></i></div>
@@ -486,10 +650,10 @@ const Terminal = {
 
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
-      if (!uid) return alert("Fill User ID First!");
+      if (!uid) return App.showToast("Fill User ID First!", "error");
     }
 
-    if (!selectedItem) return alert("Select Item First!");
+    if (!selectedItem) return App.showToast("Select Item First!", "error");
 
     const listDiv = document.getElementById("paymentList");
     listDiv.innerHTML = "";
@@ -550,7 +714,7 @@ const Terminal = {
       payload.nickname = finalNickname;
 
       if (method === "HAWAI_COIN" && !Auth.user) {
-        alert("Please Login First");
+        App.showToast("Please Login First", "error");
         return;
       }
     } else if (transactionType === "COIN") {
@@ -574,10 +738,10 @@ const Terminal = {
       if (json.success) {
         window.location.href = `/invoice.html?ref=${json.data.reference}`;
       } else {
-        alert(json.message || "Transaction Failed");
+        App.showToast(json.message || "Transaction Failed", "error");
       }
     } catch (e) {
-      alert("Error: " + e.message);
+      App.showToast("Error: " + e.message, "error");
       document.getElementById("paymentModal").classList.remove("active");
     }
   },
