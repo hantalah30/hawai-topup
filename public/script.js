@@ -45,12 +45,9 @@ const Auth = {
 
   signIn: () => {
     const provider = new firebase.auth.GoogleAuthProvider();
-    firebase
-      .auth()
-      .signInWithPopup(provider)
-      .catch((error) => {
-        alert("Login Gagal: " + error.message);
-      });
+    firebase.auth().signInWithPopup(provider).catch((error) => {
+      alert("Login Gagal: " + error.message);
+    });
   },
 
   signOut: () => {
@@ -62,19 +59,16 @@ const Auth = {
     const info = document.getElementById("userInfo");
 
     if (isLoggedIn && Auth.user) {
-      if (btn) btn.style.display = "none";
+      if (btn) btn.classList.add("hidden");
       if (info) {
-        info.style.display = "flex";
-        document.getElementById("userName").innerText =
-          Auth.user.name.split(" ")[0];
-        document.getElementById("userCoins").innerText = (
-          Auth.user.hawai_coins || 0
-        ).toLocaleString();
+        info.classList.remove("hidden");
+        document.getElementById("userName").innerText = Auth.user.name.split(" ")[0];
+        document.getElementById("userCoins").innerText = (Auth.user.hawai_coins || 0).toLocaleString();
         document.getElementById("userImg").src = Auth.user.picture;
       }
     } else {
-      if (btn) btn.style.display = "flex";
-      if (info) info.style.display = "none";
+      if (btn) btn.classList.remove("hidden");
+      if (info) info.classList.add("hidden");
     }
   },
 };
@@ -96,7 +90,7 @@ const PRESET_ASSETS = {
     banner: "https://wallpaperaccess.com/full/1239676.jpg",
     theme: "#f2a900",
   },
-  Valorant: {
+  "Valorant": {
     logo: "https://img.icons8.com/color/480/valorant.png",
     banner: "https://images4.alphacoders.com/114/1149479.jpg",
     theme: "#ff4655",
@@ -118,7 +112,8 @@ const Sound = {
   ctx: new (window.AudioContext || window.webkitAudioContext)(),
   play: (f, t, d, v = 0.05) => {
     if (window.innerWidth < 768) return;
-    if (Sound.ctx.state === "suspended") Sound.ctx.resume();
+    if (Sound.ctx.state === "suspended") Sound.ctx.resume().catch(() => { });
+
     const o = Sound.ctx.createOscillator();
     const g = Sound.ctx.createGain();
     o.type = t;
@@ -132,66 +127,11 @@ const Sound = {
   },
   hover: () => Sound.play(300, "triangle", 0.05, 0.02),
   click: () => Sound.play(800, "sine", 0.1, 0.05),
-  type: () => Sound.play(600, "square", 0.03, 0.03),
   success: () => {
     Sound.play(600, "square", 0.1);
     setTimeout(() => Sound.play(1200, "square", 0.4), 100);
   },
 };
-
-// --- TEXT SCRAMBLER ---
-class TextScramble {
-  constructor(el) {
-    this.el = el;
-    this.chars = "!<>-_\\/[]{}—=+*^?#________";
-    this.update = this.update.bind(this);
-  }
-  setText(newText) {
-    const oldText = this.el.innerText;
-    const length = Math.max(oldText.length, newText.length);
-    const promise = new Promise((resolve) => (this.resolve = resolve));
-    this.queue = [];
-    for (let i = 0; i < length; i++) {
-      const from = oldText[i] || "";
-      const to = newText[i] || "";
-      const start = Math.floor(Math.random() * 40);
-      const end = start + Math.floor(Math.random() * 40);
-      this.queue.push({ from, to, start, end });
-    }
-    cancelAnimationFrame(this.frameRequest);
-    this.frame = 0;
-    this.update();
-    return promise;
-  }
-  update() {
-    let output = "";
-    let complete = 0;
-    for (let i = 0, n = this.queue.length; i < n; i++) {
-      let { from, to, start, end, char } = this.queue[i];
-      if (this.frame >= end) {
-        complete++;
-        output += to;
-      } else if (this.frame >= start) {
-        if (!char || Math.random() < 0.28) {
-          char = this.randomChar();
-          this.queue[i].char = char;
-        }
-        output += `<span class="dud">${char}</span>`;
-      } else {
-        output += from;
-      }
-    }
-    this.el.innerHTML = output;
-    if (complete === this.queue.length) this.resolve();
-    else {
-      this.frameRequest = requestAnimationFrame(this.update);
-      this.frame++;
-    }
-  }
-  randomChar() {
-    return this.chars[Math.floor(Math.random() * this.chars.length)];
-  }
-}
 
 // --- APP ENGINE ---
 const App = {
@@ -203,32 +143,16 @@ const App = {
     serverSliders: [],
     selectedItem: null,
     transactionType: "GAME",
-    activeBrand: null, // [FIX] Menyimpan nama game yang sedang aktif
+    activeBrand: null,
     refId: null,
     nickname: null,
   },
 
   init: async () => {
     Auth.init();
-
-    if (window.innerWidth > 768) {
-      document.addEventListener("mousemove", (e) => {
-        gsap.to(".cursor-dot", { x: e.clientX, y: e.clientY, duration: 0 });
-        gsap.to(".cursor-ring", {
-          x: e.clientX - 20,
-          y: e.clientY - 20,
-          duration: 0.15,
-        });
-      });
-    }
-
     await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
 
-    const bootLayer = document.getElementById("boot-layer");
-    if (bootLayer) bootLayer.style.display = "none";
-
     if (typeof World !== "undefined") World.init();
-
     App.router("home");
     document.addEventListener("click", () => Sound.click());
   },
@@ -244,9 +168,7 @@ const App = {
 
       if (data.reward_percent) CONFIG.rewardPercent = data.reward_percent;
 
-      const uniqueBrands = [
-        ...new Set(App.state.rawProducts.map((p) => p.brand)),
-      ];
+      const uniqueBrands = [...new Set(App.state.rawProducts.map((p) => p.brand))];
 
       App.state.gamesList = uniqueBrands
         .map((brandName) => {
@@ -254,7 +176,7 @@ const App = {
           const preset = PRESET_ASSETS[brandName] || {};
           const adminBanner = App.state.serverBanners[brandName];
           const sampleProduct = App.state.rawProducts.find(
-            (p) => p.brand === brandName && !p.image.includes("default"),
+            (p) => p.brand === brandName && !p.image.includes("default")
           );
           const serverImg = sampleProduct ? sampleProduct.image : null;
 
@@ -290,16 +212,19 @@ const App = {
     const vp = document.getElementById("viewport");
     if (!vp) return;
 
-    vp.innerHTML = "";
     window.scrollTo(0, 0);
+    // Remove active class from modals on navigation
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+
     if (page === "home") App.renderHome(vp);
     else if (page === "order") App.renderOrderPage(vp, param);
+    else if (page === "history") vp.innerHTML = `<div class="container text-center" style="padding-top:100px;"><h2>HISTORY LOGS</h2><p class="text-muted">Feature coming soon...</p></div>`;
   },
 
   openTopupModal: () => {
-    if (!Auth.user) return alert("Silakan Login terlebih dahulu!");
+    if (!Auth.user) return alert("Please Login First!");
     const modal = document.getElementById("coinModal");
-    if (modal) modal.classList.remove("hidden");
+    if (modal) modal.classList.add("active");
   },
 
   selectCoin: (amount) => {
@@ -307,7 +232,7 @@ const App = {
   },
 
   closeModal: (id) => {
-    document.getElementById(id).classList.add("hidden");
+    document.getElementById(id).classList.remove("active");
   },
 
   processTopupCoin: () => {
@@ -315,7 +240,7 @@ const App = {
     const amount = parseInt(amountInput.value);
 
     if (isNaN(amount) || amount < 10000) {
-      return alert("Minimal Topup Rp 10.000");
+      return alert("Min Topup Rp 10.000");
     }
 
     App.state.selectedItem = {
@@ -333,28 +258,24 @@ const App = {
     if (App.sliderInterval) clearInterval(App.sliderInterval);
 
     let html = `
-            <div class="hero-slider" id="home-slider"><div class="slider-timer"></div></div>
+            <div class="hero-slider" id="home-slider"></div>
             <div class="container">
-                <h2 class="section-title">POPULAR GAMES</h2>
-                <div class="grid">`;
+                <h2 class="section-title">TRENDING GAMES</h2>
+                <div class="grid-games">`;
 
     App.state.gamesList.forEach((g) => {
       html += `
-                <div class="tilt-card" onclick="App.router('order', '${g.id}')" onmouseenter="App.tilt(this)" style="background-image: url('${g.banner}');">
-                    <div class="card-overlay">
-                        <div class="d-flex align-items-center gap-2">
-                            <img src="${g.img}" class="mini-logo" onerror="this.style.display='none'">
-                            <div class="card-info">
-                                <h3>${g.name}</h3>
-                                <p>● SERVER ONLINE</p>
-                            </div>
-                        </div>
+                <div class="game-card" onclick="App.router('order', '${g.id}')">
+                    <div class="gc-bg" style="background-image: url('${g.banner}');"></div>
+                    <div class="gc-info">
+                        <div class="gc-name">${g.name}</div>
+                        <div class="gc-status">● SERVER ONLINE</div>
                     </div>
                 </div>`;
     });
 
     if (App.state.gamesList.length === 0) {
-      html += `<div style="text-align:center; padding:50px; color:#fff;">LOADING GAMES...</div>`;
+      html += `<div class="text-center text-muted" style="grid-column: 1/-1; padding: 50px;">LOADING GAMES...</div>`;
     }
 
     html += `</div></div>`;
@@ -365,7 +286,7 @@ const App = {
   renderOrderPage: (container, brandName) => {
     App.state.transactionType = "GAME";
     App.state.nickname = null;
-    App.state.activeBrand = brandName; // [FIX] Simpan nama game aktif
+    App.state.activeBrand = brandName;
 
     const items = App.state.rawProducts
       .filter((p) => p.brand === brandName && p.is_active !== false)
@@ -379,87 +300,52 @@ const App = {
 
     const isML = brandName.toLowerCase().includes("mobile");
     const zoneInput = isML
-      ? `<input type="number" id="zone" class="input-neon" placeholder="Zone (4 Angka)" oninput="App.checkNickname()">`
+      ? `<input type="number" id="zone" class="input-cyber" placeholder="Zone" oninput="App.checkNickname()" style="flex:1;">`
       : `<input type="hidden" id="zone" value="">`;
 
-    const promoItems = items.filter((p) => p.is_promo === true);
-    const normalItems = items.filter((p) => !p.is_promo);
-    const mem = normalItems.filter(
-      (p) =>
-        p.name.toLowerCase().includes("member") ||
-        p.name.toLowerCase().includes("pass"),
-    );
-    const dia = normalItems.filter((p) => !mem.includes(p));
-
     container.innerHTML = `
-            <div class="game-hero" style="background-image: url('${gameData.banner}'), url('${DEFAULT_ASSETS.banner}');"></div>
+            <div class="game-hero-banner" style="background-image: url('${gameData.banner}');"></div>
+            
             <div class="container">
-                <div class="game-header-wrap">
-                    <img src="${gameData.img}" class="game-poster-img" style="border: 4px solid ${gameData.theme}; box-shadow: 0 0 30px ${gameData.theme}40;">
-                    <div class="game-title">
-                        <h1 style="color:#fff; text-shadow: 0 0 20px ${gameData.theme};">${brandName}</h1>
-                        <p style="color:#ddd;">Instant Delivery System</p>
+                <div class="order-header">
+                    <img src="${gameData.img}" class="game-poster">
+                    <div class="game-meta" style="flex:1; padding-top:20px;">
+                        <h1 class="text-neon">${brandName}</h1>
+                        <p class="text-muted">Instant Delivery • Secure Payment • 24/7 Support</p>
                     </div>
                 </div>
 
-                <div class="cyber-form">
-                    <div class="form-section">
-                        <span class="sec-title">01 // ACCOUNT DATA</span>
-                        <div class="input-row">
-                            <input type="number" id="uid" class="input-neon" placeholder="User ID" onchange="App.checkNickname()">
-                            ${zoneInput}
-                        </div>
-                        <div id="nick-result" class="nick-res"></div>
+                <div class="form-panel">
+                    <span class="panel-num">01</span>
+                    <h3 class="mb-3">ACCOUNT DATA</h3>
+                    <div class="d-flex gap-2">
+                        <input type="text" id="uid" class="input-cyber" placeholder="User ID" onchange="App.checkNickname()" style="flex:2;">
+                        ${zoneInput}
                     </div>
+                    <div id="nick-result" class="mt-2 text-neon" style="font-size:0.9rem; min-height:20px;"></div>
+                </div>
 
-                    <div class="form-section">
-                        <span class="sec-title">02 // PILIH PRODUK</span>
-                        ${
-                          promoItems.length > 0
-                            ? `<div class="cat-label hot-label"><i class="fas fa-fire"></i> HOT PROMO</div>
-                        <div class="item-grid mb-4">
-                            ${promoItems.map((p) => App.renderItemCard(p)).join("")}
-                        </div>`
-                            : ""
-                        }
-                        ${
-                          mem.length > 0
-                            ? `<div class="cat-label mt-3"><i class="fas fa-crown text-warning"></i> MEMBERSHIP</div>
-                        <div class="item-grid">
-                            ${mem.map((p) => App.renderItemCard(p)).join("")}
-                        </div>`
-                            : ""
-                        }
-                        <div class="cat-label mt-4"><i class="fas fa-gem" style="color:${gameData.theme}"></i> TOP UP</div>
-                        <div class="item-grid">
-                            ${dia.map((p) => App.renderItemCard(p)).join("")}
-                        </div>
+                <div class="form-panel">
+                    <span class="panel-num">02</span>
+                    <h3 class="mb-3">SELECT ITEM</h3>
+                    <div class="items-grid">
+                        ${items.map((p) => App.renderItemCard(p)).join("")}
                     </div>
-                    
-                    <div class="footer-action">
-                        <button class="btn-pay-now" onclick="Terminal.openPaymentSelect()">
-                            BELI SEKARANG <i class="fas fa-wallet ml-2"></i>
-                        </button>
-                    </div>
+                </div>
+                
+                <div class="text-end mb-5">
+                    <button class="btn-neon" style="padding: 15px 40px; font-size: 1.1rem;" onclick="Terminal.openPaymentSelect()">
+                        PROCEED TO PAYMENT <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
                 </div>
             </div>`;
   },
 
   renderItemCard: (p) => {
     let cardClass = "item-card";
-    let badgeHtml = "";
     const points = Math.floor(p.price_sell * (CONFIG.rewardPercent / 100));
 
-    if (p.is_promo) {
-      cardClass += " card-promo";
-      badgeHtml = `<div class="hot-badge">HOT 🔥</div>`;
-    } else if (
-      p.name.toLowerCase().includes("member") ||
-      p.name.toLowerCase().includes("pass")
-    ) {
-      cardClass += " card-premium";
-    }
-
+    // Handle Image Source
     let imgDisplay;
     if (p.image && !p.image.includes("default")) {
       if (p.image.startsWith("http") || p.image.startsWith("data:")) {
@@ -475,13 +361,13 @@ const App = {
 
     return `
         <div class="${cardClass}" onclick="App.selectItem(this, '${p.sku}', ${p.price_sell}, '${p.name}')">
-            ${badgeHtml} <div class="i-content">
-                <img src="${imgDisplay}" class="i-icon" loading="lazy">
-                <div class="i-name">${p.name}</div>
-                <div class="i-price">Rp ${p.price_sell.toLocaleString()}</div>
-                <div style="font-size:0.7rem; color:#00f3ff; margin-top:3px;">
-                   <i class="fas fa-plus-circle"></i> ${points} Coins
-                </div>
+            <div class="d-flex align-center gap-2 mb-2">
+                <img src="${imgDisplay}" class="item-icon" loading="lazy">
+                <div class="item-name">${p.name}</div>
+            </div>
+            <div class="item-price">Rp ${p.price_sell.toLocaleString()}</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">
+                +${points} Coins
             </div>
         </div>`;
   },
@@ -491,133 +377,94 @@ const App = {
     const zoneInput = document.getElementById("zone");
     const zone = zoneInput ? zoneInput.value : "";
     const res = document.getElementById("nick-result");
-    const gameTitleEl = document.querySelector(".game-title h1");
-    const gameTitle = gameTitleEl ? gameTitleEl.innerText : "";
+    const game = App.state.activeBrand || "";
 
     if (uid.length < 4) {
       res.innerHTML = "";
       return;
     }
-    const isML = gameTitle.toLowerCase().includes("mobile");
-    if (isML && zone.length < 3) return;
 
-    res.style.display = "block";
-    res.innerHTML = `<span style="color:#00f3ff; font-size: 0.9rem;"><i class="fas fa-circle-notch fa-spin"></i> Mencari ID...</span>`;
+    res.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Checking ID...`;
 
     try {
       const response = await fetch(`${API_URL}/check-nickname`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game: gameTitle, id: uid, zone: zone }),
+        body: JSON.stringify({ game: game, id: uid, zone: zone }),
       });
       const data = await response.json();
       if (data.success) {
-        res.innerHTML = `
-                    <div style="margin-top:8px; padding:5px 10px; background:rgba(0,255,0,0.2); border:1px solid #00ff00; border-radius:6px; display:inline-flex; align-items:center; gap:5px;">
-                        <i class="fas fa-check-circle" style="color:#00ff00;"></i> 
-                        <span style="color:#fff; font-weight:bold; font-size:0.9rem;">${data.name}</span>
-                    </div>`;
+        res.innerHTML = `<span class="text-neon"><i class="fas fa-check-circle"></i> ${data.name}</span>`;
         Sound.success();
         App.state.nickname = data.name;
       } else {
-        res.innerHTML = `<span style="color:#ff4444; font-size:0.9rem; margin-top:5px; display:block;"><i class="fas fa-times-circle"></i> ID Tidak Ditemukan</span>`;
+        res.innerHTML = `<span class="text-pink"><i class="fas fa-times-circle"></i> Not Found</span>`;
         App.state.nickname = null;
       }
     } catch (e) {
-      console.error(e);
-      res.innerHTML = `<span style="color:red">Gagal koneksi</span>`;
+      res.innerHTML = `<span class="text-muted">Offline Mode / Check Ignored</span>`;
     }
   },
 
   selectItem: (el, code, price, name) => {
-    document
-      .querySelectorAll(".item-card")
-      .forEach((i) => i.classList.remove("active"));
+    document.querySelectorAll(".item-card").forEach((i) => i.classList.remove("active"));
     el.classList.add("active");
     App.state.selectedItem = { code, price, name };
-    App.state.transactionType = "GAME";
     Sound.click();
   },
 
-  tilt: (card) => {
-    if (window.innerWidth < 768) return;
-    card.addEventListener("mousemove", (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const cx = rect.width / 2;
-      const cy = rect.height / 2;
-      card.style.transform = `perspective(1000px) rotateX(${((y - cy) / cy) * -5}deg) rotateY(${((x - cx) / cx) * 5}deg) scale(1.02)`;
-    });
-    card.addEventListener("mouseleave", () => {
-      card.style.transform = `perspective(1000px) rotateX(0) rotateY(0) scale(1)`;
-    });
-    Sound.hover();
-  },
-
   startSlider: () => {
-    const sliders =
-      App.state.serverSliders.length > 0
-        ? App.state.serverSliders
-        : ["assets/slider1.png"];
+    const sliders = App.state.serverSliders.length > 0 ? App.state.serverSliders : ["assets/slider1.png"];
     const wrapper = document.getElementById("home-slider");
     if (!wrapper) return;
-    wrapper.innerHTML = '<div class="slider-timer"></div>';
+
+    wrapper.innerHTML = "";
     let curr = 0;
+
     const render = (idx) => {
       const imgUrl = sliders[idx];
       const div = document.createElement("div");
       div.className = "slide active";
       div.innerHTML = `
                 <div class="slide-bg" style="background-image: url('${imgUrl}'), url('${DEFAULT_ASSETS.banner}')"></div>
-                <div class="slide-ui">
-                    <div class="cyber-pane">
-                        <h1 class="glitch-title">HAWAI STORE</h1>
-                        <div class="slide-sub">GAME TOPUP CENTER</div>
-                    </div>
+                <div class="slide-content">
+                    <span class="hero-tag">FEATURED</span>
+                    <h1 class="hero-title">TOP UP <br> <span class="text-neon">LEVEL UP</span></h1>
                 </div>`;
+
       const old = wrapper.querySelector(".slide");
       if (old) {
         old.classList.remove("active");
         setTimeout(() => old.remove(), 1000);
       }
       wrapper.appendChild(div);
-      if (window.innerWidth > 768) {
-        const t = div.querySelector(".glitch-title");
-        if (t) new TextScramble(t).setText("HAWAI OMEGA");
-      }
     };
+
     render(0);
     App.sliderInterval = setInterval(() => {
       curr = (curr + 1) % sliders.length;
       render(curr);
-      const bar = document.querySelector(".slider-timer");
-      if (bar) {
-        bar.style.animation = "none";
-        void bar.offsetWidth;
-        bar.style.animation = "progress 5s linear forwards";
-      }
     }, 5000);
   },
 };
 
-// --- LOGIC TRANSAKSI (FIXED REDIRECT & BRAND NAME) ---
+// --- LOGIC TRANSAKSI ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels, transactionType } = App.state;
 
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
-      if (!uid) return alert("Masukkan User ID dulu!");
+      if (!uid) return alert("Fill User ID First!");
     }
 
-    if (!selectedItem) return alert("Pilih Item dulu!");
+    if (!selectedItem) return alert("Select Item First!");
 
     const listDiv = document.getElementById("paymentList");
     listDiv.innerHTML = "";
 
     if (!paymentChannels || paymentChannels.length === 0) {
-      listDiv.innerHTML = `<div class="alert alert-danger text-center">Metode Pembayaran Tidak Tersedia.</div>`;
+      listDiv.innerHTML = `<div class="text-pink text-center p-3">No payment channels available</div>`;
     } else {
       paymentChannels.forEach((ch) => {
         if (transactionType === "COIN" && ch.code === "HAWAI_COIN") return;
@@ -627,32 +474,26 @@ const Terminal = {
         let balanceCheck = "";
 
         if (ch.code === "HAWAI_COIN") {
-          const userBalance = Auth.user ? Auth.user.hawai_coins : 0;
-          if (!Auth.user) {
-            balanceCheck = `<small class="text-danger d-block">Login required</small>`;
-          } else if (userBalance < total) {
-            balanceCheck = `<small class="text-danger d-block">Saldo kurang (Sisa: ${userBalance})</small>`;
-          } else {
-            balanceCheck = `<small class="text-success d-block">Saldo cukup (Sisa: ${userBalance})</small>`;
-          }
+          const userBal = Auth.user ? Auth.user.hawai_coins : 0;
+          if (!Auth.user) balanceCheck = `<small class="text-pink">Login Required</small>`;
+          else if (userBal < total) balanceCheck = `<small class="text-pink">Insufficient Balance</small>`;
+          else balanceCheck = `<small class="text-neon">Balance Available</small>`;
         }
 
         listDiv.innerHTML += `
-                <div class="d-flex align-items-center gap-3 p-3 border rounded bg-secondary text-white mb-2" 
-                     style="cursor:pointer;" 
-                     onclick="Terminal.processTransaction('${ch.code}')">
-                    <img src="${ch.icon_url}" style="width:50px; background:white; border-radius:5px;">
-                    <div class="flex-grow-1">
-                        <div class="fw-bold">${ch.name}</div>
-                        <small class="text-warning">Total: Rp ${total.toLocaleString()}</small>
-                        ${balanceCheck}
-                    </div>
-                    <i class="fas fa-chevron-right"></i>
-                </div>`;
+            <div class="pay-item" onclick="Terminal.processTransaction('${ch.code}')">
+                <img src="${ch.icon_url}" class="pay-logo">
+                <div style="flex:1;">
+                    <div style="font-weight:bold;">${ch.name}</div>
+                    <div class="text-muted" style="font-size:0.8rem;">Total: Rp ${total.toLocaleString()}</div>
+                    ${balanceCheck}
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>`;
       });
     }
 
-    document.getElementById("paymentModal").classList.remove("hidden");
+    document.getElementById("paymentModal").classList.add("active");
   },
 
   processTransaction: async (method) => {
@@ -670,38 +511,24 @@ const Terminal = {
 
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
-      const zone = document.getElementById("zone")
-        ? document.getElementById("zone").value
-        : "";
+      const zone = document.getElementById("zone") ? document.getElementById("zone").value : "";
       payload.customer_no = uid + (zone ? ` (${zone})` : "");
-
-      // [FIX] Menggunakan nama game asli, bukan string "Game"
       payload.game = activeBrand || "Game";
 
-      let finalNickname = App.state.nickname;
-      if (!finalNickname) {
-        const nickElement = document.querySelector("#nick-result span span");
-        if (nickElement) finalNickname = nickElement.innerText;
-      }
-      payload.nickname = finalNickname || "-";
+      let finalNickname = App.state.nickname || "-";
+      payload.nickname = finalNickname;
 
       if (method === "HAWAI_COIN" && !Auth.user) {
-        alert("Silakan Login terlebih dahulu.");
+        alert("Please Login First");
         return;
       }
     } else if (transactionType === "COIN") {
       endpoint = "/topup-coin";
     }
 
-    const btn =
-      document.querySelector(".btn-pay-now") ||
-      document.querySelector("button.sp-btn");
-    if (btn) {
-      btn.innerHTML = "Memproses...";
-      btn.disabled = true;
-    }
-
-    App.closeModal("paymentModal");
+    // Lock UI (Optional)
+    const modalBody = document.querySelector('#paymentList');
+    if (modalBody) modalBody.innerHTML = `<div class="text-center p-5"><i class="fas fa-circle-notch fa-spin fa-2x text-neon"></i><p>Processing...</p></div>`;
 
     try {
       const res = await fetch(`${API_URL}${endpoint}`, {
@@ -711,78 +538,73 @@ const Terminal = {
       });
       const json = await res.json();
 
+      document.getElementById("paymentModal").classList.remove("active");
+
       if (json.success) {
         window.location.href = `/invoice.html?ref=${json.data.reference}`;
       } else {
-        throw new Error(json.message || "Gagal Transaksi");
+        alert(json.message || "Transaction Failed");
       }
     } catch (e) {
       alert("Error: " + e.message);
-      if (btn) {
-        btn.innerHTML = "BELI SEKARANG";
-        btn.disabled = false;
-      }
+      document.getElementById("paymentModal").classList.remove("active");
     }
   },
 };
 
 const Receipt = {
+  // Not heavily used if we redirect to invoice.html, but good for local fallback
   show: () => {
-    const d = App.state.selectedItem;
-    const u = document.getElementById("uid").value;
-    document.getElementById("modal-receipt").classList.remove("hidden");
-    document.getElementById("receipt-data").innerHTML =
-      `<div class="rc-row"><span>ITEM</span><span>${d.name}</span></div><div class="rc-row"><span>ID</span><span>${u}</span></div><div class="rc-row fw-bold"><span>TOTAL</span><span>Rp ${d.price.toLocaleString()}</span></div>`;
+    document.getElementById("modal-receipt").classList.add("active");
   },
   close: () => {
-    document.getElementById("modal-receipt").classList.add("hidden");
-    App.router("home");
+    document.getElementById("modal-receipt").classList.remove("active");
   },
 };
 
-// --- 3D WORLD ---
+// --- 3D WORLD (Simplified for Performance) ---
 const World = {
   init: () => {
     const cvs = document.getElementById("webgl-canvas");
     if (!cvs) return;
+
+    // Check if Three is loaded
+    if (typeof THREE === 'undefined') return;
+
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020203, 0.025);
-    const camera = new THREE.PerspectiveCamera(
-      70,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000,
-    );
-    camera.position.set(0, 3, 10);
-    const renderer = new THREE.WebGLRenderer({ canvas: cvs, alpha: true });
+    scene.fog = new THREE.FogExp2(0x050505, 0.02); // Match bg-void
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 10);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: cvs, alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    const gridGeo = new THREE.PlaneGeometry(200, 200, 60, 60);
-    const gridMat = new THREE.MeshBasicMaterial({
-      color: 0x00f3ff,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.15,
-    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Moving Grid
+    const gridGeo = new THREE.PlaneGeometry(300, 300, 50, 50);
+    const gridMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.1 });
     const grid = new THREE.Mesh(gridGeo, gridMat);
     grid.rotation.x = -Math.PI / 2;
     scene.add(grid);
+
+    // Particles
     const starGeo = new THREE.BufferGeometry();
-    const count = window.innerWidth < 768 ? 300 : 1000;
+    const count = 500;
     const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 120;
+    for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * 150;
     starGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    const stars = new THREE.Points(
-      starGeo,
-      new THREE.PointsMaterial({ color: 0xff0055, size: 0.1 }),
-    );
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xff0055, size: 0.2, transparent: true, opacity: 0.8 }));
     scene.add(stars);
+
     function animate() {
       requestAnimationFrame(animate);
-      grid.position.z = (Date.now() * 0.005) % 3;
+      grid.position.z = (Date.now() * 0.005) % 6; // Endless scroll illusion
       stars.rotation.y += 0.0005;
       renderer.render(scene, camera);
     }
     animate();
+
     window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();

@@ -2,342 +2,127 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Hawai Topup - Cyberpunk Edition</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Syncopate:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- Styles -->
     <link rel="stylesheet" href="style.css" />
-
-    <style>
-      /* Style Tambahan untuk Integrasi Fitur Baru ke Tema Lama */
-      .auth-container {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .btn-google {
-        background: #fff;
-        color: #333;
-        border: none;
-        padding: 8px 15px;
-        border-radius: 5px;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        font-family: "Rajdhani", sans-serif;
-      }
-      .user-info {
-        display: none; /* Hidden by default */
-        align-items: center;
-        gap: 10px;
-        color: #fff;
-      }
-      .user-avatar {
-        width: 35px;
-        height: 35px;
-        border-radius: 50%;
-        border: 2px solid #00f3ff;
-      }
-      /* Membuat saldo bisa diklik seperti desain baru */
-      .coin-balance {
-        color: #ffd700;
-        font-weight: bold;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: transform 0.2s;
-        border: 1px solid rgba(255, 215, 0, 0.3);
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: rgba(0, 0, 0, 0.5);
-      }
-      .coin-balance:hover {
-        transform: scale(1.05);
-        background: rgba(255, 215, 0, 0.1);
-      }
-
-      /* Style untuk Modal Baru (Coin & Payment) agar sesuai tema Cyberpunk */
-      .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(5px);
-        z-index: 2000;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        opacity: 1;
-        transition: opacity 0.3s;
-      }
-      .modal-overlay.hidden {
-        display: none;
-        opacity: 0;
-      }
-      .modal-glass {
-        background: rgba(10, 20, 30, 0.9);
-        border: 1px solid #00f3ff;
-        box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
-        padding: 20px;
-        border-radius: 10px;
-        width: 90%;
-        max-width: 400px;
-        color: #fff;
-        font-family: "Rajdhani", sans-serif;
-      }
-      .modal-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid rgba(0, 243, 255, 0.3);
-        padding-bottom: 10px;
-        margin-bottom: 15px;
-      }
-      .coin-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-bottom: 15px;
-      }
-      .coin-opt {
-        background: rgba(0, 243, 255, 0.1);
-        border: 1px solid #00f3ff;
-        padding: 10px;
-        text-align: center;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .coin-opt:hover {
-        background: #00f3ff;
-        color: #000;
-      }
-      .input-clean {
-        width: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        border: 1px solid #555;
-        color: #fff;
-        padding: 10px;
-        font-family: inherit;
-      }
-      .scrollable {
-        max-height: 60vh;
-        overflow-y: auto;
-      }
-      .full {
-        width: 100%;
-      }
-      .mt-3 {
-        margin-top: 1rem;
-      }
-    </style>
   </head>
   <body>
-    <div id="app"></div>
-
+    <!-- VFX Layers -->
     <canvas id="webgl-canvas"></canvas>
     <div class="fx-scanlines"></div>
-    <div class="fx-noise"></div>
     <div class="fx-vignette"></div>
 
-    <div class="cursor-dot"></div>
-    <div class="cursor-ring"></div>
-
+    <!-- Main App Container -->
     <div id="app-interface">
+      
+      <!-- Safe Header -->
       <header class="cyber-header">
         <div class="header-inner">
           <div class="brand" onclick="App.router('home')">
-            <div class="brand-logo">H</div>
+            <div class="brand-logo"><i class="fas fa-bolt"></i></div>
             <div class="brand-txt">
               <span class="b-title">HAWAI</span>
-              <span class="b-ver">SYS.10</span>
+              <span class="b-ver">SYS.2.0</span>
             </div>
           </div>
 
+          <!-- Auth & User Info -->
           <div class="auth-container">
-            <button id="btnLogin" class="btn-google" onclick="Auth.signIn()">
+            <button id="btnLogin" class="btn-neon" onclick="Auth.signIn()">
               <i class="fab fa-google"></i> Login
             </button>
 
-            <div id="userInfo" class="user-info">
-              <div class="text-end">
-                <div id="userName" style="font-size: 0.8rem; font-weight: bold">
-                  User
-                </div>
-                <div class="coin-balance" onclick="App.openTopupModal()">
-                  🪙 <span id="userCoins">0</span>
-                  <i
-                    class="fas fa-plus-circle text-info"
-                    style="margin-left: 5px"
-                  ></i>
-                </div>
+            <div id="userInfo" class="user-panel hidden">
+              <div class="u-info">
+                <span id="userName" class="u-name">User</span>
+                <span class="u-bal" onclick="App.openTopupModal()">
+                  <i class="fas fa-coins text-warn"></i> <span id="userCoins">0</span>
+                </span>
               </div>
-              <img id="userImg" src="" class="user-avatar" />
-              <button
-                onclick="Auth.signOut()"
-                class="btn btn-sm btn-outline-danger"
-                style="padding: 2px 6px; font-size: 0.7rem"
-              >
-                <i class="fas fa-sign-out-alt"></i>
-              </button>
+              <img id="userImg" src="" class="u-avatar" />
+              <button onclick="Auth.signOut()" class="btn-icon text-pink"><i class="fas fa-power-off"></i></button>
             </div>
-          </div>
-
-          <div class="mobile-refresh mobile-only" onclick="location.reload()">
-            <i class="fas fa-bolt"></i>
           </div>
         </div>
       </header>
 
+      <!-- Dynamic Content Viewport -->
       <main id="viewport"></main>
 
-      <nav class="dock-wrapper">
-        <div class="dock">
-          <div
-            class="dock-btn active"
-            data-page="home"
-            onclick="App.router('home')"
-          >
-            <i class="fas fa-th-large"></i>
-            <span class="dock-lbl">HOME</span>
-          </div>
-          <div
-            class="dock-btn"
-            data-page="history"
-            onclick="App.router('history')"
-          >
-            <i class="fas fa-history"></i>
-            <span class="dock-lbl">LOGS</span>
-          </div>
-          <div class="dock-btn mobile-only" onclick="App.openTopupModal()">
-            <i class="fas fa-wallet"></i>
-            <span class="dock-lbl">TOPUP</span>
-          </div>
-
-          <div class="dock-sep desktop-only"></div>
-          <div class="dock-btn desktop-only" onclick="location.reload()">
-            <i class="fas fa-power-off text-red"></i>
-            <span class="dock-lbl">EXIT</span>
-          </div>
+      <!-- Mobile Dock Navigation -->
+      <nav class="dock-nav">
+        <div class="dock-item active" onclick="App.router('home')">
+          <i class="fas fa-home"></i>
+        </div>
+        <div class="dock-item" onclick="App.router('history')">
+          <i class="fas fa-history"></i>
+        </div>
+        <div class="dock-item" onclick="App.openTopupModal()">
+          <i class="fas fa-wallet"></i>
         </div>
       </nav>
 
-      <div id="modal-terminal" class="modal hidden">
-        <div class="terminal-window">
-          <div class="term-head">
-            <div class="traffic-lights">
-              <span class="red"></span><span class="yellow"></span
-              ><span class="green"></span>
-            </div>
-            <div class="term-title">SECURE_GATEWAY.exe</div>
+      <!-- MODALS -->
+
+      <!-- 1. Payment Method Modal -->
+      <div id="paymentModal" class="modal-overlay">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3><i class="fas fa-credit-card text-neon"></i> Payment Method</h3>
+            <button class="btn-icon" onclick="App.closeModal('paymentModal')">&times;</button>
           </div>
-          <div class="term-body" id="term-log"></div>
+          <div id="paymentList" class="modal-body"></div>
         </div>
       </div>
 
-      <div id="modal-receipt" class="modal hidden">
-        <div class="receipt-card">
-          <div class="receipt-icon"><i class="fas fa-check"></i></div>
-          <h2>PAYMENT SUCCESS</h2>
-          <div id="receipt-data" class="receipt-content"></div>
-          <button class="btn-glitch full" onclick="Receipt.close()">
-            DISMISS
-          </button>
-        </div>
-      </div>
-
-      <div id="coinModal" class="modal-overlay hidden">
-        <div class="modal-glass">
-          <div class="modal-head">
-            <h3><i class="fas fa-wallet"></i> Top Up HAWAI Coin</h3>
-            <button
-              style="
-                background: none;
-                border: none;
-                color: red;
-                font-size: 1.5rem;
-                cursor: pointer;
-              "
-              onclick="App.closeModal('coinModal')"
-            >
-              &times;
-            </button>
+      <!-- 2. Coin Topup Modal -->
+      <div id="coinModal" class="modal-overlay">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3><i class="fas fa-coins text-warn"></i> Topup Wallet</h3>
+            <button class="btn-icon" onclick="App.closeModal('coinModal')">&times;</button>
           </div>
           <div class="modal-body">
-            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 10px">
-              Saldo coin digunakan untuk pembayaran instan tanpa ribet.
-            </p>
-            <div class="coin-grid">
-              <div class="coin-opt" onclick="App.selectCoin(10000)">10.000</div>
-              <div class="coin-opt" onclick="App.selectCoin(25000)">25.000</div>
-              <div class="coin-opt" onclick="App.selectCoin(50000)">50.000</div>
-              <div class="coin-opt" onclick="App.selectCoin(100000)">
-                100.000
-              </div>
+            <p class="text-muted mb-3">Instant saldo for quick payments.</p>
+            <div class="items-grid col-mob-2 mb-3">
+              <button class="btn-neon" onclick="App.selectCoin(10000)">10k</button>
+              <button class="btn-neon" onclick="App.selectCoin(25000)">25k</button>
+              <button class="btn-neon" onclick="App.selectCoin(50000)">50k</button>
+              <button class="btn-neon" onclick="App.selectCoin(100000)">100k</button>
             </div>
-            <input
-              type="number"
-              id="customCoin"
-              class="input-clean mt-3"
-              placeholder="Nominal Lain (Min 10.000)"
-            />
-            <button
-              class="sp-btn full mt-3"
-              style="width: 100%; margin-top: 15px"
-              onclick="App.processTopupCoin()"
-            >
-              LANJUT BAYAR
-            </button>
+            <input type="number" id="customCoin" class="input-cyber" placeholder="Custom Amount (Min 10k)">
+            <button class="btn-neon" style="width:100%; margin-top:20px;" onclick="App.processTopupCoin()">TOPUP NOW</button>
           </div>
         </div>
       </div>
 
-      <div id="paymentModal" class="modal-overlay hidden">
-        <div class="modal-glass">
-          <div class="modal-head">
-            <h3><i class="fas fa-credit-card"></i> Metode Pembayaran</h3>
-            <button
-              style="
-                background: none;
-                border: none;
-                color: red;
-                font-size: 1.5rem;
-                cursor: pointer;
-              "
-              onclick="App.closeModal('paymentModal')"
-            >
-              &times;
-            </button>
+      <!-- 3. Receipt / Invoice Modal -->
+      <div id="modal-receipt" class="modal-overlay">
+        <div class="modal-box text-center">
+          <div class="modal-body">
+            <i class="fas fa-check-circle text-neon" style="font-size: 3rem; margin-bottom: 20px;"></i>
+            <h2 class="text-neon">ORDER SUCCESS</h2>
+            <div id="receipt-data" style="margin: 20px 0; border-top: 1px dashed var(--border-glass); border-bottom: 1px dashed var(--border-glass); padding: 15px 0;"></div>
+            <button class="btn-neon" onclick="Receipt.close()">CLOSE</button>
           </div>
-          <div id="paymentList" class="modal-body scrollable"></div>
         </div>
       </div>
 
-      <div id="sticky-pay" class="sticky-pay hidden mobile-only">
-        <div class="sp-info">
-          <span id="sp-item">Select Item</span>
-          <span id="sp-price" class="text-neon">Rp 0</span>
-        </div>
-        <button class="sp-btn" onclick="Terminal.process()">PAY NOW</button>
-      </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   </body>
 </html>

@@ -1,654 +1,386 @@
 <!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>Invoice Premium - Hawai Omega</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<html lang="en">
 
-    <style>
-      /* --- STYLE DASAR (Sama seperti sebelumnya) --- */
-      :root {
-        --primary: #00f3ff;
-        --secondary: #bc13fe;
-        --bg-dark: #050507;
-        --panel-bg: #0e0e12;
-        --border: rgba(255, 255, 255, 0.08);
-        --font-mono: "Consolas", "Monaco", monospace;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Invoice - Hawai Topup</title>
 
+  <!-- Icons & Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Unified Style -->
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* OVERRIDES SPECIFIC TO INVOICE */
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-void);
+    }
+
+    .invoice-layout {
+      display: flex;
+      width: 100%;
+      max-width: 1200px;
+      height: 90vh;
+      max-height: 800px;
+      background: rgba(10, 15, 25, 0.9);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 0 50px rgba(0, 243, 255, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    /* Visual Side (Left) */
+    .visual-side {
+      flex: 4;
+      position: relative;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      border-right: 1px solid var(--border-glass);
+    }
+
+    .visual-bg {
+      position: absolute;
+      inset: 0;
+      opacity: 0.5;
+      background-size: cover;
+      background-position: center;
+      filter: grayscale(100%) contrast(1.2);
+    }
+
+    .visual-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, #000, transparent);
+      z-index: 1;
+    }
+
+    .game-logo-large {
+      width: 150px;
+      height: 150px;
+      border-radius: 20px;
+      border: 2px solid var(--primary);
+      box-shadow: 0 0 30px var(--primary-glow);
+      z-index: 5;
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .game-title-large {
+      font-family: var(--font-head);
+      font-size: 3rem;
+      color: #fff;
+      z-index: 5;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      text-align: center;
+      line-height: 1;
+    }
+
+    .trx-badge {
+      font-family: var(--font-mono);
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--text-muted);
+      padding: 5px 15px;
+      border-radius: 5px;
+      color: var(--text-muted);
+      margin-top: 10px;
+      z-index: 5;
+      font-size: 0.8rem;
+    }
+
+    /* Details Side (Right) */
+    .detail-side {
+      flex: 5;
+      padding: 40px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-dark);
+    }
+
+    .inv-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 1px solid var(--border-glass);
+      padding-bottom: 15px;
+    }
+
+    .inv-title {
+      font-family: var(--font-head);
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+
+    /* Timeline */
+    .stepper {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 30px;
+      position: relative;
+    }
+
+    .stepper::before {
+      content: '';
+      position: absolute;
+      top: 15px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: #333;
+      z-index: 0;
+    }
+
+    .step-item {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .step-dot {
+      width: 30px;
+      height: 30px;
+      background: #111;
+      border: 2px solid #444;
+      border-radius: 50%;
+      margin: 0 auto 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.3s;
+    }
+
+    .step-item.active .step-dot {
+      border-color: var(--primary);
+      color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    .step-item.done .step-dot {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #000;
+    }
+
+    /* Timer */
+    .timer-box {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .timer-val {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      color: var(--secondary);
+      border: 1px solid var(--secondary);
+      padding: 5px 20px;
+      border-radius: 5px;
+      display: inline-block;
+      background: rgba(255, 0, 85, 0.1);
+    }
+
+    /* Data Rows */
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px dashed var(--border-glass);
+      font-family: var(--font-body);
+      font-size: 1rem;
+    }
+
+    .data-row .val {
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .data-row .lbl {
+      color: var(--text-muted);
+    }
+
+    /* Payment Box */
+    .pay-zone {
+      background: #fff;
+      color: #000;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin-top: auto;
+    }
+
+    .va-num {
+      font-family: var(--font-mono);
+      font-size: 1.8rem;
+      font-weight: bold;
+      display: block;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+
+    .va-num:hover {
+      color: var(--secondary);
+    }
+
+    /* Success Overlay */
+    .success-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .success-overlay.active {
+      display: flex;
+    }
+
+    #loader {
+      display: flex;
+      background: #000;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 768px) {
       body {
-        background-color: #000;
-        color: #fff;
-        font-family: "Segoe UI", sans-serif;
-        margin: 0;
-        height: 100vh;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        overflow-y: auto;
+        height: auto;
+        display: block;
       }
 
-      /* --- LAYOUT UTAMA --- */
       .invoice-layout {
-        display: flex;
-        width: 100%;
-        height: 100%;
-        max-width: 1300px;
-        max-height: 850px;
-        background: var(--bg-dark);
-        border-radius: 25px;
-        overflow: hidden;
-        box-shadow: 0 0 80px rgba(0, 243, 255, 0.05);
-        position: relative;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        opacity: 0;
-        animation: fadeIn 1s forwards;
-      }
-      @keyframes fadeIn {
-        to {
-          opacity: 1;
-        }
-      }
-
-      /* --- SISI KIRI (VISUAL) --- */
-      .visual-side {
-        flex: 4;
-        position: relative;
-        overflow: hidden;
-        display: flex;
         flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        z-index: 1;
-        background: #000;
-      }
-      .visual-bg {
-        position: absolute;
-        inset: 0;
-        background-size: cover;
-        background-position: center;
-        opacity: 0.6;
-        transition: transform 0.2s;
-        z-index: -2;
-      }
-      .crt-overlay {
-        position: absolute;
-        inset: 0;
-        background:
-          linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-          linear-gradient(
-            90deg,
-            rgba(255, 0, 0, 0.06),
-            rgba(0, 255, 0, 0.02),
-            rgba(0, 0, 255, 0.06)
-          );
-        background-size:
-          100% 2px,
-          3px 100%;
-        pointer-events: none;
-        z-index: 0;
-      }
-      #particles {
-        position: absolute;
-        inset: 0;
-        z-index: -1;
+        height: auto;
+        border: none;
+        border-radius: 0;
       }
 
-      /* Logo 3D */
-      .logo-container {
-        perspective: 1000px;
-        margin-bottom: 20px;
-        position: relative;
+      .visual-side {
+        height: 250px;
       }
+
       .game-logo-large {
-        width: 130px;
-        height: 130px;
-        border-radius: 30px;
-        box-shadow: 0 0 50px rgba(0, 243, 255, 0.3);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        background: #000;
-        z-index: 2;
-        position: relative;
-      }
-      .logo-glow {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 140px;
-        height: 140px;
-        border-radius: 50%;
-        background: var(--primary);
-        filter: blur(60px);
-        opacity: 0.4;
-        z-index: 1;
-        animation: pulseGlow 3s infinite;
-      }
-      @keyframes pulseGlow {
-        0%,
-        100% {
-          opacity: 0.4;
-          transform: translate(-50%, -50%) scale(1);
-        }
-        50% {
-          opacity: 0.6;
-          transform: translate(-50%, -50%) scale(1.1);
-        }
+        width: 100px;
+        height: 100px;
       }
 
       .game-title-large {
-        font-size: 3.5rem;
-        font-weight: 900;
-        line-height: 1;
-        text-transform: uppercase;
-        color: #fff;
-        position: relative;
-        text-shadow:
-          2px 2px var(--secondary),
-          -2px -2px var(--primary);
-        animation: glitch 3s infinite alternate;
+        font-size: 2rem;
       }
-      @keyframes glitch {
-        0% {
-          text-shadow:
-            2px 2px var(--secondary),
-            -2px -2px var(--primary);
-        }
-        100% {
-          text-shadow:
-            2px 2px var(--secondary),
-            -2px -2px var(--primary);
-        }
-      }
+    }
+  </style>
+</head>
 
-      /* --- SISI KANAN (DETAIL) --- */
-      .detail-side {
-        flex: 6;
-        background: var(--panel-bg);
-        padding: 40px 50px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        border-left: 1px solid var(--border);
-        position: relative;
-      }
+<body>
+  <!-- LOADER -->
+  <div id="loader">
+    <div class="text-neon" style="font-family: var(--font-mono); letter-spacing: 2px;">LOADING SECURE DATA...</div>
+  </div>
 
-      /* Timeline */
-      .stepper-wrapper {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 30px;
-        position: relative;
-      }
-      .progress-line {
-        position: absolute;
-        top: 15px;
-        left: 0;
-        width: 100%;
-        height: 2px;
-        background: #222;
-        z-index: 0;
-      }
-      .progress-fill {
-        position: absolute;
-        top: 15px;
-        left: 0;
-        height: 2px;
-        background: var(--primary);
-        z-index: 0;
-        width: 0%;
-        transition: width 1s ease;
-        box-shadow: 0 0 10px var(--primary);
-      }
-      .stepper-item {
-        position: relative;
-        z-index: 1;
-        text-align: center;
-        width: 33%;
-        opacity: 0.5;
-        transition: 0.3s;
-      }
-      .stepper-item.active {
-        opacity: 1;
-      }
-      .step-counter {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: #111;
-        color: #fff;
-        border: 2px solid #333;
-        margin: 0 auto 8px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-weight: bold;
-        transition: 0.3s;
-      }
-      .stepper-item.active .step-counter {
-        border-color: var(--primary);
-        box-shadow: 0 0 15px var(--primary);
-        color: var(--primary);
-      }
-      .stepper-item.completed .step-counter {
-        background: var(--primary);
-        border-color: var(--primary);
-        color: #000;
-      }
-
-      /* --- UPGRADE: NICKNAME BADGE --- */
-      .nick-wrapper {
-        background: rgba(0, 255, 136, 0.1);
-        border: 1px solid rgba(0, 255, 136, 0.3);
-        border-radius: 50px;
-        padding: 5px 15px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 5px;
-        box-shadow: 0 0 15px rgba(0, 255, 136, 0.1);
-        position: relative;
-        overflow: hidden;
-      }
-      /* Kilau Berjalan */
-      .nick-wrapper::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          rgba(255, 255, 255, 0.2),
-          transparent
-        );
-        animation: shine 3s infinite;
-      }
-      @keyframes shine {
-        0% {
-          left: -100%;
-        }
-        20% {
-          left: 100%;
-        }
-        100% {
-          left: 100%;
-        }
-      }
-
-      .nick-text {
-        color: #00ff88;
-        font-family: var(--font-mono);
-        font-weight: bold;
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
-      }
-
-      .verified-icon {
-        color: #00ff88;
-        animation: pulse-verify 2s infinite;
-      }
-      @keyframes pulse-verify {
-        0% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.2);
-          text-shadow: 0 0 10px #00ff88;
-        }
-        100% {
-          transform: scale(1);
-        }
-      }
-
-      /* Detail Box */
-      .info-card {
-        background: linear-gradient(
-          145deg,
-          rgba(255, 255, 255, 0.03),
-          rgba(255, 255, 255, 0.01)
-        );
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 25px;
-        margin-bottom: 20px;
-      }
-      .row-item {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 12px;
-        font-size: 0.95rem;
-        border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
-        padding-bottom: 8px;
-      }
-      .row-item:last-child {
-        border: 0;
-        padding: 0;
-        margin: 0;
-      }
-      .val-hl {
-        color: var(--primary);
-        font-family: var(--font-mono);
-        letter-spacing: 1px;
-      }
-
-      /* Payment Zone */
-      .payment-zone {
-        background: #fff;
-        color: #000;
-        border-radius: 20px;
-        padding: 25px;
-        text-align: center;
-        margin-top: auto;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
-      }
-
-      /* QR & VA */
-      .qr-wrapper {
-        position: relative;
-        display: inline-block;
-        border: 10px solid #fff;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 10px;
-      }
-      .qr-laser {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 5px;
-        background: rgba(255, 0, 0, 0.5);
-        box-shadow: 0 0 10px red;
-        animation: scan 2s infinite ease-in-out;
-      }
-      @keyframes scan {
-        0%,
-        100% {
-          top: 0;
-        }
-        50% {
-          top: 100%;
-        }
-      }
-
-      .va-display {
-        font-family: var(--font-mono);
-        font-size: 2.2rem;
-        font-weight: 800;
-        letter-spacing: 2px;
-        color: #333;
-        margin: 10px 0;
-        cursor: pointer;
-        position: relative;
-        transition: 0.2s;
-      }
-      .va-display:active {
-        transform: scale(0.95);
-      }
-      .copy-tooltip {
-        position: absolute;
-        top: -30px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #000;
-        color: #fff;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 0.8rem;
-        opacity: 0;
-        transition: 0.2s;
-        pointer-events: none;
-      }
-      .va-display:hover .copy-tooltip {
-        opacity: 1;
-        top: -40px;
-      }
-
-      /* Success */
-      .success-overlay {
-        position: absolute;
-        inset: 0;
-        background: #000;
-        z-index: 10;
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        animation: expand 0.5s ease;
-      }
-      @keyframes expand {
-        from {
-          clip-path: circle(0% at 50% 50%);
-        }
-        to {
-          clip-path: circle(150% at 50% 50%);
-        }
-      }
-
-      #loader {
-        position: fixed;
-        inset: 0;
-        background: #000;
-        z-index: 99;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      @media (max-width: 768px) {
-        body {
-          display: block;
-          overflow-y: auto;
-          height: auto;
-          background: #0e0e12;
-        }
-        .invoice-layout {
-          flex-direction: column;
-          border-radius: 0;
-          height: auto;
-          max-height: none;
-          border: none;
-        }
-        .visual-side {
-          height: 320px;
-          padding: 20px;
-          justify-content: flex-end;
-          padding-bottom: 50px;
-        }
-        .game-logo-large {
-          width: 90px;
-          height: 90px;
-          margin-bottom: 10px;
-        }
-        .game-title-large {
-          font-size: 2.2rem;
-        }
-        .detail-side {
-          margin-top: -30px;
-          border-top-left-radius: 30px;
-          border-top-right-radius: 30px;
-          border-top: 2px solid var(--primary);
-          padding: 30px 20px;
-          min-height: 60vh;
-          background: #0e0e12;
-        }
-        .va-display {
-          font-size: 1.6rem;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <audio
-      id="sfx-success"
-      src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
-    ></audio>
-    <audio
-      id="sfx-click"
-      src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"
-    ></audio>
-
-    <div id="loader">
-      <div class="text-center">
-        <div
-          class="spinner-border text-info mb-3"
-          style="width: 3rem; height: 3rem"
-        ></div>
-        <div class="small fw-bold text-secondary ls-2">SECURE CHECKOUT...</div>
-      </div>
+  <div class="invoice-layout">
+    <!-- Visual Side -->
+    <div class="visual-side" id="visualSide">
+      <div class="visual-bg" id="bgImg"></div>
+      <div class="visual-overlay"></div>
+      <img src="" id="gameLogo" class="game-logo-large" onerror="this.style.display='none'">
+      <div id="gameTitle" class="game-title-large">GAME</div>
+      <div class="trx-badge" id="refIdSmall">TRX-...</div>
     </div>
 
-    <div class="invoice-layout">
-      <div class="visual-side" id="visualSide">
-        <div class="visual-bg" id="bgImg"></div>
-        <canvas id="particles"></canvas>
-        <div class="crt-overlay"></div>
+    <!-- Detail Side -->
+    <div class="detail-side">
+      <div class="inv-header">
+        <div class="inv-title">INVOICE</div>
+        <button onclick="window.location.href='index.html'" class="btn-neon"
+          style="padding: 5px 15px; font-size: 0.8rem;">CLOSE</button>
+      </div>
 
-        <div class="logo-container" id="logoWrap">
-          <div class="logo-glow"></div>
-          <img src="" id="gameLogo" class="game-logo-large" />
+      <div class="stepper">
+        <div class="step-item done">
+          <div class="step-dot"><i class="fas fa-check"></i></div>Order
         </div>
-
-        <div id="gameTitle" class="game-title-large">GAME</div>
-        <div
-          class="badge bg-dark border border-secondary text-secondary font-monospace"
-          id="refIdSmall"
-        >
-          TRX-...
+        <div class="step-item active" id="stepPay">
+          <div class="step-dot">2</div>Pay
+        </div>
+        <div class="step-item" id="stepDone">
+          <div class="step-dot">3</div>Done
         </div>
       </div>
 
-      <div class="detail-side">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <h4 class="m-0 fw-bold">
-            <i class="fas fa-receipt text-primary me-2"></i>Invoice
-          </h4>
-          <div>
-            <button
-              onclick="window.print()"
-              class="btn btn-dark btn-sm rounded-pill me-2"
-            >
-              <i class="fas fa-print"></i>
-            </button>
-            <a
-              href="index.html"
-              class="btn btn-outline-secondary btn-sm rounded-pill"
-            >
-              <i class="fas fa-times"></i> Tutup
-            </a>
-          </div>
+      <div class="timer-box" id="timerWrap">
+        <div class="text-muted mb-1" style="font-size:0.8rem;">PAY BEFORE</div>
+        <div class="timer-val" id="countdown">--:--:--</div>
+      </div>
+
+      <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <div class="data-row">
+          <span class="lbl">Item</span>
+          <span class="val text-white" id="dItem">...</span>
         </div>
-
-        <div class="stepper-wrapper">
-          <div class="progress-line">
-            <div class="progress-fill" id="progFill"></div>
-          </div>
-          <div class="stepper-item completed">
-            <div class="step-counter"><i class="fas fa-check"></i></div>
-            Order
-          </div>
-          <div class="stepper-item active" id="stepPay">
-            <div class="step-counter">2</div>
-            Bayar
-          </div>
-          <div class="stepper-item" id="stepDone">
-            <div class="step-counter">3</div>
-            Selesai
-          </div>
+        <div class="data-row">
+          <span class="lbl">ID / Zone</span>
+          <span class="val text-neon" id="dUid">...</span>
         </div>
-
-        <div id="timerWrap" class="text-center mb-3">
-          <div
-            class="d-inline-block px-3 py-1 rounded bg-danger bg-opacity-10 text-danger fw-bold border border-danger border-opacity-25"
-          >
-            <i class="fas fa-stopwatch me-1"></i>
-            <span id="countdown">--:--:--</span>
-          </div>
+        <div class="data-row">
+          <span class="lbl">Nickname</span>
+          <span class="val"><i class="fas fa-check-circle text-neon"></i> <span id="dNick">...</span></span>
         </div>
-
-        <div class="info-card">
-          <div class="row-item">
-            <span class="lbl">Item</span>
-            <span class="val text-white" id="dItem">...</span>
-          </div>
-          <div class="row-item">
-            <span class="lbl">ID Player</span>
-            <span class="val text-end"
-              ><span id="dUid" class="val-hl">...</span></span
-            >
-          </div>
-
-          <div class="row-item">
-            <span class="lbl">Nickname</span>
-            <span class="val text-end">
-              <div class="nick-wrapper">
-                <i class="fas fa-check-circle verified-icon"></i>
-                <span id="dNick" class="nick-text">Checking...</span>
-              </div>
-            </span>
-          </div>
-
-          <div class="row-item">
-            <span class="lbl">Metode</span>
-            <span class="val text-info" id="dMethod">...</span>
-          </div>
-          <div
-            class="row-item pt-2 mt-2"
-            style="border-top: 1px dashed #444 !important"
-          >
-            <span class="lbl">Total Bayar</span>
-            <span class="val fs-3 text-warning" id="dTotal">Rp 0</span>
-          </div>
+        <div class="data-row" style="border: none;">
+          <span class="lbl">Payment</span>
+          <span class="val" id="dMethod">...</span>
         </div>
-
-        <div id="paymentArea" class="payment-zone"></div>
-
-        <div id="successOverlay" class="success-overlay text-center">
-          <i
-            class="fas fa-check-circle fa-6x text-success mb-4"
-            style="filter: drop-shadow(0 0 30px #00ff00)"
-          ></i>
-          <h1 class="fw-bold text-white mb-2">PEMBAYARAN SUKSES!</h1>
-          <p class="text-secondary mb-4">
-            Item Anda sedang dikirim secara otomatis.
-          </p>
-          <button
-            onclick="window.location.href = 'index.html'"
-            class="btn btn-outline-light rounded-pill px-4"
-          >
-            Buat Pesanan Baru
-          </button>
+        <div class="data-row" style="border-top: 1px solid var(--border-glass); margin-top: 5px; padding-top: 15px;">
+          <span class="lbl" style="font-size: 1.2rem;">TOTAL</span>
+          <span class="val text-warn" style="font-size: 1.5rem;" id="dTotal">Rp 0</span>
         </div>
       </div>
+
+      <div id="paymentArea" class="pay-zone"></div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- Success Overlay -->
+    <div id="successOverlay" class="success-overlay">
+      <i class="fas fa-check-circle text-neon"
+        style="font-size: 5rem; margin-bottom: 20px; box-shadow: 0 0 50px var(--primary); border-radius: 50%; background: #000;"></i>
+      <h1 class="text-white mb-2" style="font-family: var(--font-head);">PAYMENT SUCCESS</h1>
+      <p class="text-muted mb-4">Your item is being delivered automatically.</p>
+      <button onclick="window.location.href='index.html'" class="btn-neon">MAKE NEW ORDER</button>
+    </div>
 
-    <script src="firebase-config.js"></script>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="invoice.js"></script>
+</body>
 
-    <script src="invoice.js"></script>
-  </body>
 </html>
