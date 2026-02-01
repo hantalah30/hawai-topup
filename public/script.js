@@ -139,19 +139,40 @@ const Sound = {
   },
 };
 
-// --- PROMO SYSTEM (NEW) ---
+// --- PROMO SYSTEM (DYNAMIC) ---
 const Promo = {
-  codes: {
-    "HAWAI": 0.1,    // 10% Off
-    "CYBER": 0.2,    // 20% Off
-    "GWGANTENG": 0.5,// 50% Off (Secret)
-    "FLASH50": 5000, // Flat 5000 Off
+  // Helper to get codes from DB or Fallback
+  getCodes: () => {
+    const dbKey = 'HAWAI_PROMO_DB';
+    const stored = localStorage.getItem(dbKey);
+
+    // Default codes if DB empty
+    const defaults = {
+      "HAWAI": { value: 0.1, type: "percent" },
+      "CYBER": { value: 0.2, type: "percent" },
+      "FLASH50": { value: 5000, type: "flat" }
+    };
+
+    if (stored) {
+      return JSON.parse(stored);
+    } else {
+      // Seed defaults to LS if not present (so Admin sees them too)
+      localStorage.setItem(dbKey, JSON.stringify(defaults));
+      return defaults;
+    }
   },
 
   validate: (code) => {
     const c = code.toUpperCase();
-    if (Promo.codes.hasOwnProperty(c)) {
-      return { valid: true, value: Promo.codes[c] };
+    const codes = Promo.getCodes();
+
+    if (codes.hasOwnProperty(c)) {
+      const item = codes[c];
+      // Support old format (just number) or new object format
+      if (typeof item === 'number') {
+        return { valid: true, value: item, type: item < 1 ? 'percent' : 'flat' };
+      }
+      return { valid: true, value: item.value, type: item.type };
     }
     return { valid: false };
   }
