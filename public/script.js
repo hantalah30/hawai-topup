@@ -87,11 +87,37 @@ const DEFAULT_ASSETS = {
   },
 };
 
-// --- AUDIO SYSTEM ---
+// --- AUDIO SYSTEM (UPGRADED) ---
 const Sound = {
   ctx: new (window.AudioContext || window.webkitAudioContext)(),
+  muted: localStorage.getItem('hawa_muted') === 'true',
+
+  init: () => {
+    Sound.updateIcon();
+  },
+
+  toggle: () => {
+    Sound.muted = !Sound.muted;
+    localStorage.setItem('hawa_muted', Sound.muted);
+    Sound.updateIcon();
+    if (!Sound.muted) Sound.click();
+  },
+
+  updateIcon: () => {
+    const btn = document.getElementById('btnAudio');
+    if (btn) {
+      if (Sound.muted) {
+        btn.classList.add('muted');
+        btn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+      } else {
+        btn.classList.remove('muted');
+        btn.innerHTML = '<i class="fas fa-volume-up"></i>';
+      }
+    }
+  },
+
   play: (f, t, d, v = 0.05) => {
-    if (window.innerWidth < 768) return;
+    if (Sound.muted || window.innerWidth < 768) return;
     if (Sound.ctx.state === "suspended") Sound.ctx.resume().catch(() => { });
 
     const o = Sound.ctx.createOscillator();
@@ -113,7 +139,25 @@ const Sound = {
   },
 };
 
-// --- FX ENGINE (GOD TIER) ---
+// --- PROMO SYSTEM (NEW) ---
+const Promo = {
+  codes: {
+    "HAWAI": 0.1,    // 10% Off
+    "CYBER": 0.2,    // 20% Off
+    "GWGANTENG": 0.5,// 50% Off (Secret)
+    "FLASH50": 5000, // Flat 5000 Off
+  },
+
+  validate: (code) => {
+    const c = code.toUpperCase();
+    if (Promo.codes.hasOwnProperty(c)) {
+      return { valid: true, value: Promo.codes[c] };
+    }
+    return { valid: false };
+  }
+};
+
+// --- FX ENGINE ---
 const FX = {
   init: () => {
     FX.initCursor();
@@ -130,20 +174,17 @@ const FX = {
         preloader.style.opacity = "0";
         preloader.style.pointerEvents = "none";
       }
-    }, 3000); // 3 Seconds cinematic wait
+    }, 2500);
   },
 
   initCursor: () => {
     if (window.innerWidth < 768) return;
-
     const cursor = document.createElement("div");
     cursor.className = "custom-cursor";
     document.body.appendChild(cursor);
-
     const trail = document.createElement("div");
     trail.className = "cursor-trail";
     document.body.appendChild(trail);
-
     document.addEventListener("mousemove", (e) => {
       cursor.style.left = e.clientX + "px";
       cursor.style.top = e.clientY + "px";
@@ -151,7 +192,6 @@ const FX = {
         trail.style.left = e.clientX - 3 + "px";
         trail.style.top = e.clientY - 3 + "px";
       }, 50);
-
       const target = e.target;
       if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('.game-card') || target.closest('.item-card')) {
         cursor.classList.add("hovered");
@@ -182,7 +222,6 @@ const FX = {
       wrap.className = 'ticker-wrap';
       wrap.innerHTML = `<div class="ticker" id="liveTicker"></div>`;
       header.prepend(wrap);
-
       const names = ["Zuxxy", "Ryzen", "Lemon", "Jess", "Oura", "Donkey", "R7", "Alberttt"];
       const items = ["366 Diamonds", "Weekly Diamond Pass", "Twilight Pass", "1000 CP", "Starlight Member"];
       const ticker = document.getElementById("liveTicker");
@@ -244,20 +283,27 @@ const App = {
     activeBrand: null,
     refId: null,
     nickname: null,
-    displayedGames: [], // For filtering
+    displayedGames: [],
+    activePromo: null, // Applied Promo
+    discount: 0
   },
 
   init: async () => {
+    Sound.init();
     Auth.init();
+
+    // Show Skeletons immediately
+    App.renderSkeletons();
+
     await Promise.all([App.fetchData(), App.fetchPaymentChannels()]);
 
     if (typeof World !== "undefined") World.init();
-    FX.init(); // Initialize Preloader & FX
+    FX.init();
 
     App.router("home");
     document.addEventListener("click", () => Sound.click());
 
-    // Inject Footer if not present
+    // Inject Footer
     if (!document.getElementById('mainFooter')) {
       const vp = document.getElementById("viewport");
       if (vp) {
@@ -318,8 +364,31 @@ const App = {
     }, 3000);
   },
 
+  // UPGRADE: Skeleton Logic
+  renderSkeletons: () => {
+    const container = document.getElementById("viewport");
+    if (!container) return;
+    let html = `
+        <div class="hero-slider" id="home-slider" style="background:#000;">
+            <div class="skeleton" style="width:100%; height:100%;"></div>
+        </div>
+        <div class="container">
+            <h2 class="section-title">TRENDING GAMES</h2>
+            <div class="grid-games">`;
+
+    for (let i = 0; i < 8; i++) {
+      html += `
+         <div class="game-card" style="border:none;">
+            <div class="skeleton" style="width:100%; height:100%;"></div>
+         </div>`;
+    }
+    html += `</div></div>`;
+    container.innerHTML = html;
+  },
+
   fetchData: async () => {
     try {
+      // Reduced simulated delay for skeletons to be visible but snappy
       const res = await fetch(`${API_URL}/init-data`);
       const data = await res.json();
       App.state.rawProducts = data.products || [];
@@ -365,6 +434,11 @@ const App = {
     if (!vp) return;
     window.scrollTo(0, 0);
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+
+    // Reset Promo State on Navigation
+    App.state.activePromo = null;
+    App.state.discount = 0;
+
     if (page === "home") App.renderHome(vp);
     else if (page === "order") App.renderOrderPage(vp, param);
     else if (page === "history") App.renderHistory(vp);
@@ -413,12 +487,16 @@ const App = {
     if (App.sliderInterval) clearInterval(App.sliderInterval);
     App.state.displayedGames = [...App.state.gamesList];
 
+    // If still loading (empty list but request sent), show skeletons
+    if (App.state.gamesList.length === 0 && App.state.rawProducts.length === 0) {
+      return App.renderSkeletons();
+    }
+
     let html = `
             <div class="hero-slider" id="home-slider"></div>
             <div class="container">
                 <h2 class="section-title" onmouseover="FX.scrambleText(this)">TRENDING GAMES</h2>
                 
-                <!-- SEARCH BAR -->
                 <div class="search-wrapper">
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" class="input-holo" placeholder="Search Games..." oninput="App.filterGames(this.value)">
@@ -427,10 +505,9 @@ const App = {
                 <div class="grid-games" id="games-grid-container">`;
 
     if (App.state.gamesList.length === 0) {
-      html += `<div class="text-center text-muted" style="grid-column: 1/-1; padding: 50px;">LOADING GAMES...</div>`;
+      html += `<div class="text-center text-muted" style="grid-column: 1/-1; padding: 50px;">NO GAMES FOUND</div>`;
     } else {
       App.state.gamesList.forEach((g, index) => {
-        // UPGRADE: Rank Badges
         let badge = "";
         if (index === 0) badge = `<div class="rank-badge rank-1" data-rank="1"></div>`;
         if (index === 1) badge = `<div class="rank-badge rank-2" data-rank="2"></div>`;
@@ -453,7 +530,6 @@ const App = {
     App.startSlider();
   },
 
-  // ... rest of functions (renderHistory, etc) remain same, just overwritten for safety
   renderHistory: async (container) => {
     if (!Auth.user) {
       container.innerHTML = `<div class="container text-center" style="padding-top:100px;">
@@ -593,7 +669,6 @@ const App = {
             </div>`;
   },
 
-  // Re-include this helper
   renderItemCard: (p, type = "diamond") => {
     let cardClass = "item-card";
     if (type === "hot") cardClass += " card-hot";
@@ -623,7 +698,7 @@ const App = {
         </div>`;
   },
 
-  checkNickname: async () => { /* ... same as before ... */
+  checkNickname: async () => {
     const uid = document.getElementById("uid").value;
     const zoneInput = document.getElementById("zone");
     const zone = zoneInput ? zoneInput.value : "";
@@ -663,7 +738,6 @@ const App = {
       const imgUrl = sliders[idx];
       const div = document.createElement("div");
       div.className = "slide active";
-      // UPGRADE: GLITCH HERO TEXT
       div.innerHTML = `
                 <div class="slide-bg" style="background-image: url('${imgUrl}'), url('${DEFAULT_ASSETS.banner}')"></div>
                 <div class="slide-content">
@@ -685,35 +759,74 @@ const App = {
   },
 };
 
-// ... Terminal & World remain unchanged ...
-// --- LOGIC TRANSAKSI ---
+// --- LOGIC TRANSAKSI (UPDATED WITH PROMO) ---
 const Terminal = {
   openPaymentSelect: () => {
     const { selectedItem, paymentChannels, transactionType } = App.state;
     if (transactionType === "GAME") { const uid = document.getElementById("uid").value; if (!uid) return App.showToast("Fill User ID First!", "error"); }
     if (!selectedItem) return App.showToast("Select Item First!", "error");
+
     const listDiv = document.getElementById("paymentList");
     listDiv.innerHTML = "";
+
+    // START PROMO HTML
+    let promoHTML = `
+      <div class="promo-box">
+          <label style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:5px;">Have a Promo Code?</label>
+          <div class="promo-input-group">
+            <input type="text" id="promoInput" class="promo-input" placeholder="CODE">
+            <button class="btn-apply" onclick="Terminal.applyPromo()">APPLY</button>
+          </div>
+          <div id="promoMsg" style="font-size:0.8rem; margin-top:5px; min-height:15px;"></div>
+      </div>`;
+    listDiv.innerHTML += promoHTML;
+    // END PROMO HTML
+
     if (!paymentChannels || paymentChannels.length === 0) {
-      listDiv.innerHTML = `<div class="text-pink text-center p-3">No payment channels available</div>`;
+      listDiv.innerHTML += `<div class="text-pink text-center p-3">No payment channels available</div>`;
     } else {
       paymentChannels.forEach((ch) => {
         if (transactionType === "COIN" && ch.code === "HAWAI_COIN") return;
+
+        // Price Calculation with Discount
         let fee = ch.total_fee?.flat || 0;
-        let total = selectedItem.price + fee;
+        let basePrice = selectedItem.price;
+        let finalPrice = basePrice + fee;
+
+        let priceDisplay = `Total: Rp ${finalPrice.toLocaleString()}`;
+
+        if (App.state.activePromo) {
+          let discountValue = 0;
+          if (App.state.activePromo.type === 'percent') {
+            discountValue = basePrice * App.state.activePromo.value;
+          } else {
+            discountValue = App.state.activePromo.value;
+          }
+          App.state.discount = discountValue; // store for transaction
+
+          let discountedTotal = finalPrice - discountValue;
+          if (discountedTotal < 0) discountedTotal = 0;
+
+          priceDisplay = `Total: <span class="price-strike">Rp ${finalPrice.toLocaleString()}</span> <span class="price-final">Rp ${discountedTotal.toLocaleString()}</span>`;
+          finalPrice = discountedTotal; // for balance check
+        } else {
+          App.state.discount = 0;
+        }
+
         let balanceCheck = "";
         if (ch.code === "HAWAI_COIN") {
           const userBal = Auth.user ? Auth.user.hawai_coins : 0;
           if (!Auth.user) balanceCheck = `<small class="text-pink">Login Required</small>`;
-          else if (userBal < total) balanceCheck = `<small class="text-pink">Insufficient Balance</small>`;
+          else if (userBal < finalPrice) balanceCheck = `<small class="text-pink">Insufficient Balance</small>`;
           else balanceCheck = `<small class="text-neon">Balance Available</small>`;
         }
+
         listDiv.innerHTML += `
             <div class="pay-item" onclick="Terminal.processTransaction('${ch.code}')">
                 <img src="${ch.icon_url}" class="pay-logo">
                 <div style="flex:1;">
                     <div style="font-weight:bold;">${ch.name}</div>
-                    <div class="text-muted" style="font-size:0.8rem;">Total: Rp ${total.toLocaleString()}</div>
+                    <div class="text-muted" style="font-size:0.8rem;">${priceDisplay}</div>
                     ${balanceCheck}
                 </div>
                 <i class="fas fa-chevron-right text-muted"></i>
@@ -722,12 +835,51 @@ const Terminal = {
     }
     document.getElementById("paymentModal").classList.add("active");
   },
+
+  applyPromo: () => {
+    const input = document.getElementById("promoInput");
+    const msg = document.getElementById("promoMsg");
+    const code = input.value.trim().toUpperCase();
+
+    if (!code) return;
+
+    const validation = Promo.validate(code);
+    if (validation.valid) {
+      // Determine if percent or flat based on value size (heuristic: < 1 is percent)
+      let type = validation.value < 1 ? 'percent' : 'flat';
+
+      App.state.activePromo = { code: code, value: validation.value, type: type };
+      msg.innerHTML = `<span class="text-neon"><i class="fas fa-check"></i> Code Applied!</span>`;
+      Sound.success();
+      input.disabled = true;
+      // Re-render to show new prices
+      Terminal.openPaymentSelect();
+    } else {
+      App.state.activePromo = null;
+      msg.innerHTML = `<span class="text-pink"><i class="fas fa-times"></i> Invalid Code</span>`;
+      Sound.play(200, "sawtooth", 0.2);
+      setTimeout(() => {
+        // Re-render to clear prices
+        Terminal.openPaymentSelect();
+      }, 1000);
+    }
+  },
+
   processTransaction: async (method) => {
-    const { selectedItem, transactionType, activeBrand } = App.state;
+    const { selectedItem, transactionType, activeBrand, discount } = App.state;
+
+    // In real app, perform server-side validation of amount!
+    let finalAmount = selectedItem.price - (discount || 0);
+    if (finalAmount < 0) finalAmount = 0;
+
     const payload = {
-      sku: selectedItem.code, amount: selectedItem.price, method: method,
+      sku: selectedItem.code,
+      amount: finalAmount, // Client side calc, risky but OK for demo
+      method: method,
       user_uid: Auth.user ? Auth.user.uid : null, user_name: Auth.user ? Auth.user.name : "Guest",
+      promo_code: App.state.activePromo ? App.state.activePromo.code : null
     };
+
     let endpoint = "/transaction";
     if (transactionType === "GAME") {
       const uid = document.getElementById("uid").value;
