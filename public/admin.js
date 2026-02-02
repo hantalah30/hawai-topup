@@ -22,11 +22,17 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("adminName").innerText =
                 user.displayName || user.email;
 
+            if (user.photoURL) {
+                const img = document.getElementById("adminProfileImg");
+                if (img) img.src = user.photoURL;
+            }
+
             // Simpan token
             idToken = await user.getIdToken();
 
             // Load Data
             loadData();
+            initDashboard();
         } else {
             // Belum login
             document.getElementById("loginOverlay").style.display = "flex";
@@ -35,6 +41,69 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
+// --- UI NAVIGATION ---
+function openTab(btn, tabId) {
+    // Nav Buttons
+    document.querySelectorAll('.nav-item-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Panes
+    document.querySelectorAll('.tab-pane-custom').forEach(p => p.classList.add('d-none'));
+    const target = document.getElementById(tabId);
+    if (target) target.classList.remove('d-none');
+}
+
+function initDashboard() {
+    // Update Stats (Simulasi)
+    setTimeout(() => {
+        const rev = document.getElementById('stat-revenue');
+        const ord = document.getElementById('stat-orders');
+        const usr = document.getElementById('stat-users');
+        const pnd = document.getElementById('stat-pending');
+
+        if (rev) rev.innerText = "Rp " + (12500000).toLocaleString();
+        if (ord) ord.innerText = "1,452";
+        if (usr) usr.innerText = "842";
+        if (pnd) pnd.innerText = "12";
+
+        renderCharts();
+    }, 500);
+}
+
+function renderCharts() {
+    const canvas = document.getElementById('revenueChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (window.myChart) window.myChart.destroy();
+
+    window.myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
+            datasets: [{
+                label: 'Revenue (IDR)',
+                data: [1200000, 1900000, 1500000, 2500000, 2200000, 3100000, 3800000],
+                borderColor: '#00f3ff',
+                backgroundColor: 'rgba(0, 243, 255, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: '#00f3ff',
+                pointRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } },
+                x: { grid: { display: false }, ticks: { color: '#64748b' } }
+            }
+        }
+    });
+}
 
 function loginWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
